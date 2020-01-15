@@ -15,7 +15,29 @@ int computeArgs( char * str, char ** argv )
     return i;
 }
 
-int convertNumber( char * str, unsigned short * val, int minVal, int maxVal, dgnasm * state )
+int checkArgs( int argc, int minArg, int maxArg, dgnasm * state )
+{
+    if ( minArg == maxArg && argc != minArg )
+    {
+        xlog( DGNASM_LOG_SYTX, state, "Incorrect number of arguments '%d', expected %d\n", argc, minArg );
+    }
+    else if ( argc < minArg )
+    {
+        xlog( DGNASM_LOG_SYTX, state, "Too few arguments %d, expected %d to %d\n", argc, minArg, maxArg );
+    }
+    else if ( argc > maxArg )
+    {
+        xlog( DGNASM_LOG_SYTX, state, "Too many arguments %d, expected %d to %d\n", argc, minArg, maxArg );
+    }
+    else
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+int convertNumber( char * str, unsigned short * val, short minVal, short maxVal, dgnasm * state )
 {
     int len = strlen(str);
 
@@ -26,12 +48,36 @@ int convertNumber( char * str, unsigned short * val, int minVal, int maxVal, dgn
         return 0;
     }
 
-    int base = 8; // Octal is default
+    // Use octal by default
+    int base = 8;
 
     char * valPos = str;
 
+    // Is this a character literal?
+    if ( str[0] == '\'' )
+    {
+        // No convert
+        base = -1;
+
+        // One character literal
+        if ( str[1] != '\0' && str[2] == '\'' )
+        {
+            *val = (short)str[1];
+        }
+        // Two character literal
+        else if ( str[1] != '\0' && str[2] != '\0' && str[3] == '\'' )
+        {
+            *val = (short)(((short)str[1]) << 8) | str[2];
+        }
+        // Invalid
+        else
+        {
+            xlog( DGNASM_LOG_SYTX, state, "Invalid character literal: >%s<\n", str );
+            return 0;
+        }
+    }
     // Check if this is a hex constant
-    if ( str[0] == '$' )
+    else if ( str[0] == '$' )
     {
         valPos++;
         base = 16;
@@ -79,26 +125,28 @@ int convertNumber( char * str, unsigned short * val, int minVal, int maxVal, dgn
         base = 10;
     }
 
-    char * end;
-    short temp = (short)strtol( valPos, &end, base );
+    char * end = '\0';
+
+    if ( base >= 0 )
+    {
+        *val = (unsigned short)strtol( valPos, &end, base );
+    }
 
     if ( *end != '\0' )
     {
         xlog( DGNASM_LOG_SYTX, state, "Invalid character '%c' in number literal '%s'\n", *end, str );
         return 0;
     }
-    else if ( temp < minVal )
+    else if ( *val < (unsigned short)minVal )
     {
         xlog( DGNASM_LOG_SYTX, state, "Number literal '%s' excedes minimum value of %d\n", str, minVal );
         return 0;
     }
-    else if ( temp > maxVal )
+    else if ( *val > (unsigned short)maxVal )
     {
         xlog( DGNASM_LOG_SYTX, state, "Number literal '%s' excedes maximum value of %d\n", str, maxVal );
         return 0;
     }
-
-    *val = (unsigned short)temp;
 
     return 1;
 }

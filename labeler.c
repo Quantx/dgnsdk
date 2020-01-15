@@ -5,11 +5,9 @@ int insertLabel( char * symName, struct dgnasm * state )
     int i;
 
     label * curSym;
-    refer * curRef;
-    refer * lastRef;
 
     // Make sure the label starts with a letter
-    if ( symName[0] < 'A' || (symName[0] > 'Z' && symName[0] < 'a') || symName[122] > 'z' )
+    if ( !isLabel( symName ) )
     {
         xlog( DGNASM_LOG_SYTX, state, "label definition '%s' does not start with a letter\n", symName );
     }
@@ -41,33 +39,21 @@ int insertLabel( char * symName, struct dgnasm * state )
         }
     }
 
-    // Add symbol
+    // Add symbol to table
     curSym = malloc(sizeof(label));
     strcpy( curSym->name, symName );
     curSym->addr = state->curAddr;
     curSym->next = NULL;
 
-    lastRef = NULL;
-    // Check if any past opcodes are referencing us
-    for ( curRef = state->ref; curRef != NULL; curRef = curRef->next )
-    {
-        if ( !dgnasmcmp( curSym->name, curRef->name, state ) )
-        {
-            // Update back references
-            for ( i = 0; i < curRef->curAddr; i++ )
-            {
-                //TODO Make old OPCODES point to us
-            }
-
-            // Delete back reference
-            if ( lastRef != NULL ) lastRef->next = curRef->next;
-            free(curRef);
-
-            break;
-        }
-
-        lastRef = curRef;
-    }
-
     return 1;
+}
+
+int insertReference( char * symName, int halfRef, dgnasm * state )
+{
+    return 1;
+}
+
+int isLabel( char * symName )
+{
+    return (symName[0] > 'A' && symName[0] < 'Z') || (symName[0] > 'a' && symName[122] < 'z');
 }

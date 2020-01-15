@@ -26,8 +26,6 @@
 
 // Maximum characters in a label
 #define MAX_LABEL_SIZE 16
-// Maximum number of back references per label
-#define MAX_BACK_REFERENCES 256
 
 // Maximum number of arguments per opcode
 #define MAX_ARGS 5
@@ -52,14 +50,6 @@ typedef struct label
     struct label * next;
 } label;
 
-typedef struct refer
-{
-    char name[MAX_LABEL_SIZE + 1];
-    unsigned short addrs[MAX_BACK_REFERENCES];
-    int curAddr;
-    struct refer * next;
-} refer;
-
 typedef struct instr
 {
     char * name;
@@ -81,9 +71,6 @@ typedef struct dgnasm
 
     // Store all symbols
     label * sym;
-
-    // How many opcodes need symbols?
-    refer * ref;
 
     // Buildspace
     unsigned short memory[MAX_MEM_SIZE];
@@ -110,13 +97,14 @@ char * skipWhite( char * str );
 int computeArgs( char * str, char ** argv );
 int dgnasmcmp( const char * str1, const char * str2, dgnasm * state );
 int dgnasmncmp( const char * str1, const char * str2, int len, dgnasm * state );
-int convertNumber( char * str, unsigned short * val, int minVal, int maxVal, dgnasm * state );
+int convertNumber( char * str, unsigned short * val, short minVal, short maxVal, dgnasm * state );
 void xlog( int level, dgnasm * state, const char * format, ... );
-
+int checkArgs( int argc, int minArg, int maxArg, dgnasm * state );
 
 // Label processing functions
 int insertLabel( char * symName, dgnasm * state );
-int insertReference( char * ref, dgnasm * state );
+int insertReference( char * symName, int halfRef, dgnasm * state );
+int isLabel(char * symName);
 
 // Opcode table and lookup functions
 void initOpcodeTable();

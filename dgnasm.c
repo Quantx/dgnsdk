@@ -20,7 +20,6 @@ int main( int argc, char * argv[] )
     dgnasm state;
 
     state.sym = NULL;
-    state.ref = NULL;
 
     memset(state.memory, 0, MAX_MEM_SIZE);
 
@@ -154,8 +153,6 @@ int assembleFile( char * srcPath, dgnasm * state )
     int labelHere; // Does this line have a label on it?
 
     label * curSym;
-    refer * curRef;
-    refer * lastRef;
     instr * curIns;
 
     // Store arguments
@@ -167,9 +164,11 @@ int assembleFile( char * srcPath, dgnasm * state )
     char * ipos = NULL; // Instruction position
     char * apos = NULL; // Argument position
 
+    xlog( DGNASM_LOG_DBUG, state, "Starting labeling pass\n" );
+
+    // Labeling pass
     while ( fgets( line, MAX_LINE_LENGTH + 1, srcFile ) != NULL )
     {
-        // Increment current line number
         state->curLine++;
 
         // Terminate on comments or newlines
@@ -218,9 +217,6 @@ int assembleFile( char * srcPath, dgnasm * state )
             apos = skipWhite(ipos + i + 1);
         }
 
-        // Look up opcode
-        curIns = getOpcode( ipos, state );
-
         // Compute arguments
         argc = computeArgs( apos, argv );
         if ( argc >= MAX_ARGS )
@@ -242,9 +238,8 @@ int assembleFile( char * srcPath, dgnasm * state )
             }
 
             // Check number of arguments
-            if ( argc != 1 )
+            if ( !checkArgs( argc, 1, 1, state ) )
             {
-                xlog( DGNASM_LOG_SYTX, state, "Incorrect number of arguments '%d', expected 1\n", argc );
                 fclose( srcFile );
                 return 0;
             }
@@ -267,10 +262,74 @@ int assembleFile( char * srcPath, dgnasm * state )
                 xlog( DGNASM_LOG_DBUG, state, "Moved start address of program to [%o]\n", newAddr );
                 state->startAddr = newAddr;
             }
-            else
-            {
-                xlog( DGNASM_LOG_DBUG, state, "Moved up %d address from [%o] to [%o]\n", newAddr - state->curAddr, state->curAddr, newAddr );
-            }
+
+            // Update the current address
+            state->curAddr = newAddr;
+        }
+    }
+
+    // Reset file pointer to start
+    fseek( srcFile, 0, SEEK_SET );
+    state->curLine = 0;
+    state->curAddr = state->startAddr;
+
+    xlog( DGNASM_LOG_DBUG, state, "Starting assembly pass\n" );
+
+    // Assembly pass
+    while ( fgets( line, MAX_LINE_LENGTH + 1, srcFile ) != NULL )
+    {
+        // Increment current line number
+        state->curLine++;
+
+        // Terminate on comments or newlines
+        for ( i = 0; line[i] != '\0' && line[i] != ';' && line[i] != '\n'; i++ );
+        line[i] = '\0';
+
+        // Check if a label exists on this line
+        ipos = strchr( line, ':' );
+        if ( ipos != NULL )
+        {
+            *ipos = '\0';
+            ipos++;
+        }
+        else
+        {
+            ipos = line;
+        }
+
+        // Get start of the opcode
+        ipos = skipWhite( ipos );
+
+        // Terminate end of opcode
+        for ( i = 0; ipos[i] != '\0' && ipos[i] != ' ' && ipos[i] != '\t'; i++ );
+        if ( ipos[i] != '\0' )
+        {
+            ipos[i] = '\0';
+            // Setup argument pointer
+            apos = skipWhite(ipos + i + 1);
+        }
+
+        // Look up opcode
+        curIns = getOpcode( ipos, state );
+
+        // Compute arguments
+        argc = computeArgs( apos, argv );
+        if ( argc >= MAX_ARGS )
+        {
+            xlog( DGNASM_LOG_SYTX, state, "Exceded the maximum of %d arguments\n", MAX_ARGS );
+            fclose( srcFile );
+            return 0;
+        }
+
+        // Check for LOC assembler directives
+        if ( !dgnasmcmp( ipos, ".LOC", state )
+          || !dgnasmcmp( ipos, ".ORG", state ) )
+        {
+            // Get new address to start compilation from
+            unsigned short newAddr;
+            if ( !convertNumber( argv[0], &newAddr, 0, 32767, state ) ) return 0;
+
+            xlog( DGNASM_LOG_DBUG, state, "Moved up %d address from [%o] to [%o]\n", newAddr - state->curAddr, state->curAddr, newAddr );
 
             // Update the current address
             state->curAddr = newAddr;
@@ -290,6 +349,41 @@ int assembleFile( char * srcPath, dgnasm * state )
         // Check for constant
         else
         {
+            unsigned short data = 0;
+
+            // Set indirect flag
+            if ( ipos[0] == '@' )
+            {
+                ipos++;
+                data |= 1 << 15;
+            }
+
+            // Label constant
+            if ( isLabel( ipos ) )
+            {
+                if ( insertReference( ipos, 0, state ) )
+                {
+                    fclose( srcFile );
+                    return 0;
+                }
+            }
+            // Literal constant
+            else
+            {
+                if ( data > 0 )
+                {
+                    xlog( DGNASM_LOG_WARN, state, "Indirect flag '@' set on a literal constant\n" );
+                }
+
+                unsigned short litVal;
+                if ( !convertNumber( ipos, &litVal, 0, 0xFFFF, state ) )
+                {
+                    fclose( srcFile );
+                    return 0;
+                }
+                data |= litVal;
+            }
+
             // Increment to the next address
             state->curAddr++;
         }
