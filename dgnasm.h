@@ -47,6 +47,7 @@ typedef struct label
 {
     char name[MAX_LABEL_SIZE + 1];
     unsigned short addr;
+    int refCount;
     struct label * next;
 } label;
 
@@ -89,7 +90,6 @@ typedef struct dgnasm
 
 // Primary assembly routine
 int assembleFile( char * scrPath, dgnasm * state );
-int generateListing( dgnasm * state );
 int decodeOption( char * arg, dgnasm * state );
 
 // Utility functions
@@ -109,6 +109,9 @@ int isLabel(char * symName);
 // Opcode table and lookup functions
 void initOpcodeTable();
 instr * getOpcode( char * mnem, dgnasm * state );
+
+// Assembler directive functions
+int processDirective( char * direct, int argc, char ** args, int labelHere, dgnasm * state );
 
 // Instruction generation functions
 int buildInstruction( instr * curIns, char * fpos, int argc, char ** args, dgnasm * state );

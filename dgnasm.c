@@ -115,28 +115,32 @@ int main( int argc, char * argv[] )
     initOpcodeTable();
 
     // Assemble the input file
-    assembleFile( inPath, &state );
+    int finalResult = assembleFile( inPath, &state );
+    if ( finalResult )
+    {
+        // Final output
+        void * progStart = state.memory + state.startAddr;
+        int progLen = state.curAddr - state.startAddr;
 
-    // Final output
-    void * progStart = state.memory + state.startAddr;
-    int progLen = state.curAddr - state.startAddr;
-
-    fwrite( progStart, sizeof(short), progLen, state.outFile );
-
-    //generateListing( &state );
+        fwrite( progStart, sizeof(short), progLen, state.outFile );
+    }
+    else
+    {
+        printf( "*** Assembly failed ***\n" );
+    }
 
     // Close files
     fclose( state.listFile );
     fclose( state.outFile );
 
-    return 0;
+    return !finalResult;
 }
 
 int assembleFile( char * srcPath, dgnasm * state )
 {
     // Store debug info regarding the current file
     state->curFile = srcPath;
-    state->curLine = 0;
+    state->curLine = 1;
 
     // Open the source file
     FILE * srcFile = fopen( srcPath, "r" );
@@ -164,12 +168,17 @@ int assembleFile( char * srcPath, dgnasm * state )
     char * ipos = NULL; // Instruction position
     char * apos = NULL; // Argument position
 
-    xlog( DGNASM_LOG_DBUG, state, "Starting labeling pass\n" );
+    // Store a copy of current line for list file
+    char listLine[MAX_LINE_LENGTH + 1];
+
+    int doInc; // Should we increment to next address?
+
+    xlog( DGNASM_LOG_DBUG, state, "*** Starting labeling pass ***\n" );
 
     // Labeling pass
     while ( fgets( line, MAX_LINE_LENGTH + 1, srcFile ) != NULL )
     {
-        state->curLine++;
+        doInc = 0;
 
         // Terminate on comments or newlines
         for ( i = 0; line[i] != '\0' && line[i] != ';' && line[i] != '\n'; i++ );
@@ -177,7 +186,7 @@ int assembleFile( char * srcPath, dgnasm * state )
 
         // Check if a label exists on this line
         ipos = strchr( line, ':' );
-        labelHere = (ipos != NULL);
+        labelHere = ipos != NULL;
 
         if ( labelHere )
         {
@@ -216,6 +225,10 @@ int assembleFile( char * srcPath, dgnasm * state )
             // Setup argument pointer
             apos = skipWhite(ipos + i + 1);
         }
+        else
+        {
+            apos = NULL;
+        }
 
         // Compute arguments
         argc = computeArgs( apos, argv );
@@ -227,59 +240,42 @@ int assembleFile( char * srcPath, dgnasm * state )
         }
 
         // Check for LOC assembler directives
-        if ( !dgnasmcmp( ipos, ".LOC", state )
-          || !dgnasmcmp( ipos, ".ORG", state ) )
+        int dirRes = processDirective( ipos, argc, argv, labelHere, state );
+        if ( dirRes < 3 )
         {
-            if ( labelHere )
-            {
-                xlog( DGNASM_LOG_SYTX, state, "No labels before .org or .loc directives\n" );
-                fclose( srcFile );
-                return 0;
-            }
-
-            // Check number of arguments
-            if ( !checkArgs( argc, 1, 1, state ) )
+            if ( !dirRes ) // Error code
             {
                 fclose( srcFile );
                 return 0;
             }
 
-            // Get new address to start compilation from
-            unsigned short newAddr;
-            if ( !convertNumber( argv[0], &newAddr, 0, 0x7FFF, state ) ) return 0;
-
-            // Check to make sure we're not going backwards
-            if ( newAddr < state->curAddr )
-            {
-                xlog( DGNASM_LOG_SYTX, state, "New %s [%o] is behind current address [%o], must be after!\n", ipos, newAddr, state->curAddr );
-                fclose( srcFile );
-                return 0;
-            }
-
-            // Check if we're changing the start address
-            if ( state->curAddr == state->startAddr )
-            {
-                xlog( DGNASM_LOG_DBUG, state, "Moved start address of program to [%o]\n", newAddr );
-                state->startAddr = newAddr;
-            }
-
-            // Update the current address
-            state->curAddr = newAddr;
+            if ( dirRes == 1 ) doInc = 1;
         }
+        else if ( ipos[0] != '\0' )
+        {
+            doInc = 1;
+        }
+
+        // Increment current address
+        if ( doInc ) state->curAddr++;
+
+        // Increment current line
+        state->curLine++;
     }
 
     // Reset file pointer to start
     fseek( srcFile, 0, SEEK_SET );
-    state->curLine = 0;
+    state->curLine = 1;
     state->curAddr = state->startAddr;
 
-    xlog( DGNASM_LOG_DBUG, state, "Starting assembly pass\n" );
+    xlog( DGNASM_LOG_DBUG, state, "*** Starting assembly pass ***\n" );
 
     // Assembly pass
     while ( fgets( line, MAX_LINE_LENGTH + 1, srcFile ) != NULL )
     {
-        // Increment current line number
-        state->curLine++;
+        doInc = 0;
+        // Make a copy for the listing
+        strcpy( listLine, line );
 
         // Terminate on comments or newlines
         for ( i = 0; line[i] != '\0' && line[i] != ';' && line[i] != '\n'; i++ );
@@ -287,6 +283,7 @@ int assembleFile( char * srcPath, dgnasm * state )
 
         // Check if a label exists on this line
         ipos = strchr( line, ':' );
+
         if ( ipos != NULL )
         {
             *ipos = '\0';
@@ -308,6 +305,10 @@ int assembleFile( char * srcPath, dgnasm * state )
             // Setup argument pointer
             apos = skipWhite(ipos + i + 1);
         }
+        else
+        {
+            apos = NULL;
+        }
 
         // Look up opcode
         curIns = getOpcode( ipos, state );
@@ -322,17 +323,19 @@ int assembleFile( char * srcPath, dgnasm * state )
         }
 
         // Check for LOC assembler directives
-        if ( !dgnasmcmp( ipos, ".LOC", state )
-          || !dgnasmcmp( ipos, ".ORG", state ) )
+        int dirRes = processDirective( ipos, argc, argv, labelHere, state );
+        if ( dirRes < 3 )
         {
-            // Get new address to start compilation from
-            unsigned short newAddr;
-            if ( !convertNumber( argv[0], &newAddr, 0, 0x7FFF, state ) ) return 0;
+            if ( !dirRes ) // Error
+            {
+                fclose( srcFile );
+                return 0;
+            }
 
-            xlog( DGNASM_LOG_DBUG, state, "Moved up %d address from [%o] to [%o]\n", newAddr - state->curAddr, state->curAddr, newAddr );
-
-            // Update the current address
-            state->curAddr = newAddr;
+            if ( dirRes == 1 )
+            {
+                doInc = 1;
+            }
         }
         // Check if this is an instruction
         else if ( curIns != NULL )
@@ -343,11 +346,10 @@ int assembleFile( char * srcPath, dgnasm * state )
             // Compute opcode
             buildInstruction( curIns, ipos, argc, argv, state );
 
-            // Increment to the next address
-            state->curAddr++;
+            doInc = 1;
         }
         // Check for constant
-        else
+        else if ( ipos[0] != '\0' )
         {
             unsigned short data = 0;
 
@@ -361,7 +363,7 @@ int assembleFile( char * srcPath, dgnasm * state )
             // Label constant
             if ( isLabel( ipos ) )
             {
-                if ( insertReference( ipos, 0, state ) )
+                if ( !insertReference( ipos, 0, state ) )
                 {
                     fclose( srcFile );
                     return 0;
@@ -381,22 +383,44 @@ int assembleFile( char * srcPath, dgnasm * state )
                     fclose( srcFile );
                     return 0;
                 }
+
                 data |= litVal;
             }
 
-            // Increment to the next address
-            state->curAddr++;
+            doInc = 1;
+            xlog( DGNASM_LOG_DBUG, state, "Alert!\n" );
         }
+
+        // Output listing
+        if ( doInc )
+        {
+             fprintf( state->listFile, "%05o: %06o %s",
+                      state->curAddr,
+                      state->memory[state->curAddr],
+                      listLine );
+
+             // Increment to the next address
+             state->curAddr++;
+        }
+        else
+        {
+             fprintf( state->listFile, "              %s", listLine );
+        }
+
+        // Increment current line
+        state->curLine++;
+    }
+
+    // Dump symbol table
+    fprintf( state->listFile, "\nSymbols:\n" );
+    for ( curSym = state->sym; curSym != NULL; curSym = curSym->next )
+    {
+        fprintf( state->listFile, "%05o: '%s', number of references: %d\n", curSym->addr, curSym->name, curSym->refCount );
     }
 
     // Don't forget to close the file
     fclose( srcFile );
     return 1;
-}
-
-int generateListing( dgnasm * state )
-{
-
 }
 
 int deocdeOption( char * arg, dgnasm * state )

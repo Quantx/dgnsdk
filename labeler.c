@@ -39,11 +39,21 @@ int insertLabel( char * symName, struct dgnasm * state )
         }
     }
 
-    // Add symbol to table
+    // Create symbol
     curSym = malloc(sizeof(label));
     strcpy( curSym->name, symName );
     curSym->addr = state->curAddr;
+    curSym->refCount = 0;
     curSym->next = NULL;
+
+    label ** firSym;
+
+    // Add symbol to table
+    for ( firSym = &(state->sym); *firSym != NULL; *firSym = (*firSym)->next );
+    *firSym = curSym;
+
+
+    xlog( DGNASM_LOG_DBUG, state, "Added label '%s' to symbol table\n", curSym->name );
 
     return 1;
 }
@@ -70,13 +80,31 @@ int insertReference( char * symName, int halfRef, dgnasm * state )
     // A single byte displacemen
     if ( halfRef )
     {
+        // Forward ref
+        if ( state->curAddr >= curSym->addr && state->curAddr - curSym->addr > 127 )
+        {
+            xlog( DGNASM_LOG_ASEM, state, "forward reference to label '%s' has a displacement of %d which excedes maximum of 127\n",
+                  symName, state->curAddr - curSym->addr );
+            return 0;
+        }
+        // Back ref
+        else if ( state->curAddr - curSym->addr < -128 )
+        {
+            xlog( DGNASM_LOG_ASEM, state, "forward reference to label '%s' has a displacement of %d which excedes minimum of -128\n",
+                  symName, state->curAddr - curSym->addr );
+            return 0;
+        }
 
+        *outAddr |= curSym->addr & 0xFF;
     }
     // A full word address
     else
     {
         *outAddr |= curSym->addr;
     }
+
+    // Increase reference count
+    curSym->refCount++;
 
     return 1;
 }

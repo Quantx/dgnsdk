@@ -2,6 +2,8 @@
 
 int computeArgs( char * str, char ** argv )
 {
+    if ( str == NULL ) return 0;
+
     int i;
     char * curArg = strtok( str, ", \t" );
 

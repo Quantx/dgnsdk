@@ -118,7 +118,7 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         // Label displacement
         if ( isLabel( dispArg ) )
         {
-            insertReference( dispArg, 1, state );
+            if ( !insertReference( dispArg, 1, state ) ) return 0;
         }
         // Literal displacement
         else
@@ -175,7 +175,7 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
     }
     else if ( curIns->type == DGNOVA_INSTR_ARL )
     {
-
+        
     }
 
     // Store instruction to memory
