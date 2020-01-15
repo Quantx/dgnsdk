@@ -1,6 +1,6 @@
 #include "dgnasm.h"
 
-void initInstructionTable()
+void initOpcodeTable()
 {
     // *** I/O Instructions *** //
 
@@ -135,16 +135,24 @@ void initInstructionTable()
     // Interrupt mask out
 
     // Interrupt acknowledge
+
+
+    // Compute length of each mnemonic
+    int i;
+    for ( i = 0; i < DGNOVA_LANG_LEN; i++ )
+    {
+        dgnlang[i].len = strlen( dgnlang[i].name );
+    }
 }
 
-instr * getInstruction( char * mnem, dgnasm * state )
+instr * getOpcode( char * mnem, dgnasm * state )
 {
     int i;
 
     // Find matching opcode
     for ( i = 0; i < DGNOVA_LANG_LEN; i++ )
     {
-        if ( !dgnasmcmp( dgnlang[i].name, mnem, state ) )
+        if ( !dgnasmncmp( mnem, dgnlang[i].name, dgnlang[i].len, state ) )
         {
             return &dgnlang[i];
         }

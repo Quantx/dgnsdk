@@ -10,15 +10,12 @@ int main( int argc, char * argv[] )
 "Syntax:\n"
 "    dgnasm [options] input_file\n"
 "    dgnasm [options] input_file output_file\n"
-"    dgnasm [options] input_file list_file out_file\n\n"
+"    dgnasm [options] input_file output_file list_file\n\n"
 "Options:\n"
 "    -c    Enable case sensitivity\n"
         , DGNASM_VERSION );
-        return 1;
+        return 0;
     }
-
-    // Generate the Nova ASM table
-    initInstructionTable();
 
     dgnasm state;
 
@@ -33,7 +30,107 @@ int main( int argc, char * argv[] )
     state.verbosity = DEFAULT_VERBOSITY;
     state.caseSense = 0;
 
-    assembleFile( argv[argc - 1], &state );
+    char inPath[MAX_FILENAME_LENGTH + 1] = "";
+    char listPath[MAX_FILENAME_LENGTH + 1] = "";
+    char outPath[MAX_FILENAME_LENGTH + 1] = "";
+
+
+    int i;
+    for ( i = 1; i < argc; i++ )
+    {
+        char * arg = argv[i];
+        if ( arg[0] == '-' )
+        {
+            //decodeOption( arg, &state );
+        }
+        else
+        {
+            if ( strlen( arg ) == MAX_FILENAME_LENGTH + 1 )
+            {
+                printf( "File Error: name %s, excedes the maximum character limit of %d\n", arg, MAX_FILENAME_LENGTH );
+                return 1;
+            }
+            else if ( inPath[0] == '\0' )
+            {
+                strcpy( inPath, arg );
+            }
+            else if ( outPath[0] == '\0' )
+            {
+                strcpy( outPath, arg );
+            }
+            else if ( listPath[0] == '\0' )
+            {
+                strcpy( listPath, arg );
+            }
+            else
+            {
+                printf( "Too many file names specified!\n" );
+                return 1;
+            }
+        }
+    }
+
+    // Make sure we got an input file
+    if ( inPath[0] == '\0' )
+    {
+        printf( "File Error: no input file specified!" );
+        return 1;
+    }
+
+    char * fext;
+    // Generate output file path if needed
+    if ( outPath[0] == '\0' )
+    {
+        strcpy( outPath, inPath );
+        fext = strrchr( outPath, '.' ) + 1;
+        strcpy( fext, "bin" );
+    }
+
+    // Generate listing file path if needed
+    if ( listPath[0] == '\0' )
+    {
+        strcpy( listPath, inPath );
+        fext = strrchr( listPath, '.' ) + 1;
+        strcpy( fext, "lst" );
+    }
+
+    // Open list file
+    state.listFile = fopen( listPath, "w" );
+
+    if ( state.listFile == NULL )
+    {
+        printf( "File Error: unable to open list file '%s'\n", listPath );
+        return 1;
+    }
+
+    // Open output file
+    state.outFile = fopen( outPath, "wb" );
+
+    if ( state.outFile == NULL )
+    {
+        printf( "File error: unable to open output file '%s'\n", outPath );
+        return 1;
+    }
+
+    // Generate the Nova ASM table
+    initOpcodeTable();
+
+    // Assemble the input file
+    assembleFile( inPath, &state );
+
+    // Final output
+    void * progStart = state.memory + state.startAddr;
+    int progLen = state.curAddr - state.startAddr;
+
+    fwrite( progStart, sizeof(short), progLen, state.outFile );
+
+    //generateListing( &state );
+
+    // Close files
+    fclose( state.listFile );
+    fclose( state.outFile );
+
+    return 0;
 }
 
 int assembleFile( char * srcPath, dgnasm * state )
@@ -48,11 +145,13 @@ int assembleFile( char * srcPath, dgnasm * state )
     // Make sure the file exists
     if ( srcFile == NULL )
     {
-        printf( "Unable to open source file '%s'", srcPath );
+        printf( "File Error: Unable to open source file '%s'", srcPath );
         return 0;
     }
 
     int i;
+
+    int labelHere; // Does this line have a label on it?
 
     label * curSym;
     refer * curRef;
@@ -75,8 +174,9 @@ int assembleFile( char * srcPath, dgnasm * state )
 
         // Check if a label exists on this line
         ipos = strchr( line, ':' );
+        labelHere = (ipos != NULL);
 
-        if ( ipos != NULL )
+        if ( labelHere )
         {
             // Replace label terminator with string terminator
             *ipos = '\0';
@@ -110,28 +210,60 @@ int assembleFile( char * srcPath, dgnasm * state )
             apos = skipWhite(ipos + i + 1);
         }
 
-        // Look up instruction
-        curIns = getInstruction( ipos, state );
+        // Look up opcode
+        curIns = getOpcode( ipos, state );
+
+        // Move to instruction pointer to flags
+        ipos += curIns->len;
+
+        // Compute arguments
+        char * argv[MAX_ARGS];
+        int argc = computeArgs( apos, argv );
+        if ( argc >= MAX_ARGS )
+        {
+            xlog( DGNASM_LOG_SYTX, state, "Exceded the maximum of %d arguments\n", MAX_ARGS );
+            fclose( srcFile );
+            return 0;
+        }
 
         // Check for LOC assembler directives
         if ( !dgnasmcmp( ipos, ".LOC", state )
           || !dgnasmcmp( ipos, ".ORG", state ) )
         {
-
+            if ( labelHere )
+            {
+                xlog( DGNASM_LOG_SYTX, state, "No labels before .org or .loc directives\n" );
+                fclose( srcFile );
+                return 0;
+            }
         }
-        // Check for opcode
+        // Check if this is an instruction
         else if ( curIns != NULL )
         {
-            
+            // Compute opcode
+            buildInstruction( curIns, ipos, argc, argv, state );
         }
         // Check for constant
         else
         {
 
         }
+
+        // Increment to the next address
+        state->curAddr++;
     }
 
     // Don't forget to close the file
     fclose( srcFile );
+    return 1;
+}
+
+int generateListing( dgnasm * state )
+{
+
+}
+
+int deocdeOption( char * arg, dgnasm * state )
+{
     return 1;
 }

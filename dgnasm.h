@@ -5,6 +5,9 @@
 
 #define DGNASM_VERSION "0.0.1"
 
+// How many characters are allowed in the filename
+#define MAX_FILENAME_LENGTH 255
+
 // Max length of a source file line
 #define MAX_LINE_LENGTH 256
 
@@ -26,15 +29,19 @@
 // Maximum number of back references per label
 #define MAX_BACK_REFERENCES 256
 
+// Maximum number of arguments per opcode
+#define MAX_ARGS 5
+
 // Number of distinct instructions
 #define DGNOVA_LANG_LEN 22
 
 // Instruction type constants
-#define DGNOVA_INSTR_IOC 0
-#define DGNOVA_INSTR_JMP 1
-#define DGNOVA_INSTR_MEM 2
-#define DGNOVA_INSTR_ARL 3
-#define DGNOVA_INSTR_CPU 5
+#define DGNOVA_INSTR_IOC 0 // I/O Instruction
+#define DGNOVA_INSTR_JMP 1 // Jump Instruction
+#define DGNOVA_INSTR_MEM 2 // Memory Instruction
+#define DGNOVA_INSTR_ARL 3 // Arithmetic / Logic Instruction
+#define DGNOVA_INSTR_CPC 5 // CPU Control Instruction
+#define DGNOVA_INSTR_CPA 6 // CPU Data Instruction
 
 typedef struct dgnasm dgnasm;
 
@@ -56,6 +63,7 @@ typedef struct refer
 typedef struct instr
 {
     char * name;
+    int len;
     unsigned short opcode;
     int type;
 } instr;
@@ -67,6 +75,9 @@ typedef struct dgnasm
     // Current file and line
     char * curFile;
     int curLine;
+
+    FILE * listFile;
+    FILE * outFile;
 
     // Store all symbols
     label * sym;
@@ -91,15 +102,25 @@ typedef struct dgnasm
 
 // Primary assembly routine
 int assembleFile( char * scrPath, dgnasm * state );
+int generateListing( dgnasm * state );
+int decodeOption( char * arg, dgnasm * state );
 
 // Utility functions
 char * skipWhite( char * str );
+int computeArgs( char * str, char ** argv );
 int dgnasmcmp( const char * str1, const char * str2, dgnasm * state );
+int dgnasmncmp( const char * str1, const char * str2, int len, dgnasm * state );
+int convertNumber( char * str, unsigned short * val, int minVal, int maxVal, dgnasm * state );
 void xlog( int level, dgnasm * state, const char * format, ... );
+
 
 // Label processing functions
 int insertLabel( char * symName, dgnasm * state );
+int insertReference( char * ref, dgnasm * state );
 
-// Instruction processing functions
-void initInstructionTable();
-struct instr * getInstruction( char * mnem, dgnasm * state );
+// Opcode table and lookup functions
+void initOpcodeTable();
+instr * getOpcode( char * mnem, dgnasm * state );
+
+// Instruction generation functions
+int buildInstruction( instr * curIns, char * fpos, int argc, char ** args, dgnasm * state );

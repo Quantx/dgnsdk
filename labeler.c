@@ -8,10 +8,16 @@ int insertLabel( char * symName, struct dgnasm * state )
     refer * curRef;
     refer * lastRef;
 
+    // Make sure the label starts with a letter
+    if ( symName[0] < 'A' || (symName[0] > 'Z' && symName[0] < 'a') || symName[122] > 'z' )
+    {
+        xlog( DGNASM_LOG_SYTX, state, "label definition '%s' does not start with a letter\n", symName );
+    }
+
     // Make sure the label is a valid length
     if ( strlen( symName ) > MAX_LABEL_SIZE )
     {
-        xlog( 2, state, "label definition '%s' excedes char limit of %d\n", symName, MAX_LABEL_SIZE );
+        xlog( DGNASM_LOG_SYTX, state, "label definition '%s' excedes char limit of %d\n", symName, MAX_LABEL_SIZE );
         return 0;
     }
 
@@ -20,7 +26,7 @@ int insertLabel( char * symName, struct dgnasm * state )
     {
         if ( symName[i] == ' ' || symName[i] == '\t' )
         {
-            xlog( 1, state, "whitespace present in label definition '%s'\n", symName );
+            xlog( DGNASM_LOG_WARN, state, "whitespace present in label definition '%s'\n", symName );
             break;
         }
     }
@@ -30,14 +36,14 @@ int insertLabel( char * symName, struct dgnasm * state )
     {
         if ( !dgnasmcmp( symName, curSym->name, state ) )
         {
-            xlog( 2, state, "duplicate label definition '%s'\n", symName );
+            xlog( DGNASM_LOG_SYTX, state, "duplicate label definition '%s'\n", symName );
             return 1;
         }
     }
 
     // Add symbol
     curSym = malloc(sizeof(label));
-    strcpy( symName, curSym->name );
+    strcpy( curSym->name, symName );
     curSym->addr = state->curAddr;
     curSym->next = NULL;
 
