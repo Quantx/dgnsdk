@@ -38,29 +38,29 @@ int main( int argc, char * argv[] )
     int i;
     for ( i = 1; i < argc; i++ )
     {
-        char * arg = argv[i];
-        if ( arg[0] == '-' )
+        char * curArg = argv[i];
+        if ( curArg[0] == '-' )
         {
             //decodeOption( arg, &state );
         }
         else
         {
-            if ( strlen( arg ) == MAX_FILENAME_LENGTH + 1 )
+            if ( strlen( curArg ) == MAX_FILENAME_LENGTH + 1 )
             {
-                printf( "File Error: name %s, excedes the maximum character limit of %d\n", arg, MAX_FILENAME_LENGTH );
+                printf( "File Error: name %s, excedes the maximum character limit of %d\n", curArg, MAX_FILENAME_LENGTH );
                 return 1;
             }
             else if ( inPath[0] == '\0' )
             {
-                strcpy( inPath, arg );
+                strcpy( inPath, curArg );
             }
             else if ( outPath[0] == '\0' )
             {
-                strcpy( outPath, arg );
+                strcpy( outPath, curArg );
             }
             else if ( listPath[0] == '\0' )
             {
-                strcpy( listPath, arg );
+                strcpy( listPath, curArg );
             }
             else
             {
@@ -158,6 +158,10 @@ int assembleFile( char * srcPath, dgnasm * state )
     refer * lastRef;
     instr * curIns;
 
+    // Store arguments
+    char * argv[MAX_ARGS];
+    int argc;
+
     // Store current line of file
     char line[MAX_LINE_LENGTH + 1];
     char * ipos = NULL; // Instruction position
@@ -197,6 +201,10 @@ int assembleFile( char * srcPath, dgnasm * state )
                 return 0;
             }
         }
+        else
+        {
+            ipos = line;
+        }
 
         // Get start of the opcode
         ipos = skipWhite( ipos );
@@ -213,12 +221,8 @@ int assembleFile( char * srcPath, dgnasm * state )
         // Look up opcode
         curIns = getOpcode( ipos, state );
 
-        // Move to instruction pointer to flags
-        ipos += curIns->len;
-
         // Compute arguments
-        char * argv[MAX_ARGS];
-        int argc = computeArgs( apos, argv );
+        argc = computeArgs( apos, argv );
         if ( argc >= MAX_ARGS )
         {
             xlog( DGNASM_LOG_SYTX, state, "Exceded the maximum of %d arguments\n", MAX_ARGS );
@@ -236,21 +240,59 @@ int assembleFile( char * srcPath, dgnasm * state )
                 fclose( srcFile );
                 return 0;
             }
+
+            // Check number of arguments
+            if ( argc != 1 )
+            {
+                xlog( DGNASM_LOG_SYTX, state, "Incorrect number of arguments '%d', expected 1\n", argc );
+                fclose( srcFile );
+                return 0;
+            }
+
+            // Get new address to start compilation from
+            unsigned short newAddr;
+            if ( !convertNumber( argv[0], &newAddr, 0, 32767, state ) ) return 0;
+
+            // Check to make sure we're not going backwards
+            if ( newAddr < state->curAddr )
+            {
+                xlog( DGNASM_LOG_SYTX, state, "New %s [%o] is behind current address [%o], must be after!\n", ipos, newAddr, state->curAddr );
+                fclose( srcFile );
+                return 0;
+            }
+
+            // Check if we're changing the start address
+            if ( state->curAddr == state->startAddr )
+            {
+                xlog( DGNASM_LOG_DBUG, state, "Moved start address of program to [%o]\n", newAddr );
+                state->startAddr = newAddr;
+            }
+            else
+            {
+                xlog( DGNASM_LOG_DBUG, state, "Moved up %d address from [%o] to [%o]\n", newAddr - state->curAddr, state->curAddr, newAddr );
+            }
+
+            // Update the current address
+            state->curAddr = newAddr;
         }
         // Check if this is an instruction
         else if ( curIns != NULL )
         {
+            // Move to instruction pointer to flags
+            ipos += curIns->len;
+
             // Compute opcode
             buildInstruction( curIns, ipos, argc, argv, state );
+
+            // Increment to the next address
+            state->curAddr++;
         }
         // Check for constant
         else
         {
-
+            // Increment to the next address
+            state->curAddr++;
         }
-
-        // Increment to the next address
-        state->curAddr++;
     }
 
     // Don't forget to close the file

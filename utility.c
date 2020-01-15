@@ -80,7 +80,7 @@ int convertNumber( char * str, unsigned short * val, int minVal, int maxVal, dgn
     }
 
     char * end;
-    int temp = strtol( valPos, &end, base );
+    short temp = (short)strtol( valPos, &end, base );
 
     if ( *end != '\0' )
     {
