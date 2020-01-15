@@ -35,7 +35,7 @@ int insertLabel( char * symName, struct dgnasm * state )
         if ( !dgnasmcmp( symName, curSym->name, state ) )
         {
             xlog( DGNASM_LOG_SYTX, state, "duplicate label definition '%s'\n", symName );
-            return 1;
+            return 0;
         }
     }
 
@@ -50,6 +50,34 @@ int insertLabel( char * symName, struct dgnasm * state )
 
 int insertReference( char * symName, int halfRef, dgnasm * state )
 {
+    label * curSym;
+
+    for ( curSym = state->sym; curSym != NULL; curSym = curSym->next )
+    {
+        if ( !dgnasmcmp( symName, curSym->name, state ) ) break;
+    }
+
+    // Make sure requested symbol exists
+    if ( curSym == NULL )
+    {
+        xlog( DGNASM_LOG_ASEM, state, "reference to a non-existant label '%s'\n", symName );
+        return 0;
+    }
+
+    // Get output location
+    unsigned short * outAddr = state->memory + state->curAddr;
+
+    // A single byte displacemen
+    if ( halfRef )
+    {
+
+    }
+    // A full word address
+    else
+    {
+        *outAddr |= curSym->addr;
+    }
+
     return 1;
 }
 

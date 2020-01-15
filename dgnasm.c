@@ -246,7 +246,7 @@ int assembleFile( char * srcPath, dgnasm * state )
 
             // Get new address to start compilation from
             unsigned short newAddr;
-            if ( !convertNumber( argv[0], &newAddr, 0, 32767, state ) ) return 0;
+            if ( !convertNumber( argv[0], &newAddr, 0, 0x7FFF, state ) ) return 0;
 
             // Check to make sure we're not going backwards
             if ( newAddr < state->curAddr )
@@ -327,7 +327,7 @@ int assembleFile( char * srcPath, dgnasm * state )
         {
             // Get new address to start compilation from
             unsigned short newAddr;
-            if ( !convertNumber( argv[0], &newAddr, 0, 32767, state ) ) return 0;
+            if ( !convertNumber( argv[0], &newAddr, 0, 0x7FFF, state ) ) return 0;
 
             xlog( DGNASM_LOG_DBUG, state, "Moved up %d address from [%o] to [%o]\n", newAddr - state->curAddr, state->curAddr, newAddr );
 
