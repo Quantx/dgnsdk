@@ -145,7 +145,7 @@ int assembleFile( char * srcPath, dgnasm * state )
     // Make sure the file exists
     if ( srcFile == NULL )
     {
-        printf( "File Error: Unable to open source file '%s'", srcPath );
+        printf( "File Error: Unable to open source file '%s'\n", srcPath );
         return 0;
     }
 

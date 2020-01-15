@@ -72,10 +72,12 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
             return 0;
         }
 
+        printf( "Opcode & Flags: %d\n", data );
+
         // Pick an accumulator
         unsigned short accum;
         if ( !convertNumber( argv[0], &accum, 0, 3, state ) ) return 0;
-        printf( "Accum: %d\n", accum );
+        printf( "Accum: %d, shift %d\n", accum, accum << 11 );
         data |= (accum << 11);
 
         // Pick a device code

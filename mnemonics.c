@@ -123,18 +123,39 @@ void initOpcodeTable()
     // *** CPU Instructions *** //
 
     // Reset all I/O devices
+    dgnlang[22].name = "IORST";
+    dgnlang[22].opcode = 0b0110010110111111;
+    dgnlang[22].type = DGNOVA_INSTR_CPC;
 
     // Halt the CPU
+    dgnlang[23].name = "HALT";
+    dgnlang[23].opcode = 0b0110011000111111;
+    dgnlang[23].type = DGNOVA_INSTR_CPC;
 
     // Read frontpannel switches
+    dgnlang[24].name = "READS";
+    dgnlang[24].opcode = 0b0110000100111111;
+    dgnlang[24].type = DGNOVA_INSTR_CPD;
 
     // Interrupt enable
+    dgnlang[25].name = "INTEN";
+    dgnlang[25].opcode = 0b0110000001111111;
+    dgnlang[25].type = DGNOVA_INSTR_CPC;
 
     // Interrupt disable
+    dgnlang[26].name = "INTDS";
+    dgnlang[26].opcode = 0b0110000010111111;
+    dgnlang[26].type = DGNOVA_INSTR_CPC;
 
     // Interrupt mask out
+    dgnlang[27].name = "MSKO";
+    dgnlang[27].opcode = 0b0110010000111111;
+    dgnlang[27].type = DGNOVA_INSTR_CPD;
 
     // Interrupt acknowledge
+    dgnlang[28].name = "INTA";
+    dgnlang[28].opcode = 0b0110001100111111;
+    dgnlang[28].type = DGNOVA_INSTR_CPD;
 
 
     // Compute length of each mnemonic

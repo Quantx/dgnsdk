@@ -33,7 +33,7 @@
 #define MAX_ARGS 5
 
 // Number of distinct instructions
-#define DGNOVA_LANG_LEN 22
+#define DGNOVA_LANG_LEN 29
 
 // Instruction type constants
 #define DGNOVA_INSTR_IOC 0 // I/O Instruction
@@ -41,7 +41,7 @@
 #define DGNOVA_INSTR_MEM 2 // Memory Instruction
 #define DGNOVA_INSTR_ARL 3 // Arithmetic / Logic Instruction
 #define DGNOVA_INSTR_CPC 5 // CPU Control Instruction
-#define DGNOVA_INSTR_CPA 6 // CPU Data Instruction
+#define DGNOVA_INSTR_CPD 6 // CPU Data Instruction
 
 typedef struct dgnasm dgnasm;
 
