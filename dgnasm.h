@@ -12,7 +12,7 @@
 #define MAX_LINE_LENGTH 256
 
 // How much should we print by default
-#define DEFAULT_VERBOSITY 4
+#define DEFAULT_VERBOSITY 3
 
 // The max memory available in the DGN
 #define MAX_MEM_SIZE 32768
@@ -60,6 +60,7 @@ typedef struct instr
 } instr;
 
 struct instr dgnlang[DGNOVA_LANG_LEN];
+const char * skipCodes[7];
 
 typedef struct dgnasm
 {
@@ -97,13 +98,13 @@ char * skipWhite( char * str );
 int computeArgs( char * str, char ** argv );
 int dgnasmcmp( const char * str1, const char * str2, dgnasm * state );
 int dgnasmncmp( const char * str1, const char * str2, int len, dgnasm * state );
-int convertNumber( char * str, unsigned short * val, short minVal, short maxVal, dgnasm * state );
+int convertNumber( char * str, unsigned short * val, int halfVal, unsigned short maxVal, dgnasm * state );
 void xlog( int level, dgnasm * state, const char * format, ... );
 int checkArgs( int argc, int minArg, int maxArg, dgnasm * state );
 
 // Label processing functions
 int insertLabel( char * symName, dgnasm * state );
-int insertReference( char * symName, int halfRef, dgnasm * state );
+int insertReference( char * symName, unsigned short * outRef, unsigned short dispAddr, dgnasm * state );
 int isLabel(char * symName);
 
 // Opcode table and lookup functions

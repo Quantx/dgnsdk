@@ -263,6 +263,11 @@ int assembleFile( char * srcPath, dgnasm * state )
         state->curLine++;
     }
 
+    // Count symbols
+    i = 0;
+    for ( curSym = state->sym; curSym != NULL; curSym = curSym->next ) i++;
+    xlog( DGNASM_LOG_DBUG, state, "Loaded %d labels into the symbol table\n", i );
+
     // Reset file pointer to start
     fseek( srcFile, 0, SEEK_SET );
     state->curLine = 1;
@@ -283,8 +288,9 @@ int assembleFile( char * srcPath, dgnasm * state )
 
         // Check if a label exists on this line
         ipos = strchr( line, ':' );
+        labelHere = ipos != NULL;
 
-        if ( ipos != NULL )
+        if ( labelHere )
         {
             *ipos = '\0';
             ipos++;
@@ -344,7 +350,11 @@ int assembleFile( char * srcPath, dgnasm * state )
             ipos += curIns->len;
 
             // Compute opcode
-            buildInstruction( curIns, ipos, argc, argv, state );
+            if ( !buildInstruction( curIns, ipos, argc, argv, state ) )
+            {
+                fclose( srcFile );
+                return 0;
+            }
 
             doInc = 1;
         }
@@ -363,7 +373,7 @@ int assembleFile( char * srcPath, dgnasm * state )
             // Label constant
             if ( isLabel( ipos ) )
             {
-                if ( !insertReference( ipos, 0, state ) )
+                if ( !insertReference( ipos, &data, 0xFFFF, state ) )
                 {
                     fclose( srcFile );
                     return 0;
@@ -387,14 +397,16 @@ int assembleFile( char * srcPath, dgnasm * state )
                 data |= litVal;
             }
 
+            // Load data into memory
+            state->memory[state->curAddr] = data;
+
             doInc = 1;
-            xlog( DGNASM_LOG_DBUG, state, "Alert!\n" );
         }
 
         // Output listing
         if ( doInc )
         {
-             fprintf( state->listFile, "%05o: %06o %s",
+             fprintf( state->listFile, "%05o: %06o | %s",
                       state->curAddr,
                       state->memory[state->curAddr],
                       listLine );
@@ -404,7 +416,7 @@ int assembleFile( char * srcPath, dgnasm * state )
         }
         else
         {
-             fprintf( state->listFile, "              %s", listLine );
+             fprintf( state->listFile, "                %s", listLine );
         }
 
         // Increment current line

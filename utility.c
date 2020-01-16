@@ -39,7 +39,7 @@ int checkArgs( int argc, int minArg, int maxArg, dgnasm * state )
     return 0;
 }
 
-int convertNumber( char * str, unsigned short * val, short minVal, short maxVal, dgnasm * state )
+int convertNumber( char * str, unsigned short * val, int halfVal, unsigned short maxVal, dgnasm * state )
 {
     int len = strlen(str);
 
@@ -134,19 +134,17 @@ int convertNumber( char * str, unsigned short * val, short minVal, short maxVal,
         *val = (unsigned short)strtol( valPos, &end, base );
     }
 
+    // We only want 1 byte, null the upper half
+    if ( halfVal ) *val &= 0xFF;
+
     if ( *end != '\0' )
     {
         xlog( DGNASM_LOG_SYTX, state, "Invalid character '%c' in number literal '%s'\n", *end, str );
         return 0;
     }
-    else if ( *val < (unsigned short)minVal )
+    else if ( *val > maxVal )
     {
-        xlog( DGNASM_LOG_SYTX, state, "Number literal '%s' excedes minimum value of %d\n", str, minVal );
-        return 0;
-    }
-    else if ( *val > (unsigned short)maxVal )
-    {
-        xlog( DGNASM_LOG_SYTX, state, "Number literal '%s' excedes maximum value of %d\n", str, maxVal );
+        xlog( DGNASM_LOG_SYTX, state, "Number literal '%s' %dd excedes maximum value of %dd\n", str, *val, maxVal );
         return 0;
     }
 
