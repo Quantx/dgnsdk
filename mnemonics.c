@@ -157,13 +157,21 @@ void initOpcodeTable()
     dgnlang[28].opcode = 0b0110001100111111;
     dgnlang[28].type = DGNOVA_INSTR_CPD;
 
-
     // Compute length of each mnemonic
     int i;
     for ( i = 0; i < DGNOVA_LANG_LEN; i++ )
     {
         dgnlang[i].len = strlen( dgnlang[i].name );
     }
+
+    // Load skip codes
+    skipCodes[0] = "SKP"; // Skip unconditionally
+    skipCodes[1] = "SZC"; // Skip if carry equal zero
+    skipCodes[2] = "SNC"; // Skip if carry not equal zero
+    skipCodes[3] = "SZR"; // Skip if result if result of operation is zero
+    skipCodes[4] = "SNR"; // Skip if result if result of operation is non zero
+    skipCodes[5] = "SEZ"; // Skip if either carry or result are zero (or both)
+    skipCodes[6] = "SBN"; // Skip if both carry and result are non zero
 }
 
 instr * getOpcode( char * mnem, dgnasm * state )
