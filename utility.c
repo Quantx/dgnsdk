@@ -5,12 +5,16 @@ int computeArgs( char * str, char ** argv )
     if ( str == NULL ) return 0;
 
     int i;
-    char * curArg = strtok( str, ", \t" );
+    char * curArg = strtok( str, "," );
 
     for ( i = 0; i < MAX_ARGS && curArg != NULL; i++ )
     {
-        argv[i] = curArg;
-        curArg = strtok( NULL, ", \t" );
+        // Remove whitespace from end
+        stripEnd( curArg );
+        // Remove whitespace from start
+        argv[i] = skipWhite( curArg );
+        // Get next arg
+        curArg = strtok( NULL, "," );
     }
 
     // Return number of args
@@ -155,6 +159,12 @@ char * skipWhite( char * str )
 {
     for ( ; *str == ' ' || *str == '\t'; str++ );
     return str;
+}
+
+void stripEnd( char * str )
+{
+    for ( ; *str != '\0'; str++ );
+    for ( str--; *str == ' ' || *str == '\t'; str-- ) *str = '\0';
 }
 
 int dgnasmcmp( const char * str1, const char * str2, dgnasm * state )

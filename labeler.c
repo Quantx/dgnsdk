@@ -156,5 +156,5 @@ int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgna
 
 int isLabel( char * symName )
 {
-    return (symName[0] > 'A' && symName[0] < 'Z') || (symName[0] > 'a' && symName[122] < 'z');
+    return (*symName > 'A' && *symName < 'Z') || (*symName > 'a' && *symName < 'z');
 }

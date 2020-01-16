@@ -176,6 +176,7 @@ int assembleFile( char * srcPath, dgnasm * state )
     xlog( DGNASM_LOG_DBUG, state, "*** Starting labeling pass ***\n" );
 
     // Labeling pass
+    state->curPass = 0;
     while ( fgets( line, MAX_LINE_LENGTH + 1, srcFile ) != NULL )
     {
         doInc = 0;
@@ -241,15 +242,15 @@ int assembleFile( char * srcPath, dgnasm * state )
 
         // Check for LOC assembler directives
         int dirRes = processDirective( ipos, argc, argv, labelHere, state );
-        if ( dirRes < 3 )
+        if ( dirRes > -2 )
         {
-            if ( !dirRes ) // Error code
+            if ( dirRes == -1 ) // Error code
             {
                 fclose( srcFile );
                 return 0;
             }
 
-            if ( dirRes == 1 ) doInc = 1;
+            doInc = dirRes;
         }
         else if ( ipos[0] != '\0' )
         {
@@ -257,7 +258,7 @@ int assembleFile( char * srcPath, dgnasm * state )
         }
 
         // Increment current address
-        if ( doInc ) state->curAddr++;
+        state->curAddr += doInc;
 
         // Increment current line
         state->curLine++;
@@ -276,6 +277,7 @@ int assembleFile( char * srcPath, dgnasm * state )
     xlog( DGNASM_LOG_DBUG, state, "*** Starting assembly pass ***\n" );
 
     // Assembly pass
+    state->curPass = 1;
     while ( fgets( line, MAX_LINE_LENGTH + 1, srcFile ) != NULL )
     {
         doInc = 0;
@@ -330,18 +332,15 @@ int assembleFile( char * srcPath, dgnasm * state )
 
         // Check for LOC assembler directives
         int dirRes = processDirective( ipos, argc, argv, labelHere, state );
-        if ( dirRes < 3 )
+        if ( dirRes > -2 )
         {
-            if ( !dirRes ) // Error
+            if ( dirRes == -1 ) // Error
             {
                 fclose( srcFile );
                 return 0;
             }
 
-            if ( dirRes == 1 )
-            {
-                doInc = 1;
-            }
+            doInc = dirRes;
         }
         // Check if this is an instruction
         else if ( curIns != NULL )
@@ -404,17 +403,27 @@ int assembleFile( char * srcPath, dgnasm * state )
         }
 
         // Output listing
-        if ( doInc )
+        for ( i = 0; i < doInc; i++ )
         {
-             fprintf( state->listFile, "%05o: %06o | %s",
-                      state->curAddr,
-                      state->memory[state->curAddr],
-                      listLine );
+            if ( i == 0 )
+            {
+                fprintf( state->listFile, "%05o: %06o | %s",
+                         state->curAddr,
+                         state->memory[state->curAddr],
+                         listLine );
+            }
+            else
+            {
+                fprintf( state->listFile, "%05o: %06o\n",
+                         state->curAddr,
+                         state->memory[state->curAddr] );
+            }
 
-             // Increment to the next address
-             state->curAddr++;
+            // Increment to the next address
+            state->curAddr++;
         }
-        else
+
+        if ( i == 0 )
         {
              fprintf( state->listFile, "                %s", listLine );
         }

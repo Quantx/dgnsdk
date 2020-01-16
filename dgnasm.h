@@ -12,7 +12,7 @@
 #define MAX_LINE_LENGTH 256
 
 // How much should we print by default
-#define DEFAULT_VERBOSITY 3
+#define DEFAULT_VERBOSITY 4
 
 // The max memory available in the DGN
 #define MAX_MEM_SIZE 32768
@@ -71,6 +71,9 @@ typedef struct dgnasm
     FILE * listFile;
     FILE * outFile;
 
+    // What pass are we on?
+    int curPass;
+
     // Store all symbols
     label * sym;
 
@@ -95,6 +98,7 @@ int decodeOption( char * arg, dgnasm * state );
 
 // Utility functions
 char * skipWhite( char * str );
+void stripEnd( char * str );
 int computeArgs( char * str, char ** argv );
 int dgnasmcmp( const char * str1, const char * str2, dgnasm * state );
 int dgnasmncmp( const char * str1, const char * str2, int len, dgnasm * state );
