@@ -71,10 +71,28 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         if ( !convertNumber( argv[1], &device, 0, 63, state ) ) return 0;
         data |= device;
     }
+    else if ( curIns->type == DGNOVA_INSTR_CPC )
+    {
+        if ( !checkArgs( argc, 0, 0, state ) ) return 0;
+
+        // Make sure no flags
+        if ( *fpos != '\0' )
+        {
+            xlog( DGNASM_LOG_SYTX, state, "No flags allowed for this instruction\n" );
+            return 0;
+        }
+    }
     else if ( curIns->type == DGNOVA_INSTR_CPD )
     {
         // Check number of arguments
         if ( !checkArgs( argc, 1, 1, state ) ) return 0;
+
+        // Make sure no flags
+        if ( *fpos != '\0' )
+        {
+            xlog( DGNASM_LOG_SYTX, state, "No flags allowed for this instruction\n" );
+            return 0;
+        }
 
         // Pick an accumulator
         unsigned short accum;
@@ -102,6 +120,21 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
 
             // Set indirect flag
             data |= (1 << 10);
+        }
+
+        int flagError = 0;
+        // Another way to set indirect bit
+        if ( fpos[0] == '@' )
+        {
+            data |= (1 << 10);
+            if ( fpos[1] != '\0' ) flagError = 1;
+        }
+        else if ( fpos[0] != '\0' ) flagError = 1;
+
+        if ( flagError )
+        {
+            xlog( DGNASM_LOG_SYTX, state, "Invalid flags '%s', valid flags: (None), @\n", fpos );
+            return 0;
         }
 
         unsigned short disp = 0;
@@ -150,6 +183,21 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
 
             // Set indirect flag
             data |= (1 << 10);
+        }
+
+        int flagError = 0;
+        // Another way to set indirect bit
+        if ( fpos[0] == '@' )
+        {
+            data |= (1 << 10);
+            if ( fpos[1] != '\0' ) flagError = 1;
+        }
+        else if ( fpos[0] != '\0' ) flagError = 1;
+
+        if ( flagError )
+        {
+            xlog( DGNASM_LOG_SYTX, state, "Invalid flags '%s', valid flags: (None), @\n", fpos );
+            return 0;
         }
 
         unsigned short disp = 0;
