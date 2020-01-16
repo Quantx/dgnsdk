@@ -104,7 +104,8 @@ int checkArgs( int argc, int minArg, int maxArg, dgnasm * state );
 
 // Label processing functions
 int insertLabel( char * symName, dgnasm * state );
-int insertReference( char * symName, unsigned short * outRef, unsigned short dispAddr, dgnasm * state );
+int insertReference( char * symName, unsigned short * outRef, dgnasm * state );
+int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgnasm * state );
 int isLabel(char * symName);
 
 // Opcode table and lookup functions

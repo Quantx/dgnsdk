@@ -86,7 +86,7 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         // Check number of arguments
         if ( !checkArgs( argc, 1, 2, state ) ) return 0;
 
-        unsigned short page = 0;
+        unsigned short page = 4;
         // Check if paging mode was set
         if ( argc == 2 )
         {
@@ -108,16 +108,13 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         // Label displacement
         if ( isLabel( argv[0] ) )
         {
-            unsigned short baseAddr = 0;
-            if      ( page == 0 ) baseAddr = 0;
-            else if ( page == 1 ) baseAddr = state->curAddr;
-            else
+            if ( page == 2 || page == 3 )
             {
                 xlog( DGNASM_LOG_SYTX, state, "cannot use page mode %d with a label\n", page );
                 return 0;
             }
 
-            if ( !insertReference( argv[0], &disp, baseAddr, state ) ) return 0;
+            if ( !insertDisplacement( argv[0], &disp, page, state ) ) return 0;
         }
         // Literal displacement
         else
@@ -137,7 +134,7 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         if ( !convertNumber( argv[0], &accum, 0, 3, state ) ) return 0;
         data |= (accum << 11);
 
-        unsigned short page = 0;
+        unsigned short page = 4;
         // Check if paging mode was set
         if ( argc == 3 )
         {
@@ -159,16 +156,13 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         // Label displacement
         if ( isLabel( argv[1] ) )
         {
-            unsigned short baseAddr = 0;
-            if      ( page == 0 ) baseAddr = 0;
-            else if ( page == 1 ) baseAddr = state->curAddr;
-            else
+            if ( page == 2 || page == 3 )
             {
                 xlog( DGNASM_LOG_SYTX, state, "cannot use page mode %d with a label\n", page );
                 return 0;
             }
 
-            if ( !insertReference( argv[1], &disp, baseAddr, state ) ) return 0;
+            if ( !insertDisplacement( argv[1], &disp, page, state ) ) return 0;
         }
         // Literal displacement
         else

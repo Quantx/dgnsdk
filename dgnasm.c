@@ -373,7 +373,7 @@ int assembleFile( char * srcPath, dgnasm * state )
             // Label constant
             if ( isLabel( ipos ) )
             {
-                if ( !insertReference( ipos, &data, 0xFFFF, state ) )
+                if ( !insertReference( ipos, &data, state ) )
                 {
                     fclose( srcFile );
                     return 0;

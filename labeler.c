@@ -57,7 +57,7 @@ int insertLabel( char * symName, struct dgnasm * state )
     return 1;
 }
 
-int insertReference( char * symName, unsigned short * outRef, unsigned short dispAddr, dgnasm * state )
+int insertReference( char * symName, unsigned short * outRef, dgnasm * state )
 {
     label * curSym;
 
@@ -73,8 +73,39 @@ int insertReference( char * symName, unsigned short * outRef, unsigned short dis
         return 0;
     }
 
+    // Output reference
+    *outRef |= curSym->addr;
+    xlog( DGNASM_LOG_DBUG, state, "added reference at [%05o] to label '%s'\n",
+          state->curAddr, curSym->name );
+
+    // Increase reference count
+    curSym->refCount++;
+
+    return 1;
+}
+
+int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgnasm * state )
+{
+    label * curSym;
+
+    for ( curSym = state->sym; curSym != NULL; curSym = curSym->next )
+    {
+        if ( !dgnasmcmp( symName, curSym->name, state ) ) break;
+    }
+
+    // Make sure requested symbol exists
+    if ( curSym == NULL )
+    {
+        xlog( DGNASM_LOG_ASEM, state, "reference to a non-existant label '%s'\n", symName );
+        return 0;
+    }
+
+    // Auto-page
+    if ( page > 3 && curSym->addr < 0xFF ) page = 0;
+    else page = 1;
+
     // Page 0 displacement
-    if ( dispAddr == 0 )
+    if ( page == 0 )
     {
         unsigned short outVal = curSym->addr;
 
@@ -86,15 +117,16 @@ int insertReference( char * symName, unsigned short * outRef, unsigned short dis
             return 0;
         }
 
+        // Output reference
         xlog( DGNASM_LOG_DBUG, state, "added a Page 0 displacement %d at [%05o] to label '%s'\n",
               outVal, state->curAddr, curSym->name );
 
-        *outRef |= outVal & 0xFF;
+        *outDisp |= outVal & 0xFF;
     }
     // PC displacement
-    else if ( dispAddr <= 0x7FFF )
+    else if ( page == 2 )
     {
-        short outVal = curSym->addr - dispAddr;
+        short outVal = curSym->addr - state->curAddr;
 
         // Forward ref
         if ( outVal > 127 )
@@ -111,19 +143,12 @@ int insertReference( char * symName, unsigned short * outRef, unsigned short dis
             return 0;
         }
 
-        *outRef |= ((unsigned short)outVal) & 0xFF;
+        // Output reference
+        *outDisp |= ((unsigned short)outVal) & 0xFF;
         xlog( DGNASM_LOG_DBUG, state, "added a PC displacement %d at [%05o] to label '%s'\n",
               outVal, state->curAddr, curSym->name );
     }
-    // A full word address
-    else
-    {
-        *outRef |= curSym->addr;
-        xlog( DGNASM_LOG_DBUG, state, "added reference at [%05o] to label '%s'\n",
-              state->curAddr, curSym->name );
-    }
 
-    // Increase reference count
     curSym->refCount++;
 
     return 1;
