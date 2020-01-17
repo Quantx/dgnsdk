@@ -13,6 +13,8 @@ int main( int argc, char * argv[] )
 "    dgnasm [options] input_file output_file list_file\n\n"
 "Options:\n"
 "    -c    Enable case sensitivity\n"
+"    -h    Format output binary for SIMH NOVA's load command\n"
+"    -ha   Format output binary for SIMH NOVA's load command with auto-start\n"
         , DGNASM_VERSION );
         return 0;
     }
@@ -25,9 +27,11 @@ int main( int argc, char * argv[] )
 
     state.startAddr = 0;
     state.curAddr = 0;
+    state.entAddr = 0;
 
     state.verbosity = DEFAULT_VERBOSITY;
     state.caseSense = 0;
+    state.simhFormat = 0;
 
     char inPath[MAX_FILENAME_LENGTH + 1] = "";
     char listPath[MAX_FILENAME_LENGTH + 1] = "";
@@ -40,7 +44,7 @@ int main( int argc, char * argv[] )
         char * curArg = argv[i];
         if ( curArg[0] == '-' )
         {
-            //decodeOption( arg, &state );
+            decodeOption( curArg + 1, &state );
         }
         else
         {
@@ -145,11 +149,45 @@ int main( int argc, char * argv[] )
                 fprintf( state.listFile, "%05o: '%s', number of references: %d\n", curSym->addr, curSym->name, curSym->refCount );
             }
 
-            // Final output
+            // Compute start and length
             void * progStart = state.memory + state.startAddr;
-            int progLen = state.curAddr - state.startAddr;
+            short progLen = state.curAddr - state.startAddr;
 
+            // Compute simh header
+            if ( state.simhFormat )
+            {
+                short simh[3];
+
+                simh[0] = -progLen;
+                simh[1] = state.startAddr;
+
+                short csum = -progLen + state.startAddr;
+
+                for ( i = state.startAddr; i < state.curAddr; i++ )
+                {
+                    csum += state.memory[i];
+                }
+
+                simh[2] = -csum;
+
+                // Output header
+                fwrite( &simh, sizeof(short), 3, state.outFile );
+            }
+
+            // Final output
             fwrite( progStart, sizeof(short), progLen, state.outFile );
+
+            // Specify simh starting address
+            if ( state.simhFormat )
+            {
+                short simh[3];
+                simh[0] = 1;
+                simh[1] = state.entAddr | ((!state.simhStart) << 15);
+                simh[2] = 0;
+
+                // Output starting address
+                fwrite( &simh, sizeof(short), 3, state.outFile );
+            }
         }
         else
         {
@@ -496,7 +534,21 @@ int assembleFile( char * srcPath, dgnasm * state )
     return 1;
 }
 
-int deocdeOption( char * arg, dgnasm * state )
+int decodeOption( char * arg, dgnasm * state )
 {
+    switch ( *arg )
+    {
+        case 'c':
+            state->caseSense = 1;
+            break;
+        case 'h':
+            state->simhFormat = 1;
+            if ( arg[1] == 'a' ) state->simhStart = 1;
+            break;
+        default:
+            printf( "dgnasm: unknown option '%c'\n", *arg );
+            return 0;
+    }
+
     return 1;
 }

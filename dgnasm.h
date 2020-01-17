@@ -82,14 +82,19 @@ typedef struct dgnasm
 
     // Starting address of the program
     unsigned short startAddr;
-
     // Current address we're working on
     unsigned short curAddr;
+    // The entry point for the program
+    unsigned short entAddr;
 
     // How much info do we tell the user
     int verbosity;
     // Should we be case sensitive?
     int caseSense;
+    // Format output for simh
+    int simhFormat;
+    // Should simh auto start the program?
+    int simhStart;
 } dgnasm;
 
 // Primary assembly routine
