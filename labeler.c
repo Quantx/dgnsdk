@@ -118,7 +118,7 @@ int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgna
         }
 
         // Output reference
-        xlog( DGNASM_LOG_DBUG, state, "added a Page 0 displacement %d at [%05o] to label '%s'\n",
+        xlog( DGNASM_LOG_DBUG, state, "added a Page 0 displacement of %d at [%05o] to label '%s'\n",
               outVal, state->curAddr, curSym->name );
 
         *outDisp |= outVal & 0xFF;
@@ -145,7 +145,7 @@ int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgna
 
         // Output reference
         *outDisp |= ((unsigned short)outVal) & 0xFF;
-        xlog( DGNASM_LOG_DBUG, state, "added a PC displacement %d at [%05o] to label '%s'\n",
+        xlog( DGNASM_LOG_DBUG, state, "added a PC displacement of %d at [%05o] to label '%s'\n",
               outVal, state->curAddr, curSym->name );
     }
 

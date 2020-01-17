@@ -114,29 +114,61 @@ int main( int argc, char * argv[] )
     // Generate the Nova ASM table
     initOpcodeTable();
 
-    // Assemble the input file
-    int finalResult = assembleFile( inPath, &state );
-    if ( finalResult )
-    {
-        // Final output
-        void * progStart = state.memory + state.startAddr;
-        int progLen = state.curAddr - state.startAddr;
+    // Label the input file
+    xlog( DGNASM_LOG_DBUG, &state, "*** Starting labeling pass ***\n" );
+    int labelResult = labelFile( inPath, &state );
+    int assembleResult = 0;
 
-        fwrite( progStart, sizeof(short), progLen, state.outFile );
+    if ( labelResult )
+    {
+        label * curSym;
+
+        // Count symbols
+        i = 0;
+        for ( curSym = state.sym; curSym != NULL; curSym = curSym->next ) i++;
+        xlog( DGNASM_LOG_DBUG, &state, "Loaded %d labels into the symbol table\n", i );
+
+
+        // Reset address
+        state.curAddr = state.startAddr;
+
+        // Assemble the input file
+        xlog( DGNASM_LOG_DBUG, &state, "*** Starting assembly pass ***\n" );
+        assembleResult = assembleFile( inPath, &state );
+
+        if ( assembleResult )
+        {
+            // Dump symbol table
+            fprintf( state.listFile, "\nSymbols:\n" );
+            for ( curSym = state.sym; curSym != NULL; curSym = curSym->next )
+            {
+                fprintf( state.listFile, "%05o: '%s', number of references: %d\n", curSym->addr, curSym->name, curSym->refCount );
+            }
+
+            // Final output
+            void * progStart = state.memory + state.startAddr;
+            int progLen = state.curAddr - state.startAddr;
+
+            fwrite( progStart, sizeof(short), progLen, state.outFile );
+        }
+        else
+        {
+            printf( "*** Assembly failed ***\n" );
+        }
     }
     else
     {
-        printf( "*** Assembly failed ***\n" );
+        printf( "*** Labeling failed ***\n" );
     }
 
     // Close files
     fclose( state.listFile );
     fclose( state.outFile );
 
-    return !finalResult;
+    return !(labelResult && assembleResult);
 }
 
-int assembleFile( char * srcPath, dgnasm * state )
+int labelFile( char * srcPath, dgnasm * state )
 {
     // Store debug info regarding the current file
     state->curFile = srcPath;
@@ -172,8 +204,6 @@ int assembleFile( char * srcPath, dgnasm * state )
     char listLine[MAX_LINE_LENGTH + 1];
 
     int doInc; // Should we increment to next address?
-
-    xlog( DGNASM_LOG_DBUG, state, "*** Starting labeling pass ***\n" );
 
     // Labeling pass
     state->curPass = 0;
@@ -242,7 +272,7 @@ int assembleFile( char * srcPath, dgnasm * state )
 
         // Check for LOC assembler directives
         int dirRes = processDirective( ipos, argc, argv, labelHere, state );
-        if ( dirRes > -2 )
+        if ( dirRes > -3 )
         {
             if ( dirRes == -1 ) // Error code
             {
@@ -250,7 +280,7 @@ int assembleFile( char * srcPath, dgnasm * state )
                 return 0;
             }
 
-            doInc = dirRes;
+            if ( dirRes > 0 ) doInc = dirRes;
         }
         else if ( ipos[0] != '\0' )
         {
@@ -264,17 +294,46 @@ int assembleFile( char * srcPath, dgnasm * state )
         state->curLine++;
     }
 
-    // Count symbols
-    i = 0;
-    for ( curSym = state->sym; curSym != NULL; curSym = curSym->next ) i++;
-    xlog( DGNASM_LOG_DBUG, state, "Loaded %d labels into the symbol table\n", i );
+    fclose( srcFile );
+    return 1;
+}
 
+int assembleFile( char * srcPath, dgnasm * state )
+{
     // Reset file pointer to start
-    fseek( srcFile, 0, SEEK_SET );
+    state->curFile = srcPath;
     state->curLine = 1;
-    state->curAddr = state->startAddr;
 
-    xlog( DGNASM_LOG_DBUG, state, "*** Starting assembly pass ***\n" );
+    // Open the source file
+    FILE * srcFile = fopen( srcPath, "r" );
+
+    // Make sure the file exists
+    if ( srcFile == NULL )
+    {
+        printf( "File Error: Unable to open source file '%s'\n", srcPath );
+        return 0;
+    }
+
+    int i;
+
+    int labelHere; // Does this line have a label on it?
+
+    label * curSym;
+    instr * curIns;
+
+    // Store arguments
+    char * argv[MAX_ARGS];
+    int argc;
+
+    // Store current line of file
+    char line[MAX_LINE_LENGTH + 1];
+    char * ipos = NULL; // Instruction position
+    char * apos = NULL; // Argument position
+
+    // Store a copy of current line for list file
+    char listLine[MAX_LINE_LENGTH + 1];
+
+    int doInc; // Should we increment to next address?
 
     // Assembly pass
     state->curPass = 1;
@@ -332,7 +391,7 @@ int assembleFile( char * srcPath, dgnasm * state )
 
         // Check for LOC assembler directives
         int dirRes = processDirective( ipos, argc, argv, labelHere, state );
-        if ( dirRes > -2 )
+        if ( dirRes > -3 )
         {
             if ( dirRes == -1 ) // Error
             {
@@ -340,7 +399,7 @@ int assembleFile( char * srcPath, dgnasm * state )
                 return 0;
             }
 
-            doInc = dirRes;
+            if ( dirRes > 0 ) doInc = dirRes;
         }
         // Check if this is an instruction
         else if ( curIns != NULL )
@@ -423,20 +482,13 @@ int assembleFile( char * srcPath, dgnasm * state )
             state->curAddr++;
         }
 
-        if ( i == 0 )
+        if ( i == 0 && dirRes != -2 ) // DirRes -2 is an .include
         {
              fprintf( state->listFile, "                %s", listLine );
         }
 
         // Increment current line
         state->curLine++;
-    }
-
-    // Dump symbol table
-    fprintf( state->listFile, "\nSymbols:\n" );
-    for ( curSym = state->sym; curSym != NULL; curSym = curSym->next )
-    {
-        fprintf( state->listFile, "%05o: '%s', number of references: %d\n", curSym->addr, curSym->name, curSym->refCount );
     }
 
     // Don't forget to close the file

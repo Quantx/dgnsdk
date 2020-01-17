@@ -60,18 +60,18 @@ int convertNumber( char * str, unsigned short * val, int halfVal, unsigned short
     char * valPos = str;
 
     // Is this a character literal?
-    if ( str[0] == '\'' )
+    if ( str[0] == '"' )
     {
         // No convert
         base = -1;
 
         // One character literal
-        if ( str[1] != '\0' && str[2] == '\'' )
+        if ( str[1] != '\0' && str[2] == '"' )
         {
             *val = (short)str[1];
         }
         // Two character literal
-        else if ( str[1] != '\0' && str[2] != '\0' && str[3] == '\'' )
+        else if ( str[1] != '\0' && str[2] != '\0' && str[3] == '"' )
         {
             *val = (short)(((short)str[1]) << 8) | str[2];
         }

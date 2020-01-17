@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#define DGNASM_VERSION "1.0.0"
+#define DGNASM_VERSION "1.0.5"
 
 // How many characters are allowed in the filename
 #define MAX_FILENAME_LENGTH 255
@@ -12,7 +12,7 @@
 #define MAX_LINE_LENGTH 256
 
 // How much should we print by default
-#define DEFAULT_VERBOSITY 4
+#define DEFAULT_VERBOSITY 3
 
 // The max memory available in the DGN
 #define MAX_MEM_SIZE 32768
@@ -27,8 +27,8 @@
 // Maximum characters in a label
 #define MAX_LABEL_SIZE 16
 
-// Maximum number of arguments per opcode
-#define MAX_ARGS 5
+// Maximum number of arguments per instruction
+#define MAX_ARGS 16
 
 // Number of distinct instructions
 #define DGNOVA_LANG_LEN 29
@@ -93,6 +93,7 @@ typedef struct dgnasm
 } dgnasm;
 
 // Primary assembly routine
+int labelFile( char * srcPath, dgnasm * state );
 int assembleFile( char * scrPath, dgnasm * state );
 int decodeOption( char * arg, dgnasm * state );
 
