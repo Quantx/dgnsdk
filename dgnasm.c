@@ -132,6 +132,10 @@ int main( int argc, char * argv[] )
         for ( curSym = state.sym; curSym != NULL; curSym = curSym->next ) i++;
         xlog( DGNASM_LOG_DBUG, &state, "Loaded %d labels into the symbol table\n", i );
 
+        // Output listing header
+        fprintf( state.listFile, "\t\t; +-----------------------+\n" );
+        fprintf( state.listFile, "\t\t; | Assembled with DGNASM |\n" );
+        fprintf( state.listFile, "\t\t; +-----------------------+\n" );
 
         // Reset address
         state.curAddr = state.startAddr;

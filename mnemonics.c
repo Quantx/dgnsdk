@@ -157,6 +157,20 @@ void initOpcodeTable()
     dgnlang[28].opcode = 0b0110001100111111;
     dgnlang[28].type = DGNOVA_INSTR_CPD;
 
+// ***************** Optional Hardware Control Instructions ****************** //
+
+    // *** Multiply/Divide Instructions *** //
+
+    // Multiply
+    dgnlang[29].name = "MUL";
+    dgnlang[29].opcode = 0b0111011011000001;
+    dgnlang[29].type = DGNOVA_INSTR_CPC;
+
+    // Divide
+    dgnlang[30].name = "DIV";
+    dgnlang[30].opcode = 0b0111011001000001;
+    dgnlang[30].type = DGNOVA_INSTR_CPC;
+
     // Compute length of each mnemonic
     int i;
     for ( i = 0; i < DGNOVA_LANG_LEN; i++ )
