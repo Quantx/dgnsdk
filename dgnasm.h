@@ -25,7 +25,7 @@
 #define DGNASM_LOG_DBUG 4
 
 // Maximum characters in a label
-#define MAX_LABEL_SIZE 16
+#define MAX_LABEL_SIZE 32
 
 // Maximum number of arguments per instruction
 #define MAX_ARGS 16
@@ -48,6 +48,7 @@ typedef struct label
     char name[MAX_LABEL_SIZE + 1];
     unsigned short addr;
     int refCount;
+    int isConst;
     struct label * next;
 } label;
 
@@ -113,9 +114,9 @@ void xlog( int level, dgnasm * state, const char * format, ... );
 int checkArgs( int argc, int minArg, int maxArg, dgnasm * state );
 
 // Label processing functions
-int insertLabel( char * symName, dgnasm * state );
+int insertLabel( char * symName, unsigned short symAddr, int isConst, dgnasm * state );
 int insertReference( char * symName, unsigned short * outRef, dgnasm * state );
-int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgnasm * state );
+int insertDisplacement( char * symName, unsigned short * outDisp, unsigned short * page, dgnasm * state );
 int isLabel(char * symName);
 
 // Opcode table and lookup functions

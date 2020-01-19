@@ -128,14 +128,19 @@ int main( int argc, char * argv[] )
         label * curSym;
 
         // Count symbols
-        i = 0;
-        for ( curSym = state.sym; curSym != NULL; curSym = curSym->next ) i++;
-        xlog( DGNASM_LOG_DBUG, &state, "Loaded %d labels into the symbol table\n", i );
+        int lblCount = 0;
+        int conCount = 0;
+        for ( curSym = state.sym; curSym != NULL; curSym = curSym->next )
+        {
+            if ( curSym->isConst ) conCount++;
+            else lblCount++;
+        }
+        xlog( DGNASM_LOG_DBUG, &state, "Loaded %d labels and %d constants into the symbol table\n", lblCount, conCount );
 
         // Output listing header
         fprintf( state.listFile, "\t\t; +-----------------------+\n" );
         fprintf( state.listFile, "\t\t; | Assembled with DGNASM |\n" );
-        fprintf( state.listFile, "\t\t; +-----------------------+\n" );
+        fprintf( state.listFile, "\t\t; +-----------------------+\n\n" );
 
         // Reset address
         state.curAddr = state.startAddr;
@@ -147,10 +152,20 @@ int main( int argc, char * argv[] )
         if ( assembleResult )
         {
             // Dump symbol table
-            fprintf( state.listFile, "\nSymbols:\n" );
+            fprintf( state.listFile, "\nLabels:\n" );
             for ( curSym = state.sym; curSym != NULL; curSym = curSym->next )
             {
-                fprintf( state.listFile, "%05o: '%s', number of references: %d\n", curSym->addr, curSym->name, curSym->refCount );
+                if ( !curSym->isConst )
+                    fprintf( state.listFile, "%05o: '%s', number of references: %d\n",
+                             curSym->addr, curSym->name, curSym->refCount );
+            }
+
+            fprintf( state.listFile, "\nConstants:\n" );
+            for ( curSym = state.sym; curSym != NULL; curSym = curSym->next )
+            {
+                if ( curSym->isConst )
+                    fprintf( state.listFile, "'%s' = %d $%04X [%06o], number of references: %d\n",
+                             curSym->name, curSym->addr, curSym->addr, curSym->addr, curSym->refCount );
             }
 
             // Compute start and length
@@ -276,7 +291,7 @@ int labelFile( char * srcPath, dgnasm * state )
             }
 
             // Insert the label into the symbol table
-            if ( !insertLabel( line, state ) )
+            if ( !insertLabel( line, state->curAddr, 0, state ) )
             {
                 fclose( srcFile );
                 return 0;

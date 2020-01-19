@@ -109,7 +109,6 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         if ( argc == 2 )
         {
             if ( !convertNumber( argv[1], &page, 0, 3, state ) ) return 0;
-            data |= (page << 8);
         }
 
         // Check for relative offset
@@ -141,13 +140,7 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         // Label displacement
         if ( isLabel( argv[0] ) )
         {
-            if ( page == 2 || page == 3 )
-            {
-                xlog( DGNASM_LOG_SYTX, state, "cannot use page mode %d with a label\n", page );
-                return 0;
-            }
-
-            if ( !insertDisplacement( argv[0], &disp, page, state ) ) return 0;
+            if ( !insertDisplacement( argv[0], &disp, &page, state ) ) return 0;
         }
         // Literal displacement
         else
@@ -155,12 +148,17 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
             if ( !convertNumber( argv[0], &disp, 1, 0xFF, state ) ) return 0;
         }
 
+        // Write paging mode
+        if ( page > 3 ) page = 0;
+        data |= (page << 8);
+
+
         data |= disp;
     }
     else if ( curIns->type == DGNOVA_INSTR_MEM )
     {
         // Check number of arguments
-        if ( !checkArgs( argc, 1, 3, state ) ) return 0;
+        if ( !checkArgs( argc, 2, 3, state ) ) return 0;
 
         // Pick an accumulator
         unsigned short accum;
@@ -172,7 +170,6 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         if ( argc == 3 )
         {
             if ( !convertNumber( argv[2], &page, 0, 3, state ) ) return 0;
-            data |= (page << 8);
         }
 
         // Check for relative offset
@@ -204,19 +201,18 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
         // Label displacement
         if ( isLabel( argv[1] ) )
         {
-            if ( page == 2 || page == 3 )
-            {
-                xlog( DGNASM_LOG_SYTX, state, "cannot use page mode %d with a label\n", page );
-                return 0;
-            }
-
-            if ( !insertDisplacement( argv[1], &disp, page, state ) ) return 0;
+            if ( !insertDisplacement( argv[1], &disp, &page, state ) ) return 0;
         }
         // Literal displacement
         else
         {
             if ( !convertNumber( argv[1], &disp, 1, 0xFF, state ) ) return 0;
         }
+
+        // Write paging mode
+        if ( page > 3 ) page = 0;
+        data |= (page << 8);
+
         data |= disp;
     }
     else if ( curIns->type == DGNOVA_INSTR_ARL )

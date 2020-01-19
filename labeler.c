@@ -1,21 +1,24 @@
 #include "dgnasm.h"
 
-int insertLabel( char * symName, struct dgnasm * state )
+int insertLabel( char * symName, unsigned short symAddr, int isConst, struct dgnasm * state )
 {
     int i;
+
+    char * modeName = "label";
+    if ( isConst ) modeName = "constant";
 
     label * curSym;
 
     // Make sure the label starts with a letter
     if ( !isLabel( symName ) )
     {
-        xlog( DGNASM_LOG_SYTX, state, "label definition '%s' does not start with a letter\n", symName );
+        xlog( DGNASM_LOG_SYTX, state, "%s definition '%s' does not start with a letter\n", modeName, symName );
     }
 
     // Make sure the label is a valid length
     if ( strlen( symName ) > MAX_LABEL_SIZE )
     {
-        xlog( DGNASM_LOG_SYTX, state, "label definition '%s' excedes char limit of %d\n", symName, MAX_LABEL_SIZE );
+        xlog( DGNASM_LOG_SYTX, state, "%s definition '%s' excedes char limit of %d\n", modeName, symName, MAX_LABEL_SIZE );
         return 0;
     }
 
@@ -24,7 +27,7 @@ int insertLabel( char * symName, struct dgnasm * state )
     {
         if ( symName[i] == ' ' || symName[i] == '\t' )
         {
-            xlog( DGNASM_LOG_WARN, state, "whitespace present in label definition '%s'\n", symName );
+            xlog( DGNASM_LOG_WARN, state, "whitespace present in %s definition '%s'\n", modeName, symName );
             break;
         }
     }
@@ -34,7 +37,7 @@ int insertLabel( char * symName, struct dgnasm * state )
     {
         if ( !dgnasmcmp( symName, curSym->name, state ) )
         {
-            xlog( DGNASM_LOG_SYTX, state, "duplicate label definition '%s'\n", symName );
+            xlog( DGNASM_LOG_SYTX, state, "duplicate symbol definition '%s'\n", symName );
             return 0;
         }
     }
@@ -42,8 +45,9 @@ int insertLabel( char * symName, struct dgnasm * state )
     // Create symbol
     curSym = malloc(sizeof(label));
     strcpy( curSym->name, symName );
-    curSym->addr = state->curAddr;
+    curSym->addr = symAddr;
     curSym->refCount = 0;
+    curSym->isConst = isConst;
     curSym->next = NULL;
 
     // Add symbol to table
@@ -52,7 +56,7 @@ int insertLabel( char * symName, struct dgnasm * state )
     *firSym = curSym;
 
 
-    xlog( DGNASM_LOG_DBUG, state, "Added label '%s' at [%05o] to symbol table\n", curSym->name, curSym->addr );
+    xlog( DGNASM_LOG_DBUG, state, "Added %s '%s' at [%05o] to symbol table\n", modeName, curSym->name, symAddr );
 
     return 1;
 }
@@ -84,7 +88,7 @@ int insertReference( char * symName, unsigned short * outRef, dgnasm * state )
     return 1;
 }
 
-int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgnasm * state )
+int insertDisplacement( char * symName, unsigned short * outDisp, unsigned short * page, dgnasm * state )
 {
     label * curSym;
 
@@ -101,11 +105,13 @@ int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgna
     }
 
     // Auto-page
-    if ( page > 3 && curSym->addr < 0xFF ) page = 0;
-    else page = 1;
+    if ( *page > 3 )
+    {
+        *page = curSym->addr > 0xFF;
+    }
 
     // Page 0 displacement
-    if ( page == 0 )
+    if ( *page == 0 )
     {
         unsigned short outVal = curSym->addr;
 
@@ -124,7 +130,7 @@ int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgna
         *outDisp |= outVal & 0xFF;
     }
     // PC displacement
-    else if ( page == 2 )
+    else if ( *page == 1 )
     {
         short outVal = curSym->addr - state->curAddr;
 
@@ -147,6 +153,11 @@ int insertDisplacement( char * symName, unsigned short * outDisp, int page, dgna
         *outDisp |= ((unsigned short)outVal) & 0xFF;
         xlog( DGNASM_LOG_DBUG, state, "added a PC displacement of %d at [%05o] to label '%s'\n",
               outVal, state->curAddr, curSym->name );
+    }
+    else
+    {
+        xlog( DGNASM_LOG_SYTX, state, "cannot use page mode %d with a label\n", *page );
+        return 0;
     }
 
     curSym->refCount++;
