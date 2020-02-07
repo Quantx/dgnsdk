@@ -168,44 +168,15 @@ int main( int argc, char * argv[] )
                              curSym->name, curSym->addr, curSym->addr, curSym->addr, curSym->refCount );
             }
 
-            // Compute start and length
-            void * progStart = state.memory + state.startAddr;
-            short progLen = state.curAddr - state.startAddr;
-
             // Compute simh header
             if ( state.simhFormat )
             {
-                short simh[3];
-
-                simh[0] = -progLen;
-                simh[1] = state.startAddr;
-
-                short csum = -progLen + state.startAddr;
-
-                for ( i = state.startAddr; i < state.curAddr; i++ )
-                {
-                    csum += state.memory[i];
-                }
-
-                simh[2] = -csum;
-
-                // Output header
-                fwrite( &simh, sizeof(short), 3, state.outFile );
+                formatSimh( &state );
             }
-
-            // Final output
-            fwrite( progStart, sizeof(short), progLen, state.outFile );
-
-            // Specify simh starting address
-            if ( state.simhFormat )
+            else
             {
-                short simh[3];
-                simh[0] = 1;
-                simh[1] = state.entAddr | ((!state.simhStart) << 15);
-                simh[2] = 0;
-
-                // Output starting address
-                fwrite( &simh, sizeof(short), 3, state.outFile );
+                // Final output
+                fwrite( state.memory + state.startAddr, sizeof(short), state.curAddr - state.startAddr, state.outFile );
             }
         }
         else

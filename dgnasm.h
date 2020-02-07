@@ -12,7 +12,7 @@
 #define MAX_LINE_LENGTH 256
 
 // How much should we print by default
-#define DEFAULT_VERBOSITY 3
+#define DEFAULT_VERBOSITY 5
 
 // The max memory available in the DGN
 #define MAX_MEM_SIZE 32768
@@ -40,8 +40,6 @@
 #define DGNOVA_INSTR_ARL 3 // Arithmetic / Logic Instruction
 #define DGNOVA_INSTR_CPC 5 // CPU Control Instruction
 #define DGNOVA_INSTR_CPD 6 // CPU Data Instruction
-
-typedef struct dgnasm dgnasm;
 
 typedef struct label
 {
@@ -102,6 +100,9 @@ typedef struct dgnasm
 int labelFile( char * srcPath, dgnasm * state );
 int assembleFile( char * scrPath, dgnasm * state );
 int decodeOption( char * arg, dgnasm * state );
+
+// Simh format routine
+int formatSimh( dgnasm * state );
 
 // Utility functions
 char * skipWhite( char * str );
