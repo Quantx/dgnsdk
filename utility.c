@@ -60,18 +60,20 @@ int convertNumber( char * str, unsigned short * val, int halfVal, unsigned short
     char * valPos = str;
 
     // Is this a character literal?
-    if ( str[0] == '"' )
+    if ( str[0] == '"' || str[0] == '\'' )
     {
+        char delim = str[0];
+
         // No convert
         base = -1;
 
         // One character literal
-        if ( str[1] != '\0' && str[2] == '"' )
+        if ( str[1] && str[2] == delim )
         {
             *val = (short)str[1];
         }
         // Two character literal
-        else if ( str[1] != '\0' && str[2] != '\0' && str[3] == '"' )
+        else if ( str[1] && str[2] && str[3] == delim )
         {
             *val = (short)(((short)str[1]) << 8) | str[2];
         }
@@ -131,7 +133,7 @@ int convertNumber( char * str, unsigned short * val, int halfVal, unsigned short
         base = 10;
     }
 
-    char * end = '\0';
+    char * end = NULL;
 
     if ( base >= 0 )
     {
@@ -141,7 +143,7 @@ int convertNumber( char * str, unsigned short * val, int halfVal, unsigned short
     // We only want 1 byte, null the upper half
     if ( halfVal ) *val &= 0xFF;
 
-    if ( *end != '\0' )
+    if ( end != NULL && *end != '\0' )
     {
         xlog( DGNASM_LOG_SYTX, state, "Invalid character '%c' in number literal '%s'\n", *end, str );
         return 0;

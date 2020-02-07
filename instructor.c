@@ -37,8 +37,8 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
                 return 0;
             }
 
-            if ( flagDone ) control |= 1 << 8;
-            if ( flagBusy ) control |= 1 << 7;
+            if ( flagDone ) control |= 1 << 7;
+            if ( flagBusy ) control |= 1 << 6;
         }
         else
         {
@@ -54,6 +54,8 @@ int buildInstruction( instr * curIns, char * fpos, int argc, char ** argv, dgnas
                 xlog( DGNASM_LOG_SYTX, state, "Invalid flags '%s', valid flags: (None) S, C, P\n", fpos );
                 return 0;
             }
+
+            control <<= 6;
         }
         // Set control bits
         data |= control;
