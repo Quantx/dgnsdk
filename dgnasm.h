@@ -1,6 +1,3 @@
-#include <stdlib.h>
-#include <unistd.h>
-
 // Pretend this is a 16-bit system
 #define int short
 #define long int
@@ -10,44 +7,36 @@
 #define MAX_LINE 256
 #define MAX_TOKN 8
 
-//   #######   Symbol Types   #######
-// *** Instruction parameter formats ***
-#define SYM_IONO 128 // I/O No accumulator
-#define SYM_IO   129 // I/O
-#define SYM_IOSK 130 // I/O Skip
-#define SYM_FLOW 131 // Flow control
-#define SYM_LOAD 132 // Memory access
-#define SYM_MATH 133 // Arithmetic, Logic
-// *** Extened Instruction parameter formats ***
-#define SYM_TRAP 134 // Arithmetic no-op (No load, no skip)
-#define SYM_CT   135 // Control, no accumulator or flags
-#define SYM_CTA  136 // Control, acumulator
-#define SYM_CTF  137 // Control, flag
-#define SYM_CTAF 138 // Control, acumulator and flag
-#define SYM_CTAA 139 // Control, two accumulators
-// *** Assembler constants ***
-#define SYM_SKPC 140 // Arithmetic & Logic skip condition
-#define SYM_HWID 141 // Nova Hardware ID
-// *** User symbols ***
-#define SYM_DEF  142 // Pre-processor define
-#define SYM_TXT  143 // Text pointer
-#define SYM_DAT  144 // Data pointer
-#define SYM_BSS  145 // Bss  pointer
-#define SYM_GTXT 146 // Global text pointer
-#define SYM_GDAT 147 // Global data pointer
-#define SYM_GBSS 148 // Global bss  pointer
-// *** Other tokens ***
-#define TOK_NAME 149 // Named symbol
-#define TOK_NUM  150 // Numberical constant
-#define TOK_SEP  151 // Seperator token (comma)
-#define TOK_ADD  152 // Addition
-#define TOK_SUB  153 // Subtraction
-#define TOK_MUL  154 // Multiply
-#define TOK_DIV  155 // Divide
-#define TOK_MOD  156 // Modulous
-
-// *** Symbol flags ***
-#define SYM_EXST 0x8000 // Flag set when symbol is defined
+// *** Instruction Parameter Formats ***
+#define TOK_IONO 128 // I/O No accumulator
+#define TOK_IO   129 // I/O
+#define TOK_IOSK 130 // I/O Skip
+#define TOK_FLOW 131 // Flow control
+#define TOK_LOAD 132 // Memory access
+#define TOK_MATH 133 // Arithmetic, Logic
+// *** Extened Instruction Parameter Formats ***
+#define TOK_TRAP 134 // Arithmetic no-op (No load, no skip)
+#define TOK_CT   135 // Control, no accumulator or flags
+#define TOK_CTA  136 // Control, acumulator
+#define TOK_CTF  137 // Control, flag
+#define TOK_CTAF 138 // Control, acumulator and flag
+#define TOK_CTAA 139 // Control, two accumulators
+// *** Assembler Constants ***
+#define TOK_SKPC 140 // Arithmetic & Logic skip condition
+#define TOK_HWID 141 // Nova Hardware ID
+// *** User Constants ***
+#define TOK_NAME 142 // Named symbol (user label)
+#define TOK_NUM  143 // Numberical constant
+// *** User Symbols ***
+#define SYM_CNST 144 // Pre-processor define constant
+#define SYM_DEF  145 // Undefined symbol
+#define SYM_TXT  146 // Text pointer
+#define SYM_DAT  147 // Data pointer
+#define SYM_BSS  148 // Bss  pointer
+#define SYM_GDEF 149 // Global undefined symbol
+#define SYM_GTXT 150 // Global text pointer
+#define SYM_GDAT 151 // Global data pointer
+#define SYM_GBSS 152 // Global bss  pointer
 
 struct symbol
 {
@@ -56,3 +45,10 @@ struct symbol
     unsigned int type;
     unsigned int val; // Opcode, Address, Value, etc.
 };
+
+// Unix system calls
+void exit(int status);
+int  open(const char * pathname, int flags);
+int close(int fd);
+int  read(int fd, void * buf, unsigned int count);
+int write(int fd, void * buf, unsigned int count);

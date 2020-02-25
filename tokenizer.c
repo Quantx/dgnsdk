@@ -10,10 +10,18 @@ int readline( )
     if ( p - lp < MAX_LINE || *p ) return -1;
 
     // Read data in and scan for newline
-    while ( i < MAX_LINE - 1 && read(fd + i, lp, 1 ) && lp[i] != '\n' ) i++;
+    while ( i < MAX_LINE - 1 && read(fd, lp + i, 1 ) && lp[i] != '\n' )
+    {
+        // Termination on comments
+        if ( lp[i] == ';' ) lp[i] = 0;
+        i++;
+    }
 
     // Buffer overflow
-    if ( i == MAX_LINE ) exit(1);
+    if ( i == MAX_LINE - 1 ) exit(1);
+
+    // Null termiante
+    lp[i] = 0;
 
     curline++;
 
@@ -28,61 +36,109 @@ void ntok()
     {
         pp = p++;
 
-        if ( tk == '\n' ) // End of line
-        {
-            break;
-        }
-        else if ( tk == ';' ) // Rest of line is comment
-        {
-            break;
-        }
-        else if ( (tk >= 'a' && tk <= 'z') // Named symbol
+        if ( (tk >= 'a' && tk <= 'z') // Named symbol
                || (tk >= 'A' && tk <= 'Z')
                ||  tk == '_' )
         {
             // Get entire token
             while ( p - pp < MAX_TOKN
-                 && ( (*p >= 'a' && *p <= 'z')
-                 ||   (*p >= 'A' && *p <= 'Z')
-                 ||   (*p >= '0' && *p <= '9')
-                 ||    *p == '_'               ) ) p++;
+             && ( (*p >= 'a' && *p <= 'z')
+             ||   (*p >= 'A' && *p <= 'Z')
+             ||   (*p >= '0' && *p <= '9')
+             ||    *p == '_'               ) ) p++;
 
             // Label excedes max length
             if ( p - pp == MAX_TOKN ) exit(1);
 
+            int i = 0, k = 0;
             // Find a matching symbol
-            tkVal = 0;
-            while ( tkVal < cursym )
+            while ( k < cursym )
             {
-                int i = 0;
-                while ( i < MAX_TOKN && !symtbl[tkVal].name[i] ) i++;
+                // Get all characters that implicitly match
+                while ( i < p - pp && symtbl[k].name[i] == pp[i] ) i++;
 
-                if ( !datcmp( symtbl[tkVal].name, pp, i ) ) break;
+                if ( symtbl[k].type <= TOK_HWID ) // Assembler defined symbol
+                {
+                    tk = symtbl[k].type;
+                    tkVal = symtbl[k].val;
+                }
+                else
+                {
+                    tk = TOK_NAME;
+                    tkVal = k;
+                }
 
-                tkVal++;
+                // Exact match
+                if ( !symtbl[k].name[i + 1] ) return;
+
+                // Didn't match base name, skip flags
+                if ( symtbl[k].name[i] || tk == TOK_NAME ) continue;
+
+                // Number of unmatched chars (flags)
+                int flagNum = p - pp - i;
+
+                // Check flags if I/O instruction
+                if ( flagNum == 1
+                && ( symtbl[k].type == TOK_IO
+                ||   symtbl[k].type == TOK_CTF
+                ||   symtbl[k].type == TOK_CTAF ) )
+                {
+                    if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000001000000; return; }
+                    if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000010000000; return; }
+                    if ( pp[i] == 'p' || pp[i] == 'P' ) { tkVal |= 0b0000000011000000; return; }
+                }
+                else if ( symtbl[k].type = TOK_MATH && flagNum >= 1 && flagNum <= 3 )
+                {
+                    // Carry control
+                    if      ( pp[i] == 'z' || pp[i] == 'Z' ) { tkVal |= 0b0000000000010000; i++; flagNum--; }
+                    else if ( pp[i] == 'o' || pp[i] == 'O' ) { tkVal |= 0b0000000000100000; i++; flagNum--; }
+                    else if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000000110000; i++; flagNum--; }
+
+                    if ( flagNum ) // Shift control
+                    {
+                        if      ( pp[i] == 'l' || pp[i] == 'L' ) { tkVal |= 0b0000000001000000; i++; flagNum--; }
+                        else if ( pp[i] == 'r' || pp[i] == 'R' ) { tkVal |= 0b0000000010000000; i++; flagNum--; }
+                        else if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000011000000; i++; flagNum--; }
+                    }
+
+                    // No-Load
+                    if ( flagNum && pp[i] == '#' ) { tkVal |= 0b0000000000001000; flagNum--; }
+
+                    // Exhausted all flags
+                    if ( !flagNum ) return;
+                }
+
+                k++;
             }
 
-            if ( tkVal == MAX_SYMS )
+
+            if ( k == MAX_SYMS ) // Symbol table is full
             {
                 exit(1);
             }
-            else if ( tkVal == cursym )
-            {
-                datcpy( symtbl[tkVal].name, pp, p - pp );
-                symtbl[tkVal].type = 0;
-                symtbl[tkVal].val = 0;
 
-                cursym++;
+            // Create new symbol
+            i = 0;
+            while ( i < MAX_TOKN ) // Store symbol and fill rest with zeros
+            {
+                symtbl[k].name[i] = i < p - pp ? pp[i] : 0;
+                i++;
             }
 
+            symtbl[k].type = SYM_DEF; // Set type to undefined symbol
+            symtbl[k].val = 0;
+
+            cursym++;
+
             tk = TOK_NAME;
+            tkVal = k;
             return;
         }
         else if ( tk >= '0' && tk <= '9' ) // Number
         {
             tkVal = 0;
 
-            if ( tk != '0' ) // Decimal value
+            if ( tk != '0' ) // Decimal
             {
                 tkVal = tk - '0';
                 while ( *p >= '0' && *p <= '9' ) tkVal = tkVal * 10 + *p++ - '0';
@@ -107,10 +163,15 @@ void ntok()
             tk = TOK_NUM;
             return;
         }
-        else if ( tk == ',' ) // Seperator token
+        // Assembler tokens
+        else if ( tk == ',' || tk == ':' || tk == '.' || tk == '@'
+               // Math tokens
+               || tk == '+' || tk == '-'
+               || tk == '*' || tk == '/' || tk == '%'
+               || tk == '^'
+               || tk == '(' || tk == ')' )
         {
             tkVal = 0;
-            tk = TOK_SEP;
             return;
         }
     }

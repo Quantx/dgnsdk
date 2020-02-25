@@ -2,7 +2,6 @@
 
 int fd = -1;
 
-#include "utility.c"
 #include "symbols.c"
 #include "tokenizer.c"
 
