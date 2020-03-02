@@ -1,8 +1,7 @@
-// Store current line, keep track of current position
-char lp[MAX_LINE], * p, * pp, tk;
-int curline = -1, tkVal;
+char lp[MAX_LINE], * p, * pp, * fp, tk;
+int fd, curline, tkVal;
 
-int readline( )
+int readline()
 {
     int i = 0;
 
@@ -23,6 +22,7 @@ int readline( )
     // Null termiante
     lp[i] = 0;
 
+    // Increment line count
     curline++;
 
     // Return number of bytes read
@@ -37,22 +37,22 @@ void ntok()
         pp = p++;
 
         if ( (tk >= 'a' && tk <= 'z') // Named symbol
-               || (tk >= 'A' && tk <= 'Z')
-               ||  tk == '_' )
+          || (tk >= 'A' && tk <= 'Z')
+          ||  tk == '_' )
         {
             // Get entire token
             while ( p - pp < MAX_TOKN
              && ( (*p >= 'a' && *p <= 'z')
              ||   (*p >= 'A' && *p <= 'Z')
              ||   (*p >= '0' && *p <= '9')
-             ||    *p == '_'               ) ) p++;
+             ||    *p == '_' || *p == '#') ) p++;
 
             // Label excedes max length
             if ( p - pp == MAX_TOKN ) exit(1);
 
             int i = 0, k = 0;
             // Find a matching symbol
-            while ( k < cursym )
+            while ( k < sympos )
             {
                 // Get all characters that implicitly match
                 while ( i < p - pp && symtbl[k].name[i] == pp[i] ) i++;
@@ -79,15 +79,15 @@ void ntok()
 
                 // Check flags if I/O instruction
                 if ( flagNum == 1
-                && ( symtbl[k].type == TOK_IO
-                ||   symtbl[k].type == TOK_CTF
-                ||   symtbl[k].type == TOK_CTAF ) )
+                && ( symtbl[k].type == OPC_IO
+                ||   symtbl[k].type == OPC_CTF
+                ||   symtbl[k].type == OPC_CTAF ) )
                 {
                     if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000001000000; return; }
                     if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000010000000; return; }
                     if ( pp[i] == 'p' || pp[i] == 'P' ) { tkVal |= 0b0000000011000000; return; }
                 }
-                else if ( symtbl[k].type = TOK_MATH && flagNum >= 1 && flagNum <= 3 )
+                else if ( symtbl[k].type = OPC_MATH && flagNum >= 1 && flagNum <= 3 )
                 {
                     // Carry control
                     if      ( pp[i] == 'z' || pp[i] == 'Z' ) { tkVal |= 0b0000000000010000; i++; flagNum--; }
@@ -125,10 +125,11 @@ void ntok()
                 i++;
             }
 
-            symtbl[k].type = SYM_DEF; // Set type to undefined symbol
+            // Set type to undefiend symbol
+            symtbl[k].type = flags & FLG_GLOB ? SYM_GDEF : SYM_DEF;
             symtbl[k].val = 0;
 
-            cursym++;
+            sympos++;
 
             tk = TOK_NAME;
             tkVal = k;
@@ -164,15 +165,23 @@ void ntok()
             return;
         }
         // Assembler tokens
-        else if ( tk == ',' || tk == ':' || tk == '.' || tk == '@'
-               // Math tokens
-               || tk == '+' || tk == '-'
-               || tk == '*' || tk == '/' || tk == '%'
-               || tk == '^'
-               || tk == '(' || tk == ')' )
+        else if ( tk == ',' || tk == ':' || tk == '.' || tk == '@' )
         {
             tkVal = 0;
             return;
         }
+        // Math tokens
+        else if ( tk == '+' || tk == '-'
+               || tk == '*' || tk == '/' || tk == '%'
+               || tk == '^' || tk == '|' || tk == '&' || tk == '!'
+               || tk == '(' || tk == ')' )
+        {
+            tkVal = tk;
+            tk = TOK_MATH;
+            return;
+        }
     }
+
+    // End of file reached, return null token
+    tk = 0;
 }
