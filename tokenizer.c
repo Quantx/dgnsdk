@@ -9,7 +9,7 @@ int readline()
     if ( p - lp < MAX_LINE || *p ) return -1;
 
     // Read data in and scan for newline
-    while ( i < MAX_LINE - 1 && read(fd, lp + i, 1 ) && lp[i] != '\n' )
+    while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i] != '\n' )
     {
         // Termination on comments
         if ( lp[i] == ';' ) lp[i] = 0;
@@ -38,7 +38,7 @@ void ntok()
 
         if ( (tk >= 'a' && tk <= 'z') // Named symbol
           || (tk >= 'A' && tk <= 'Z')
-          ||  tk == '_' )
+          ||  tk == '_' || tk == '.'  )
         {
             // Get entire token
             while ( p - pp < MAX_TOKN
@@ -57,7 +57,7 @@ void ntok()
                 // Get all characters that implicitly match
                 while ( i < p - pp && symtbl[k].name[i] == pp[i] ) i++;
 
-                if ( symtbl[k].type <= TOK_HWID ) // Assembler defined symbol
+                if ( symtbl[k].type <= DGN_HWID ) // Assembler defined symbol
                 {
                     tk = symtbl[k].type;
                     tkVal = symtbl[k].val;
@@ -79,15 +79,15 @@ void ntok()
 
                 // Check flags if I/O instruction
                 if ( flagNum == 1
-                && ( symtbl[k].type == OPC_IO
-                ||   symtbl[k].type == OPC_CTF
-                ||   symtbl[k].type == OPC_CTAF ) )
+                && ( symtbl[k].type == DGN_IO
+                ||   symtbl[k].type == DGN_CTF
+                ||   symtbl[k].type == DGN_CTAF ) )
                 {
                     if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000001000000; return; }
                     if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000010000000; return; }
                     if ( pp[i] == 'p' || pp[i] == 'P' ) { tkVal |= 0b0000000011000000; return; }
                 }
-                else if ( symtbl[k].type = OPC_MATH && flagNum >= 1 && flagNum <= 3 )
+                else if ( symtbl[k].type = DGN_MATH && flagNum >= 1 && flagNum <= 3 )
                 {
                     // Carry control
                     if      ( pp[i] == 'z' || pp[i] == 'Z' ) { tkVal |= 0b0000000000010000; i++; flagNum--; }
@@ -126,7 +126,10 @@ void ntok()
             }
 
             // Set type to undefiend symbol
-            symtbl[k].type = flags & FLG_GLOB ? SYM_GDEF : SYM_DEF;
+            symtbl[k].type = SYM_DEF;
+            // Set current file number
+            symtbl[k].file = flags & FLG_GLOB ? 0 : curfno;
+            // Set default value
             symtbl[k].val = 0;
 
             sympos++;
@@ -135,8 +138,16 @@ void ntok()
             tkVal = k;
             return;
         }
-        else if ( tk >= '0' && tk <= '9' ) // Number
+        else if ( (tk >= '0' && tk <= '9') || tk == '+' || tk == '-' ) // Number
         {
+            int makeNeg = 0;
+            if ( tk == '-' )
+            {
+                makeNeg = 1;
+                tk = *p++;
+            }
+            else if ( tk == '+' ) tk = *p++;
+
             tkVal = 0;
 
             if ( tk != '0' ) // Decimal
@@ -161,25 +172,16 @@ void ntok()
                 while ( *p >= '0' && *p <= '7' ) tkVal = (tkVal << 3) + *p++ - '0';
             }
 
+            if ( makeNeg ) tkVal = -tkVal;
             tk = TOK_NUM;
             return;
         }
         // Assembler tokens
-        else if ( tk == ',' || tk == ':' || tk == '.' || tk == '@' )
-        {
-            tkVal = 0;
-            return;
-        }
-        // Math tokens
-        else if ( tk == '+' || tk == '-'
-               || tk == '*' || tk == '/' || tk == '%'
-               || tk == '^' || tk == '|' || tk == '&' || tk == '!'
-               || tk == '(' || tk == ')' )
-        {
-            tkVal = tk;
-            tk = TOK_MATH;
-            return;
-        }
+        else if ( tk == ',' ) { tk = TOK_ARG;  tkVal = 0; return; } // Argument seperator
+        else if ( tk == ':' ) { tk = TOK_LABL; tkVal = 0; return; } // Label declaration
+        else if ( tk == '@' ) { tk = TOK_INDR; tkVal = 0; return; } // Indirection flag
+        else if ( tk == '<' ) { tk = TOK_BYHI; tkVal = 0; return; } // Low  byte pointer flag
+        else if ( tk == '>' ) { tk = TOK_BYLO; tkVal = 0; return; } // High byte pointer flag
     }
 
     // End of file reached, return null token
