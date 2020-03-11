@@ -2,6 +2,7 @@ void assemble( char * fpath, int pass )
 {
     fp = fpath; // Save file path string
     curline = -1; // Reset current line
+    p = NULL; // Null out tok pointer for first readline
     fd = open( fpath, 0 ); // Open file for reading
 
     // Cannot open file
@@ -10,33 +11,26 @@ void assemble( char * fpath, int pass )
     ntok(); // Get first token and loop until EOF
     while ( tk )
     {
-        // Label constant with indirect bit
-        if ( tk == TOK_INDR )
+        // Label constant with indirect bit, or high byte, or low byte
+        if ( tk == TOK_INDR || tk == TOK_BYLO || tk == TOK_BYHI )
         {
+            // Store initial token type
+            char lblType = tk;
+
             ntok();
             if ( tk != TOK_NAME ) exit(1); // The following token MUST be a label
 
             // Store ref to symbol
             struct symbol * cursym = &symtbl[tkVal];
 
-            if ( cursym->type & SYM_BYTE ) exit(1); // Can't indirect a byte pointer
-
-            ntok();
-
             // Allocate room for symbol in this segment
             curseg->pos++;
+
+            ntok();
         }
         // Label declaration or label constant
-        else if ( tk == TOK_NAME || tk == TOK_BYLO || tk == TOK_BYHI )
+        else if ( tk == TOK_NAME )
         {
-            int lblType = tk;
-            // Byte pointer declaration (MUST BE FOLLOWED BY TOK_LABL)
-            if ( tk == TOK_BYLO || tk == TOK_BYHI )
-            {
-                ntok();
-                if ( tk != TOK_NAME ) exit(1);
-            }
-
             // Store ref to symbol
             struct symbol * cursym = &symtbl[tkVal];
 
@@ -44,24 +38,10 @@ void assemble( char * fpath, int pass )
             // Label declaration
             if ( tk == TOK_LABL )
             {
-                if ( cursym->type & SYM_MASK == SYM_DEF ) // Undefined symbol
+                if ( cursym->type == SYM_DEF ) // Undefined symbol
                 {
                     cursym->type = curseg->sym;
                     cursym->val = curseg->pos;
-
-                    // Set byte pointer flags
-                    if ( tk == TOK_BYLO || tk == TOK_BYHI )
-                    {
-                        cursym->type |= SYM_BYTE;
-                        cursym->val <<= 1;
-
-                        // Set high byte pointer flag
-                        if ( tk == TOK_BYHI )
-                        {
-                            cursym->type |= SYM_HIGH;
-                            cursym->val  |= 1;
-                        }
-                    }
                 }
                 else // Already defined symbol
                 {
@@ -71,15 +51,10 @@ void assemble( char * fpath, int pass )
                 ntok();
             }
             // Some other token
-            // (make sure we're not declaring a byte pointer)
-            else if ( lblType == TOK_NAME )
+            else
             {
                 // Allocate room for this symbol in the segment
                 curseg->pos++;
-            }
-            else // Byte pointer token, but no label declaration token
-            {
-                exit(1);
             }
         }
         else if ( tk == TOK_NUM ) // Numerical constant
@@ -176,13 +151,8 @@ void assemble( char * fpath, int pass )
                     // Store ref to symbol
                     struct symbol * cursym = &symtbl[tkVal];
 
-                    // Can't use a byte symbol here!
-                    if ( cursym->type & SYM_BYTE )
-                    {
-                        exit(1);
-                    }
                     // Zero page symbol
-                    else if ( cursym->type & SYM_MASK == SYM_ZERO )
+                    if ( cursym->type == SYM_ZERO )
                     {
                         opval |= cursym->val;
                     }
@@ -299,7 +269,7 @@ void assemble( char * fpath, int pass )
         // Assembler .zero directive
         else if ( tk == ASM_ZERO ) { curseg = &zero; ntok(); }
         // Assembler .glob directive
-        else if ( tk == ASM_GLOB )
+        else if ( tk == ASM_GLOB ) while ( tk == ASM_GLOB || tk == TOK_ARG )
         {
             // Get label
             ntok();
@@ -308,7 +278,7 @@ void assemble( char * fpath, int pass )
             // Make label global
             symtbl[tkVal].file = 0;
 
-            ntok();
+            ntok(); // Get comma or next statement
         }
         // Assembler .define directive
         else if ( tk == ASM_DEFN )
@@ -321,7 +291,7 @@ void assemble( char * fpath, int pass )
             struct symbol * cursym = &symtbl[tkVal];
 
             // Already defined symbol
-            if ( cursym->type & SYM_MASK != SYM_DEF ) exit(1);
+            if ( cursym->type != SYM_DEF ) exit(1);
 
             // Get comma
             ntok();

@@ -6,7 +6,7 @@ int readline()
     int i = 0;
 
     // Current line still has data
-    if ( p - lp < MAX_LINE || *p ) return -1;
+    if ( p != NULL && (p - lp < MAX_LINE || *p) ) return -1;
 
     // Read data in and scan for newline
     while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i] != '\n' )

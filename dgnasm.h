@@ -50,10 +50,7 @@
 #define SYM_BSS   4 // Bss  pointer
 #define SYM_ZERO  5 // Zero-page pointer
 
-#define SYM_MASK 0b00001111 // Symbol Type Mask
-
-#define SYM_BYTE 0b10000000 // [FLAG] Is this symbol a byte pointer?
-#define SYM_HIGH 0b01000000 // [FLAG] If this symbol is a byte pointer, is it pointing to a high byte?
+#define SYM_BYTE 0b10000000 // Byte flag
 
 // *** Boolean Flags ***
 #define FLG_GLOB 0b0000000000000001 // Force all undefined symbols to be global

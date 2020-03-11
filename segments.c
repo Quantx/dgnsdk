@@ -7,8 +7,14 @@ struct segment zero = {0, 0, NULL, NULL, SYM_ZERO };
 struct segment * curseg;
 
 // Set a word in a segment, if type is not SYM_ABS/SYM_GABS then val is a symbol table index
-void segset( struct segment * seg, unsigned int addr, unsigned char type, unsigned int val )
+void segset( struct segment * seg, unsigned char type, unsigned int val )
 {
+    unsigned char bytemod = type & SYM_BYTE; // Get Byte Flag
+
+    type &= ~SYM_BYTE; // Unset Byte Flag
+
+    unsigned int addr = seg->pos;
+
     // Beyond end of memory
     if ( addr > seg->max ) exit(1);
 
@@ -16,6 +22,26 @@ void segset( struct segment * seg, unsigned int addr, unsigned char type, unsign
     struct memblock * rdr = seg->rdir; // Redirection
 
     while ( addr > PAGESIZE )
+    {
+        blk = blk->next;
+        rdr = rdr->next;
+
+        addr -= PAGESIZE;
+    }
+
+    if ( type == SYM_DEF ) exit(1); // Undefined local symbol
+
+    blk->data[addr] = val;
+    // TODO redir bits
+}
+
+void segalloc( struct segment * seg )
+{
+    unsigned int size = seg->max;
+    struct memblock * blk = seg->head; // Segment data
+    struct memblock * rdr = seg->rdir; // Redirection
+
+    while ( size > PAGESIZE )
     {
         // Allocate another block
         if ( blk->next == NULL )
@@ -32,16 +58,6 @@ void segset( struct segment * seg, unsigned int addr, unsigned char type, unsign
         blk = blk->next;
         rdr = rdr->next;
 
-        addr -= PAGESIZE;
+        size -= PAGESIZE;
     }
-
-    if ( type == SYM_DEF ) exit(1); // Undefined local symbol
-
-    blk->data[addr] = val;
-    // TODO redir bits
-}
-
-unsigned int segget( struct segment * seg, unsigned int addr )
-{
-    return 0;
 }
