@@ -12,54 +12,54 @@
 #define PAGESIZE 1023 // 2 KB (1 KW) of memory (1 mmu page)
 
 // *** DGNova Instruction Parameter Formats ***
-#define DGN_IONO  0 // I/O No accumulator
-#define DGN_IO    1 // I/O
-#define DGN_IOSK  2 // I/O Skip
-#define DGN_FLOW  3 // Flow control
-#define DGN_LOAD  4 // Memory access
-#define DGN_MATH  5 // Arithmetic, Logic
+#define DGN_IONO  8 // I/O No accumulator
+#define DGN_IO    9 // I/O
+#define DGN_IOSK 10 // I/O Skip
+#define DGN_FLOW 11 // Flow control
+#define DGN_LOAD 12 // Memory access
+#define DGN_MATH 13 // Arithmetic, Logic
 // *** DGNova Extened Instruction Parameter Formats ***
-#define DGN_TRAP  6 // Arithmetic no-op (No load, no skip)
-#define DGN_CT    7 // Control, no accumulator or flags
-#define DGN_CTA   8 // Control, acumulator
-#define DGN_CTF   9 // Control, flag
-#define DGN_CTAF 10 // Control, acumulator and flag
-#define DGN_CTAA 11 // Control, two accumulators
+#define DGN_TRAP 14 // Arithmetic no-op (No load, no skip)
+#define DGN_CT   15 // Control, no accumulator or flags
+#define DGN_CTA  16 // Control, acumulator
+#define DGN_CTF  17 // Control, flag
+#define DGN_CTAF 18 // Control, acumulator and flag
+#define DGN_CTAA 19 // Control, two accumulators
 // *** Assembler directive ***
-#define ASM_TEXT 12 // .text   directive
-#define ASM_DATA 13 // .data   directive
-#define ASM_BSS  14 // .bss    directive
-#define ASM_ZERO 15 // .zero   directive
-#define ASM_GLOB 16 // .glob   directive
-#define ASM_DEFN 17 // .define directive
+#define ASM_TEXT 20 // .text   directive
+#define ASM_DATA 21 // .data   directive
+#define ASM_BSS  22 // .bss    directive
+#define ASM_ZERO 23 // .zero   directive
+#define ASM_GLOB 24 // .glob   directive
+#define ASM_DEFN 25 // .define directive
 // *** DGNova Constants ***
-#define DGN_SKPC 18 // Arithmetic & Logic skip condition
-#define DGN_HWID 19 // Nova Hardware ID
+#define DGN_SKPC 26 // Arithmetic & Logic skip condition
+#define DGN_HWID 27 // Nova Hardware ID
 // *** Token types ***
-#define TOK_NAME 20 // Named symbol (user label)
-#define TOK_NUM  21 // Numberical constant
-#define TOK_INDR 22 // Indirect bit token '@'
-#define TOK_LABL 23 // Label token ':'
-#define TOK_ARG  24 // Argument seperator token ','
-#define TOK_BYLO 25 // Low  byte indicator '>'
-#define TOK_BYHI 26 // High byte indicator '<'
-#define TOK_EOL  27 // End of line token
+#define TOK_NAME 28 // Named symbol (user label)
+#define TOK_NUM  29 // Numberical constant
+#define TOK_INDR 30 // Indirect bit token '@'
+#define TOK_LABL 31 // Label token ':'
+#define TOK_ARG  32 // Argument seperator token ','
+#define TOK_BYLO 33 // Low  byte indicator '>'
+#define TOK_BYHI 34 // High byte indicator '<'
+#define TOK_EOL  35 // End of line token
 
 // *** Symbols Type ***
 #define SYM_BYTE  1 // Byte flag
 
 #define SYM_ABS   0 // Constant value
-#define SYM_TEXT  2 // Text pointer
-#define SYM_DATA  4 // Data pointer
-#define SYM_BSS   6 // Bss  pointer
-#define SYM_ZERO  8 // Zero-page pointer
-#define SYM_DEF  10 // Undefined symbol
-#define SYM_ZDSP 12 // Zero-page mode 0 displacement
-#define SYM_ZDEF 14 // Undefined zero page symbol
-#define SYM_FILE 16 // File seperator symbol
+#define SYM_TEXT  1 // Text pointer
+#define SYM_DATA  2 // Data pointer
+#define SYM_BSS   3 // Bss  pointer
+#define SYM_ZERO  4 // Zero-page pointer
+#define SYM_DEF   5 // Undefined symbol
+#define SYM_ZDEF  6 // Undefined zero page symbol
+#define SYM_FILE  7 // File seperator symbol
 
 // *** Boolean Flags ***
 #define FLG_GLOB 0b0000000000000001 // Force all undefined symbols to be global
+#define FLG_PASS 0b0000000000000010 // Which pass are we on: pass 2 == Flag Set
 
 struct symbol
 {

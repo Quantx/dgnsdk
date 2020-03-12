@@ -62,6 +62,20 @@ void asmfail( char * msg )
     write( 2, "\r\n", 2 );
 
     // Output current line
+    i = 0;
+    while ( lp[i] ) i++;
+    write( 2, lp, i );
+    write( 2, "\r\n", 2 );
+
+    // Output curpos indicator
+    i = 0;
+    while ( i < pp - lp )
+    {
+        write( 2, lp[i] == '\t' ? "\t" : " ", 1 );
+        i++;
+    }
+
+    write( 2, "^\r\n", 3 );
 
     exit(1);
 }
@@ -78,12 +92,16 @@ int main( int argc, char ** argv )
         argc--; argv++;
     }
 
+    write( 1, " *** Starting first pass ***\r\n", 30 );
+
     // *** Run first pass for each file ***
     while ( curfno <= argc )
     {
-        assemble( argv[curfno - 1], 0 );
+        assemble( argv[curfno - 1] );
         curfno++;
     }
+
+    write( 1, "Allocating required memory\r\n", 28 );
 
     // *** Reset for next pass ***
     // Set max and clear pos
@@ -95,19 +113,22 @@ int main( int argc, char ** argv )
     // Did zero page overflow?
     if ( zero.max > 0xFF ) asmfail("zero page overflow");
 
-    // Allocate memory for each segment
+    // Allocate memory for each segment, except for BSS
     segalloc( &text );
     segalloc( &data );
-    segalloc(  &bss );
     segalloc( &zero );
+
+
+    write( 1, " *** Starting second pass ***\r\n", 31 );
 
     // Reset current file number
     curfno = 1;
+    flags |= FLG_PASS;
 
     // *** Run second pass for each file ***
     while ( curfno <= argc )
     {
-        assemble( argv[curfno - 1], 1 );
+        assemble( argv[curfno - 1] );
         curfno++;
     }
 

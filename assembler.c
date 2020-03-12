@@ -1,4 +1,4 @@
-void assemble( char * fpath, int pass )
+void assemble( char * fpath )
 {
     // Reset current segment
     curseg = &text;
@@ -27,7 +27,7 @@ void assemble( char * fpath, int pass )
             // Store ref to symbol
             struct symbol * cursym = &symtbl[tkVal];
 
-            if ( pass ) // Write to output
+            if ( flags & FLG_PASS ) // Write to output
             {
                 unsigned int val = cursym->val;
 
@@ -38,7 +38,7 @@ void assemble( char * fpath, int pass )
                 // This is a high byte pointer
                 if ( tk == TOK_BYHI ) val |= 1;
 
-                segset( curseg, tkVal << 4 | cursym->type | tk != TOK_INDR, val );
+                segset( curseg, tkVal << 4 | cursym->type << 1 | tk != TOK_INDR, val );
             }
 
             // Allocate room for symbol in this segment
@@ -62,7 +62,7 @@ void assemble( char * fpath, int pass )
                     cursym->type = curseg->sym;
                     cursym->val = curseg->pos;
                 }
-                else // Already defined symbol
+                else if ( ~flags & FLG_PASS ) // Already defined symbol
                 {
                     asmfail("symbol already defined");
                 }
@@ -74,7 +74,7 @@ void assemble( char * fpath, int pass )
             else
             {
                 // Write out symbol
-                if ( pass ) segset( curseg, cursymno << 4 | cursym->type, cursym->val );
+                segset( curseg, cursymno << 4 | cursym->type << 1, cursym->val );
 
                 // Allocate room for this symbol in the segment
                 curseg->pos++;
@@ -84,7 +84,7 @@ void assemble( char * fpath, int pass )
         {
             ntok();
 
-            if ( pass ) segset( curseg, SYM_ABS, tkVal );
+            segset( curseg, SYM_ABS << 1, tkVal );
 
             // Allocate room for absolute symbol in the segment
             curseg->pos++;
@@ -93,7 +93,7 @@ void assemble( char * fpath, int pass )
         {
             int optyp = tk; // Type of instruction
             int opval = tkVal; // The 16 bit instruction
-            int oprdr = SYM_ABS; // Redirection bits for the instruction
+            int oprdr = SYM_ABS << 1; // Redirection bits for the instruction
 
             // I/O Instruction, need a device code and maybe an accumulator
             if ( optyp == DGN_IONO || optyp == DGN_IO || optyp == DGN_IOSK )
@@ -102,7 +102,7 @@ void assemble( char * fpath, int pass )
                 {
                     // Get accumulator
                     ntok();
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator 0");
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
                     opval |= tkVal << 11;
                     // Get comma
                     ntok();
@@ -125,7 +125,7 @@ void assemble( char * fpath, int pass )
                 if ( optyp == DGN_LOAD )
                 {
                     // Get accumulator
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator 1");
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
                     opval |= tkVal << 11;
                     // Get comma
                     ntok();
@@ -180,13 +180,13 @@ void assemble( char * fpath, int pass )
                     // Undefined zero page symbol
                     if ( cursym->type == SYM_DEF )
                     {
-                        oprdr = SYM_ZDEF;
+                        oprdr = tkVal << 4 | SYM_ZDEF << 1;
                     }
                     // Zero page displacement symbol
                     else if ( cursym->type == SYM_ZERO )
                     {
                         opval |= cursym->val;
-                        oprdr = SYM_ZDSP;
+                        oprdr = SYM_ZERO << 1;
                     }
                     // Program counter relative symbol
                     else if ( cursym->type == curseg->sym )
@@ -271,7 +271,7 @@ void assemble( char * fpath, int pass )
                 {
                     // Get accumulator
                     ntok();
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator 2");
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
                     opval |= tkVal << 11;
 
                     if ( optyp == DGN_CTAA )
@@ -289,7 +289,7 @@ void assemble( char * fpath, int pass )
                 ntok();
             }
 
-            if ( pass ) segset( curseg, oprdr, opval );
+            segset( curseg, oprdr, opval );
 
             // Write out instruction
             curseg->pos++;

@@ -4,10 +4,10 @@ int fd, tkVal;
 
 int readline()
 {
-    int i = 0;
-
     // Current line still has data
     if ( tk != TOK_EOL ) return -1;
+
+    int i = 0;
 
     // Read data in and scan for newline
     while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i] != '\n' ) i++;
@@ -16,7 +16,7 @@ int readline()
     if ( i == MAX_LINE - 1 ) asmfail("readline overflow");
 
     // Null terminate a line if needed
-    if ( lp[i] != '\n' ) lp[++i] = '\n';
+    lp[i] = 0;
 
     // Increment line count
     curline++;
@@ -75,15 +75,15 @@ void ntok()
             {
                 i = 0;
 
-                // Get all characters that implicitly match
+                // Get all characters that implicitly match TODO case insensitivity
                 while ( i < p - pp && symtbl[k].name[i] == pp[i] ) i++;
 
-                if ( symtbl[k].type <= DGN_HWID ) // Assembler defined symbol
+                if ( symtbl[k].type >= DGN_IONO && symtbl[k].type <= DGN_HWID ) // Assembler defined symbol
                 {
                     tk = symtbl[k].type;
                     tkVal = symtbl[k].val;
                 }
-                else
+                else // User defined symbol
                 {
                     tk = TOK_NAME;
                     tkVal = k;
@@ -95,7 +95,9 @@ void ntok()
                     #if DBUG_SYM
                     write( 1, "SYM MATCH: '", 12 );
                     write( 1, symtbl[k].name, i );
-                    write( 1, "'\r\n", 3 );
+                    write( 1, "', ", 3 );
+                    octwrite( 1, tkVal );
+                    write( 1, "\r\n", 2 );
                     #endif
                     return;
                 }
@@ -116,7 +118,7 @@ void ntok()
                     if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000010000000; return; }
                     if ( pp[i] == 'p' || pp[i] == 'P' ) { tkVal |= 0b0000000011000000; return; }
                 }
-                else if ( tk = DGN_MATH && flagNum >= 1 && flagNum <= 3 )
+                else if ( tk == DGN_MATH && flagNum >= 1 && flagNum <= 3 )
                 {
                     // Carry control
                     if      ( pp[i] == 'z' || pp[i] == 'Z' ) { tkVal |= 0b0000000000010000; i++; flagNum--; }
@@ -134,7 +136,16 @@ void ntok()
                     if ( flagNum && pp[i] == '#' ) { tkVal |= 0b0000000000001000; flagNum--; }
 
                     // Exhausted all flags
-                    if ( !flagNum ) return;
+                    if ( !flagNum )
+                    {
+                        #if DBUG_SYM
+                        write( 1, "SYM MATH MATCH: '", 17 );
+                        write( 1, symtbl[k].name, i );
+                        write( 1, "'\r\n", 3 );
+                        #endif
+
+                        return;
+                    }
                 }
 
                 k++;
@@ -166,7 +177,7 @@ void ntok()
 
             #if DBUG_SYM
             write( 1, "NEW SYM: ", 9 );
-            write( 1, symtbl[k].name, MAX_TOKN );
+            write( 1, symtbl[k].name, i );
             write( 1, "\r\n", 2 );
             #endif
 
@@ -206,7 +217,6 @@ void ntok()
             }
             else // Octal
             {
-                p++;
                 while ( *p >= '0' && *p <= '7' ) tkVal = (tkVal << 3) + *p++ - '0';
             }
 
