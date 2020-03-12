@@ -1,12 +1,13 @@
-char lp[MAX_LINE], * p, * pp, * fp, tk;
-int fd, curline, tkVal;
+char lp[MAX_LINE], * p, * pp, * fp = NULL, tk;
+unsigned int curline;
+int fd, tkVal;
 
 int readline()
 {
     int i = 0;
 
     // Current line still has data
-    if ( p != NULL && (p - lp < MAX_LINE || *p) ) return -1;
+    if ( p != NULL && tk ) return -1;
 
     // Read data in and scan for newline
     while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i] != '\n' )
@@ -17,7 +18,7 @@ int readline()
     }
 
     // Buffer overflow
-    if ( i == MAX_LINE - 1 ) exit(1);
+    if ( i == MAX_LINE - 1 ) asmfail("readline overflow");
 
     // Null termiante
     lp[i] = 0;
@@ -25,13 +26,30 @@ int readline()
     // Increment line count
     curline++;
 
+    write( 1, "NLIN: '", 7 );
+    write( 1, lp, i );
+    write( 1, "'\r\n", 3 );
+
+    // Set start of line pointer
+    p = lp;
+
     // Return number of bytes read
     return i;
 }
 
+#if DBUG_TOK
+void ntok_dbg()
+#else
 void ntok()
+#endif
 {
-    while ( readline() )
+    if ( !readline() )
+    {
+        // End of file
+        tk = 0;
+        return;
+    }
+
     while ( tk = *p )
     {
         pp = p++;
@@ -48,7 +66,7 @@ void ntok()
              ||    *p == '_' || *p == '#') ) p++;
 
             // Label excedes max length
-            if ( p - pp == MAX_TOKN ) exit(1);
+            if ( p - pp == MAX_TOKN ) asmfail("named token exceeds max character length");
 
             int i = 0, k = 0;
             // Find a matching symbol
@@ -72,7 +90,7 @@ void ntok()
                 if ( !symtbl[k].name[i + 1] ) return;
 
                 // Didn't match base name, skip flags
-                if ( symtbl[k].name[i] || tk == TOK_NAME ) continue;
+                if ( symtbl[k].name[i] || tk == TOK_NAME ) { k++; continue; }
 
                 // Number of unmatched chars (flags)
                 int flagNum = p - pp - i;
@@ -114,7 +132,7 @@ void ntok()
 
             if ( k == MAX_SYMS ) // Symbol table is full
             {
-                exit(1);
+                asmfail("symbol table is full");
             }
 
             // Create new symbol
@@ -184,6 +202,17 @@ void ntok()
         else if ( tk == '>' ) { tk = TOK_BYLO; tkVal = 0; return; } // High byte pointer flag
     }
 
-    // End of file reached, return null token
-    tk = 0;
+    // End of line reached, return end of line token
+    tk = TOK_EOL;
 }
+
+#if DBUG_TOK
+void ntok()
+{
+    ntok_dbg();
+
+    write( 1, "TOKEN: ", 7 );
+    octwrite( 1, tk );
+    write( 1, "\r\n", 2 );
+}
+#endif

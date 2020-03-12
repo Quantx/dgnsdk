@@ -1,12 +1,15 @@
 void assemble( char * fpath, int pass )
 {
+    // Reset current segment
+    curseg = &text;
+
     fp = fpath; // Save file path string
-    curline = -1; // Reset current line
+    curline = 0; // Reset current line
     p = NULL; // Null out tok pointer for first readline
     fd = open( fpath, 0 ); // Open file for reading
 
     // Cannot open file
-    if ( fd < 0 ) exit(1);
+    if ( fd < 0 ) asmfail("failed to open file");
 
     ntok(); // Get first token and loop until EOF
     while ( tk )
@@ -18,10 +21,24 @@ void assemble( char * fpath, int pass )
             char lblType = tk;
 
             ntok();
-            if ( tk != TOK_NAME ) exit(1); // The following token MUST be a label
+            if ( tk != TOK_NAME ) asmfail("expected label"); // The following token MUST be a label
 
             // Store ref to symbol
             struct symbol * cursym = &symtbl[tkVal];
+
+            if ( pass ) // Write to output
+            {
+                unsigned int val = cursym->val;
+
+                // Set indirect bit if needed
+                if ( tk == TOK_INDR ) val |= 0x8000;
+                // This is a byte pointer
+                else val << 1;
+                // This is a high byte pointer
+                if ( tk == TOK_BYHI ) val |= 1;
+
+                segset( curseg, tkVal << 4 | cursym->type | tk != TOK_INDR, val );
+            }
 
             // Allocate room for symbol in this segment
             curseg->pos++;
@@ -32,7 +49,8 @@ void assemble( char * fpath, int pass )
         else if ( tk == TOK_NAME )
         {
             // Store ref to symbol
-            struct symbol * cursym = &symtbl[tkVal];
+            int cursymno = tkVal;
+            struct symbol * cursym = &symtbl[cursymno];
 
             ntok();
             // Label declaration
@@ -45,7 +63,7 @@ void assemble( char * fpath, int pass )
                 }
                 else // Already defined symbol
                 {
-                    exit(1);
+                    asmfail("symbol already defined");
                 }
 
                 ntok();
@@ -53,6 +71,9 @@ void assemble( char * fpath, int pass )
             // Some other token
             else
             {
+                // Write out symbol
+                if ( pass ) segset( curseg, cursymno << 4 | cursym->type, cursym->val );
+
                 // Allocate room for this symbol in the segment
                 curseg->pos++;
             }
@@ -61,6 +82,8 @@ void assemble( char * fpath, int pass )
         {
             ntok();
 
+            if ( pass ) segset( curseg, SYM_ABS, tkVal );
+
             // Allocate room for absolute symbol in the segment
             curseg->pos++;
         }
@@ -68,6 +91,7 @@ void assemble( char * fpath, int pass )
         {
             int optyp = tk; // Type of instruction
             int opval = tkVal; // The 16 bit instruction
+            int oprdr = SYM_ABS; // Redirection bits for the instruction
 
             // I/O Instruction, need a device code and maybe an accumulator
             if ( optyp == DGN_IONO || optyp == DGN_IO || optyp == DGN_IOSK )
@@ -76,16 +100,16 @@ void assemble( char * fpath, int pass )
                 {
                     // Get accumulator
                     ntok();
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) exit(1);
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
                     opval |= tkVal << 11;
                     // Get comma
                     ntok();
-                    if ( tk != TOK_ARG ) exit(1);
+                    if ( tk != TOK_ARG ) asmfail("expected a comma");
                 }
 
                 // Get I/O device address (Number of Hardware ID Constant)
                 ntok();
-                if ( (tk != TOK_NUM && tk != DGN_HWID) || tkVal < 0 || tkVal > 63 ) exit(1);
+                if ( (tk != TOK_NUM && tk != DGN_HWID) || tkVal < 0 || tkVal > 63 ) asmfail("expected I/O device address");
                 opval |= tkVal;
 
                 ntok();
@@ -99,11 +123,11 @@ void assemble( char * fpath, int pass )
                 if ( optyp == DGN_LOAD )
                 {
                     // Get accumulator
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) exit(1);
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
                     opval |= tkVal << 11;
                     // Get comma
                     ntok();
-                    if ( tk != TOK_ARG ) exit(1);
+                    if ( tk != TOK_ARG ) asmfail("expected a comma");
                     ntok();
                 }
 
@@ -127,7 +151,7 @@ void assemble( char * fpath, int pass )
                     {
                         // Get mode
                         ntok();
-                        if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) exit(1);
+                        if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an index mode");
                         mode = tkVal;
 
                         ntok();
@@ -135,11 +159,11 @@ void assemble( char * fpath, int pass )
 
                     if ( !mode && (disp < 0 || disp > 0xFF) ) // Zero page access
                     {
-                        exit(1);
+                        asmfail("invalid zero page address");
                     }
                     else if ( mode && (disp < -128 || disp > 127) ) // Two's complement displacement
                     {
-                        exit(1);
+                        asmfail("invalid signed 8-bit displacement");
                     }
 
                     // Set mode and displacement
@@ -151,25 +175,31 @@ void assemble( char * fpath, int pass )
                     // Store ref to symbol
                     struct symbol * cursym = &symtbl[tkVal];
 
-                    // Zero page symbol
-                    if ( cursym->type == SYM_ZERO )
+                    // Undefined zero page symbol
+                    if ( cursym->type == SYM_DEF )
+                    {
+                        oprdr = SYM_ZDEF;
+                    }
+                    // Zero page displacement symbol
+                    else if ( cursym->type == SYM_ZERO )
                     {
                         opval |= cursym->val;
-                    }
-                    // Symbol not in current segment
-                    else if ( cursym->type != curseg->sym )
-                    {
-                        exit(1);
+                        oprdr = SYM_ZDSP;
                     }
                     // Program counter relative symbol
-                    else
+                    else if ( cursym->type == curseg->sym )
                     {
                         int disp = cursym->val - curseg->pos;
 
                         // Out of bounds
-                        if ( disp < -128 || disp > 127 ) exit(1);
+                        if ( disp < -128 || disp > 127 ) asmfail("label outside displacement range");
 
                         opval |= disp;
+                    }
+                    // Symbol not in current segment
+                    else
+                    {
+                        asmfail("label not in current segment");
                     }
 
                     ntok();
@@ -181,16 +211,16 @@ void assemble( char * fpath, int pass )
             {
                 // Get source accumulator
                 ntok();
-                if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) exit(1);
+                if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected a source accumulator");
                 opval |= tkVal << 13;
 
                 // Get argument seperator
                 ntok();
-                if ( tk != TOK_ARG ) exit(1);
+                if ( tk != TOK_ARG ) asmfail("expected a comma");
 
                 // Get destination accumulator
                 ntok();
-                if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) exit(1);
+                if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected a destination accumulator");
                 opval |= tkVal << 11;
 
                 // Check if there's a skip code
@@ -211,14 +241,14 @@ void assemble( char * fpath, int pass )
                     }
                     else
                     {
-                        exit(1);
+                        asmfail("expected a skip condition");
                     }
 
                     ntok();
                 }
                 else if ( opval & 8 ) // Don't allow pseudo-trap instructions
                 {
-                    exit(1);
+                    asmfail("arithmetic no-ops are not permitted");
                 }
             }
             // Trap instruction
@@ -227,7 +257,7 @@ void assemble( char * fpath, int pass )
             {
                 // Ensure this is an 11-bit numerical constant
                 ntok();
-                if ( tk != TOK_NUM || tk < 0 || tk > 2047 ) exit(1);
+                if ( tk != TOK_NUM || tk < 0 || tk > 2047 ) asmfail("invalid trap code");
                 opval |= tkVal < 4;
 
                 ntok();
@@ -239,23 +269,25 @@ void assemble( char * fpath, int pass )
                 {
                     // Get accumulator
                     ntok();
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) exit(1);
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
                     opval |= tkVal << 11;
 
                     if ( optyp == DGN_CTAA )
                     {
                         ntok();
-                        if ( tk != TOK_ARG ) exit(1); // Missing argument seperator
+                        if ( tk != TOK_ARG ) asmfail("expected a comma"); // Missing argument seperator
 
                         // Get accumulator
                         ntok();
-                        if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) exit(1);
+                        if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected a second accumulator");
                         opval |= tkVal << 6;
                     }
                 }
 
                 ntok();
             }
+
+            if ( pass ) segset( curseg, oprdr, opval );
 
             // Write out instruction
             curseg->pos++;
@@ -273,7 +305,7 @@ void assemble( char * fpath, int pass )
         {
             // Get label
             ntok();
-            if ( tk != TOK_NAME ) exit(1);
+            if ( tk != TOK_NAME ) asmfail("expected a label");
 
             // Make label global
             symtbl[tkVal].file = 0;
@@ -285,27 +317,41 @@ void assemble( char * fpath, int pass )
         {
             // Get label
             ntok();
-            if ( tk != TOK_NAME ) exit(1);
+            if ( tk != TOK_NAME ) asmfail("expected a label");
 
             // Store ref to symbol
             struct symbol * cursym = &symtbl[tkVal];
 
             // Already defined symbol
-            if ( cursym->type != SYM_DEF ) exit(1);
+            if ( cursym->type != SYM_DEF ) asmfail("label already defined");
 
             // Get comma
             ntok();
-            if ( tk != TOK_ARG ) exit(1);
+            if ( tk != TOK_ARG ) asmfail("expected a comma");
 
             // Get numerical value to assign
             ntok();
-            if ( tk != TOK_NUM ) exit(1);
+            if ( tk != TOK_NUM ) asmfail("expected a constant value");
 
             // Assign value to absolute symbol
             cursym->type = SYM_ABS;
             cursym->val = tkVal;
             cursym->file = curfno;
+
+            ntok();
         }
+        else
+        {
+            asmfail("invalid token");
+        }
+
+        // Make sure this is the correct end of statement
+        if ( tk != TOK_EOL )
+        {
+            asmfail("expected end of statement");
+        }
+
+        ntok();
     }
 }
 

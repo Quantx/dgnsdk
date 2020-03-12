@@ -1,12 +1,13 @@
 // Pretend this is a 16-bit unix 6 system
 #define int short
-#define long int
 #define NULL 0
 
+#define DBUG_TOK 1
+
 // How many symbols should we allocate for
-#define MAX_SYMS 512
+#define MAX_SYMS 1024
 #define MAX_LINE 256
-#define MAX_TOKN 8
+#define MAX_TOKN 8    // The Unix6 'a.out' executable standard limits us to 8 characters
 #define PAGESIZE 1023 // 2 KB (1 KW) of memory (1 mmu page)
 
 // *** DGNova Instruction Parameter Formats ***
@@ -41,24 +42,27 @@
 #define TOK_ARG  24 // Argument seperator token ','
 #define TOK_BYLO 25 // Low  byte indicator '>'
 #define TOK_BYHI 26 // High byte indicator '<'
+#define TOK_EOL  27 // End of line token
 
 // *** Symbols Type ***
-#define SYM_DEF   0 // Undefined symbol
-#define SYM_ABS   1 // Absolute symbol
-#define SYM_TEXT  2 // Text pointer
-#define SYM_DATA  3 // Data pointer
-#define SYM_BSS   4 // Bss  pointer
-#define SYM_ZERO  5 // Zero-page pointer
+#define SYM_BYTE  1 // Byte flag
 
-#define SYM_BYTE 0b10000000 // Byte flag
+#define SYM_ABS   0 // Constant value
+#define SYM_TEXT  2 // Text pointer
+#define SYM_DATA  4 // Data pointer
+#define SYM_BSS   6 // Bss  pointer
+#define SYM_ZERO  8 // Zero-page pointer
+#define SYM_DEF  10 // Undefined symbol
+#define SYM_ZDSP 12 // Zero-page mode 0 displacement
+#define SYM_ZDEF 14 // Undefined zero page symbol
+#define SYM_FILE 16 // File seperator symbol
 
 // *** Boolean Flags ***
 #define FLG_GLOB 0b0000000000000001 // Force all undefined symbols to be global
 
 struct symbol
 {
-    // The Unix6 'a.out' executable standard limits us to 8 characters
-    char name[8];
+    char name[MAX_TOKN]; // Symbol name
     unsigned char type; // Symbol type
     unsigned char file; // What file this symbol is local to (0 = global)
     unsigned int val; // Opcode, Address, Value, etc.
@@ -82,6 +86,9 @@ struct segment
 
     unsigned char sym; // The symbol type
 };
+
+// Assembly fail function
+void asmfail(char * msg);
 
 // Unix system calls
 void exit(int status);
