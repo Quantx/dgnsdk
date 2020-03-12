@@ -5,7 +5,8 @@ void assemble( char * fpath, int pass )
 
     fp = fpath; // Save file path string
     curline = 0; // Reset current line
-    p = NULL; // Null out tok pointer for first readline
+    p = NULL; // Set default value for p
+    tk = TOK_EOL; // Set EOL token for readline inint
     fd = open( fpath, 0 ); // Open file for reading
 
     // Cannot open file
@@ -67,6 +68,7 @@ void assemble( char * fpath, int pass )
                 }
 
                 ntok();
+                continue; // Go right into a new statement
             }
             // Some other token
             else
@@ -100,7 +102,7 @@ void assemble( char * fpath, int pass )
                 {
                     // Get accumulator
                     ntok();
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator 0");
                     opval |= tkVal << 11;
                     // Get comma
                     ntok();
@@ -123,7 +125,7 @@ void assemble( char * fpath, int pass )
                 if ( optyp == DGN_LOAD )
                 {
                     // Get accumulator
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator 1");
                     opval |= tkVal << 11;
                     // Get comma
                     ntok();
@@ -269,7 +271,7 @@ void assemble( char * fpath, int pass )
                 {
                     // Get accumulator
                     ntok();
-                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator 2");
                     opval |= tkVal << 11;
 
                     if ( optyp == DGN_CTAA )
@@ -277,7 +279,7 @@ void assemble( char * fpath, int pass )
                         ntok();
                         if ( tk != TOK_ARG ) asmfail("expected a comma"); // Missing argument seperator
 
-                        // Get accumulator
+                        // Get second accumulator
                         ntok();
                         if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected a second accumulator");
                         opval |= tkVal << 6;
@@ -340,7 +342,7 @@ void assemble( char * fpath, int pass )
 
             ntok();
         }
-        else
+        else if ( tk != TOK_EOL )
         {
             asmfail("invalid token");
         }

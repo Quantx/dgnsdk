@@ -3,6 +3,7 @@
 #define NULL 0
 
 #define DBUG_TOK 1
+#define DBUG_SYM 1
 
 // How many symbols should we allocate for
 #define MAX_SYMS 1024

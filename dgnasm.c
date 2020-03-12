@@ -6,12 +6,18 @@ unsigned char curfno = 1; // Current file number
 // Output an octal number
 void octwrite( int nfd, unsigned int val )
 {
+    if ( !val )
+    {
+        write( 1, "0", 1 );
+        return;
+    }
+
     char tmpbuf[6];
-    int tmppos = 5;
+    int tmppos = 6;
 
     while ( val )
     {
-        tmpbuf[tmppos--] = (val & 7) + '0';
+        tmpbuf[--tmppos] = (val & 7) + '0';
         val >>= 3;
     }
 
@@ -53,9 +59,10 @@ void asmfail( char * msg )
     i = 0;
     while ( msg[i] ) i++;
     write( 2, msg, i );
-
-    // Output newline and exit
     write( 2, "\r\n", 2 );
+
+    // Output current line
+
     exit(1);
 }
 

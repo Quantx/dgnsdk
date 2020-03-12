@@ -7,21 +7,16 @@ int readline()
     int i = 0;
 
     // Current line still has data
-    if ( p != NULL && tk ) return -1;
+    if ( tk != TOK_EOL ) return -1;
 
     // Read data in and scan for newline
-    while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i] != '\n' )
-    {
-        // Termination on comments
-        if ( lp[i] == ';' ) lp[i] = 0;
-        i++;
-    }
+    while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i] != '\n' ) i++;
 
     // Buffer overflow
     if ( i == MAX_LINE - 1 ) asmfail("readline overflow");
 
-    // Null termiante
-    lp[i] = 0;
+    // Null terminate a line if needed
+    if ( lp[i] != '\n' ) lp[++i] = '\n';
 
     // Increment line count
     curline++;
@@ -33,7 +28,7 @@ int readline()
     // Set start of line pointer
     p = lp;
 
-    // Return number of bytes read
+    // Number of bytes read
     return i;
 }
 
@@ -54,9 +49,15 @@ void ntok()
     {
         pp = p++;
 
-        if ( (tk >= 'a' && tk <= 'z') // Named symbol
-          || (tk >= 'A' && tk <= 'Z')
-          ||  tk == '_' || tk == '.'  )
+        if ( tk == '\n' || tk == ';' ) // End of line
+        {
+            tk = TOK_EOL;
+            tkVal = 0;
+            return;
+        }
+        else if ( (tk >= 'a' && tk <= 'z') // Named symbol
+               || (tk >= 'A' && tk <= 'Z')
+               ||  tk == '_' || tk == '.'  )
         {
             // Get entire token
             while ( p - pp < MAX_TOKN
@@ -68,10 +69,12 @@ void ntok()
             // Label excedes max length
             if ( p - pp == MAX_TOKN ) asmfail("named token exceeds max character length");
 
-            int i = 0, k = 0;
+            int i, k = 0;
             // Find a matching symbol
             while ( k < sympos )
             {
+                i = 0;
+
                 // Get all characters that implicitly match
                 while ( i < p - pp && symtbl[k].name[i] == pp[i] ) i++;
 
@@ -87,7 +90,15 @@ void ntok()
                 }
 
                 // Exact match
-                if ( !symtbl[k].name[i + 1] ) return;
+                if ( i == p - pp && !symtbl[k].name[i] )
+                {
+                    #if DBUG_SYM
+                    write( 1, "SYM MATCH: '", 12 );
+                    write( 1, symtbl[k].name, i );
+                    write( 1, "'\r\n", 3 );
+                    #endif
+                    return;
+                }
 
                 // Didn't match base name, skip flags
                 if ( symtbl[k].name[i] || tk == TOK_NAME ) { k++; continue; }
@@ -97,15 +108,15 @@ void ntok()
 
                 // Check flags if I/O instruction
                 if ( flagNum == 1
-                && ( symtbl[k].type == DGN_IO
-                ||   symtbl[k].type == DGN_CTF
-                ||   symtbl[k].type == DGN_CTAF ) )
+                && ( tk == DGN_IO
+                ||   tk == DGN_CTF
+                ||   tk == DGN_CTAF ) )
                 {
                     if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000001000000; return; }
                     if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000010000000; return; }
                     if ( pp[i] == 'p' || pp[i] == 'P' ) { tkVal |= 0b0000000011000000; return; }
                 }
-                else if ( symtbl[k].type = DGN_MATH && flagNum >= 1 && flagNum <= 3 )
+                else if ( tk = DGN_MATH && flagNum >= 1 && flagNum <= 3 )
                 {
                     // Carry control
                     if      ( pp[i] == 'z' || pp[i] == 'Z' ) { tkVal |= 0b0000000000010000; i++; flagNum--; }
@@ -137,11 +148,14 @@ void ntok()
 
             // Create new symbol
             i = 0;
-            while ( i < MAX_TOKN ) // Store symbol and fill rest with zeros
+            while ( i < p - pp ) // Store symbol and fill rest with zeros
             {
-                symtbl[k].name[i] = i < p - pp ? pp[i] : 0;
+                symtbl[k].name[i] = pp[i];
                 i++;
             }
+
+            // Null terminate
+            if ( i < MAX_TOKN ) symtbl[k].name[i] = 0;
 
             // Set type to undefiend symbol
             symtbl[k].type = SYM_DEF;
@@ -149,6 +163,12 @@ void ntok()
             symtbl[k].file = flags & FLG_GLOB ? 0 : curfno;
             // Set default value
             symtbl[k].val = 0;
+
+            #if DBUG_SYM
+            write( 1, "NEW SYM: ", 9 );
+            write( 1, symtbl[k].name, MAX_TOKN );
+            write( 1, "\r\n", 2 );
+            #endif
 
             sympos++;
 
@@ -202,8 +222,9 @@ void ntok()
         else if ( tk == '>' ) { tk = TOK_BYLO; tkVal = 0; return; } // High byte pointer flag
     }
 
-    // End of line reached, return end of line token
+    // End of line reached, use end of line token
     tk = TOK_EOL;
+    tkVal = 0;
 }
 
 #if DBUG_TOK
@@ -211,8 +232,12 @@ void ntok()
 {
     ntok_dbg();
 
-    write( 1, "TOKEN: ", 7 );
+    write( 1, "INP: '", 6 );
+    write( 1, pp, p - pp );
+    write( 1, "', TOKEN: ", 10 );
     octwrite( 1, tk );
+    write( 1, ", VAL: ", 7 );
+    octwrite( 1, tkVal );
     write( 1, "\r\n", 2 );
 }
 #endif
