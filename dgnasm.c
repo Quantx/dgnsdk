@@ -53,6 +53,9 @@ void asmfail( char * msg )
             octwrite( 2, pp - lp );
             write( 2, ":", 1 );
         }
+
+        // Close current file (good practice)
+        close( fd );
     }
 
     // Output error message
@@ -77,12 +80,13 @@ void asmfail( char * msg )
 
     write( 2, "^\r\n", 3 );
 
-    exit(1);
+    exit(1); // Quit program
 }
 
 int main( int argc, char ** argv )
 {
     // Drop first argument (program name)
+    char * progname = *argv;
     argc--; argv++;
 
     // Force all undefined symbols to be globals
@@ -90,6 +94,17 @@ int main( int argc, char ** argv )
     {
         flags |= FLG_GLOB;
         argc--; argv++;
+    }
+
+    if ( !argc )
+    {
+        write( 2, "usage: ", 7 );
+        int i = 0;
+        while( progname[i] ) i++;
+        write( 2, progname, i );
+        write( 2, " [-] file1.s file2.s ...\r\n", 26 );
+
+        exit(1);
     }
 
     write( 1, " *** Starting first pass ***\r\n", 30 );
@@ -131,6 +146,18 @@ int main( int argc, char ** argv )
         assemble( argv[curfno - 1] );
         curfno++;
     }
+
+    // *** Output final result ***
+
+    // Open a.out for writing
+    int ofd = open( "a.out", 1 );
+
+    if ( ofd < 0 ) asmfail("failed to open a.out");
+
+    
+
+    // Close a.out
+    close( ofd );
 
     return 0;
 }

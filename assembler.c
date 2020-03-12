@@ -355,5 +355,8 @@ void assemble( char * fpath )
 
         ntok();
     }
+
+    // Close the file when done
+    close( fd );
 }
 
