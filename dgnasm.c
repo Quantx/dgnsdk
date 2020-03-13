@@ -2,6 +2,7 @@
 
 unsigned int flags = 0; // Store misc booleans
 unsigned char curfno = 1; // Current file number
+unsigned int entrypos = 0;
 
 // Output an octal number
 void octwrite( int nfd, unsigned int val )
@@ -85,6 +86,8 @@ void asmfail( char * msg )
 
 int main( int argc, char ** argv )
 {
+    int i = 0;
+
     // Drop first argument (program name)
     char * progname = *argv;
     argc--; argv++;
@@ -99,7 +102,6 @@ int main( int argc, char ** argv )
     if ( !argc )
     {
         write( 2, "usage: ", 7 );
-        int i = 0;
         while( progname[i] ) i++;
         write( 2, progname, i );
         write( 2, " [-] file1.s file2.s ...\r\n", 26 );
@@ -112,8 +114,7 @@ int main( int argc, char ** argv )
     // *** Run first pass for each file ***
     while ( curfno <= argc )
     {
-        assemble( argv[curfno - 1] );
-        curfno++;
+        assemble( argv[curfno++ - 1] );
     }
 
     write( 1, "Allocating required memory\r\n", 28 );
@@ -133,7 +134,6 @@ int main( int argc, char ** argv )
     segalloc( &data );
     segalloc( &zero );
 
-
     write( 1, " *** Starting second pass ***\r\n", 31 );
 
     // Reset current file number
@@ -143,18 +143,41 @@ int main( int argc, char ** argv )
     // *** Run second pass for each file ***
     while ( curfno <= argc )
     {
-        assemble( argv[curfno - 1] );
-        curfno++;
+        assemble( argv[curfno++ - 1] );
     }
 
     // *** Output final result ***
 
     // Open a.out for writing
-    int ofd = open( "a.out", 1 );
+    int ofd = creat( "a.out", 0755 );
 
     if ( ofd < 0 ) asmfail("failed to open a.out");
 
-    
+    // Output header
+    int header[8];
+    header[0] = 0410;     // Magic number (how do we load this program)
+    header[1] = zero.max; // Zero segment length
+    header[2] = text.max; // Text segment length
+    header[3] = data.max; // Data segment length
+    header[4] =  bss.max; // Bss  segment length
+    header[5] = sympos - ASM_SIZE; // Symbol table length
+    header[6] = entrypos; // Text segment entry offset
+    header[7] = 0;        // Misc flags
+
+    write( ofd, header, 16 );
+
+    // Output each segment's data
+    blkwrite( ofd, zero.head, zero.max );
+    blkwrite( ofd, text.head, text.max );
+    blkwrite( ofd, data.head, data.max );
+
+    // Output symbol table
+    write( ofd, symtbl + ASM_SIZE, header[5] * sizeof(struct symbol) );
+
+    // Output relocation data
+    blkwrite( ofd, zero.rloc, zero.max );
+    blkwrite( ofd, text.rloc, text.max );
+    blkwrite( ofd, data.rloc, data.max );
 
     // Close a.out
     close( ofd );

@@ -10,6 +10,7 @@
 #define MAX_LINE 256
 #define MAX_TOKN 8    // The Unix6 'a.out' executable standard limits us to 8 characters
 #define PAGESIZE 1023 // 2 KB (1 KW) of memory (1 mmu page)
+#define ASM_SIZE 71  // Number of assembler defined symbols
 
 // *** DGNova Instruction Parameter Formats ***
 #define DGN_IONO  8 // I/O No accumulator
@@ -32,18 +33,19 @@
 #define ASM_ZERO 23 // .zero   directive
 #define ASM_GLOB 24 // .glob   directive
 #define ASM_DEFN 25 // .define directive
+#define ASM_ENT  26 // .ent    directive
 // *** DGNova Constants ***
-#define DGN_SKPC 26 // Arithmetic & Logic skip condition
-#define DGN_HWID 27 // Nova Hardware ID
+#define DGN_SKPC 27 // Arithmetic & Logic skip condition
+#define DGN_HWID 28 // Nova Hardware ID
 // *** Token types ***
-#define TOK_NAME 28 // Named symbol (user label)
-#define TOK_NUM  29 // Numberical constant
-#define TOK_INDR 30 // Indirect bit token '@'
-#define TOK_LABL 31 // Label token ':'
-#define TOK_ARG  32 // Argument seperator token ','
-#define TOK_BYLO 33 // Low  byte indicator '>'
-#define TOK_BYHI 34 // High byte indicator '<'
-#define TOK_EOL  35 // End of line token
+#define TOK_NAME 29 // Named symbol (user label)
+#define TOK_NUM  30 // Numberical constant
+#define TOK_INDR 31 // Indirect bit token '@'
+#define TOK_LABL 32 // Label token ':'
+#define TOK_ARG  33 // Argument seperator token ','
+#define TOK_BYLO 34 // Low  byte indicator '>'
+#define TOK_BYHI 35 // High byte indicator '<'
+#define TOK_EOL  36 // End of line token
 
 // *** Symbols Type ***
 #define SYM_BYTE  1 // Byte flag
@@ -83,7 +85,7 @@ struct segment
     unsigned int max; // Highest position reached in the segment
 
     struct memblock * head; // Actuall data stored in segment
-    struct memblock * rdir; // Redirection bits for the data
+    struct memblock * rloc; // Relocation bits for the data
 
     unsigned char sym; // The symbol type
 };
@@ -93,6 +95,7 @@ void asmfail(char * msg);
 
 // Unix system calls
 void exit(int status);
+int creat(const char * pathname, int mode);
 int  open(const char * pathname, int flags);
 int close(int fd);
 int  read(int fd, void * buf, unsigned int count);

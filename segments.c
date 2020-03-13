@@ -7,7 +7,7 @@ struct segment zero = {0, 0, NULL, NULL, SYM_ZERO };
 struct segment * curseg;
 
 // Set a word in a segment
-void segset( struct segment * seg, unsigned char redir, unsigned int val )
+void segset( struct segment * seg, unsigned char reloc, unsigned int val )
 {
     // Still on pass 1
     if ( ~flags & FLG_PASS ) return;
@@ -19,12 +19,12 @@ void segset( struct segment * seg, unsigned char redir, unsigned int val )
     if ( seg->sym == SYM_BSS ) asmfail( "tried to output to BSS segment" );
 
     struct memblock * blk = seg->head; // Segment data
-    struct memblock * rdr = seg->rdir; // Redirection
+    struct memblock * rlc = seg->rloc; // Relocation
 
     while ( addr > PAGESIZE )
     {
         blk = blk->next;
-        rdr = rdr->next;
+        rlc = rlc->next;
 
         addr -= PAGESIZE;
     }
@@ -32,14 +32,14 @@ void segset( struct segment * seg, unsigned char redir, unsigned int val )
     if ( blk == NULL ) asmfail( "block was null!" );
 
     blk->data[addr] = val;
-    rdr->data[addr] = redir;
+    rlc->data[addr] = reloc;
 }
 
 void segalloc( struct segment * seg )
 {
     unsigned int size = seg->max;
     struct memblock ** blk = &seg->head; // Segment data
-    struct memblock ** rdr = &seg->rdir; // Redirection
+    struct memblock ** rlc = &seg->rloc; // Relocation
 
     while ( size > 0 )
     {
@@ -50,15 +50,29 @@ void segalloc( struct segment * seg )
             if ( *blk < 0 ) asmfail("out of memory");
             (*blk)->next = NULL; // Terminate new segment
 
-            *rdr = (struct memblock *) sbrk( sizeof(struct memblock) );
-            if ( *rdr < 0 ) asmfail("out of memory");
-            (*rdr)->next = NULL; // Terminate new segment
+            *rlc = (struct memblock *) sbrk( sizeof(struct memblock) );
+            if ( *rlc < 0 ) asmfail("out of memory");
+            (*rlc)->next = NULL; // Terminate new segment
         }
 
         blk = &(*blk)->next;
-        rdr = &(*rdr)->next;
+        rlc = &(*rlc)->next;
 
         if ( size >= PAGESIZE ) size -= PAGESIZE;
         else size = 0;
     }
+}
+
+void blkwrite( int sfd, struct memblock * blk, unsigned int size )
+{
+    while ( size >= PAGESIZE )
+    {
+        write( sfd, blk->data, PAGESIZE << 1 );
+
+        blk = blk->next;
+
+        size -= PAGESIZE;
+    }
+
+    if ( size ) write( sfd, blk->data, size << 1 );
 }
