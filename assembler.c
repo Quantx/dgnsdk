@@ -18,9 +18,6 @@ void assemble( char * fpath )
         // Label constant with indirect bit, or high byte, or low byte
         if ( tk == TOK_INDR || tk == TOK_BYLO || tk == TOK_BYHI )
         {
-            // Store initial token type
-            char lblType = tk;
-
             ntok();
             if ( tk != TOK_NAME ) asmfail("expected label"); // The following token MUST be a label
 
@@ -82,12 +79,19 @@ void assemble( char * fpath )
         }
         else if ( tk == TOK_NUM ) // Numerical constant
         {
+            if ( curseg->sym == SYM_BSS ) // Increment pos for BSS segment
+            {
+                curseg->pos += tkVal;
+            }
+            else
+            {
+                segset( curseg, SYM_ABS << 1, tkVal );
+
+                // Allocate room for absolute symbol in the segment
+                curseg->pos++;
+            }
+
             ntok();
-
-            segset( curseg, SYM_ABS << 1, tkVal );
-
-            // Allocate room for absolute symbol in the segment
-            curseg->pos++;
         }
         else if ( tk >= DGN_IONO && tk <= DGN_CTAA ) // DGNova instruction
         {
@@ -342,6 +346,7 @@ void assemble( char * fpath )
 
             ntok();
         }
+        // Assembler .ent directive
         else if ( tk == ASM_ENT )
         {
             ntok();
@@ -374,4 +379,3 @@ void assemble( char * fpath )
     // Close the file when done
     close( fd );
 }
-
