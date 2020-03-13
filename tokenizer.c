@@ -10,7 +10,7 @@ int readline()
     int i = 0;
 
     // Read data in and scan for newline
-    while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i] != '\n' ) i++;
+    while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i++] != '\n' );
 
     // Buffer overflow
     if ( i == MAX_LINE - 1 ) asmfail("readline overflow");
@@ -21,9 +21,9 @@ int readline()
     // Increment line count
     curline++;
 
-    write( 1, "NLIN: '", 7 );
-    write( 1, lp, i );
-    write( 1, "'\r\n", 3 );
+//    write( 1, "NLIN: '", 7 );
+//    write( 1, lp, i );
+//    write( 1, "'\r\n", 3 );
 
     // Set start of line pointer
     p = lp;
