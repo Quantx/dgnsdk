@@ -90,7 +90,8 @@ void ntok()
                 }
 
                 // Exact match
-                if ( i == p - pp && !symtbl[k].name[i] )
+                if ( i == p - pp && !symtbl[k].name[i]
+                && (!symtbl[k].file || symtbl[k].file == curfno) )
                 {
                     #if DBUG_SYM
                     write( 1, "SYM MATCH: '", 12 );

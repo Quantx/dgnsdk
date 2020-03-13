@@ -75,6 +75,7 @@ struct symbol symtbl[MAX_SYMS] = {
     { { '.', 'Z', 'E', 'R', 'O',           0 }, ASM_ZERO, 0, 0 }, // .ZERO
     { { '.', 'G', 'L', 'O', 'B',           0 }, ASM_GLOB, 0, 0 }, // .GLOB
     { { '.', 'D', 'E', 'F', 'I', 'N', 'E', 0 }, ASM_DEFN, 0, 0 }, // .DEFINE
+    { { '.', 'E', 'N', 'T',                0 }, ASM_ENT,  0, 0 }, // .ENT
     // Hardware device aliases (8 so far)
     { { 'M', 'D', 'V',      0 }, DGN_HWID, 0, 001 }, // MDV - Multiply & Divide
     { { 'M', 'A', 'P',      0 }, DGN_HWID, 0, 002 }, // MAP  - Memory Management Unit
@@ -88,4 +89,4 @@ struct symbol symtbl[MAX_SYMS] = {
 };
 
 // Intialized to the total number of symbols in the table above
-int sympos = 70;
+int sympos = ASM_SIZE;

@@ -25,7 +25,7 @@ void assemble( char * fpath )
             if ( tk != TOK_NAME ) asmfail("expected label"); // The following token MUST be a label
 
             // Store ref to symbol
-            struct symbol * cursym = &symtbl[tkVal];
+            struct symbol * cursym = symtbl + tkVal;
 
             if ( flags & FLG_PASS ) // Write to output
             {
@@ -51,7 +51,7 @@ void assemble( char * fpath )
         {
             // Store ref to symbol
             int cursymno = tkVal;
-            struct symbol * cursym = &symtbl[cursymno];
+            struct symbol * cursym = symtbl + cursymno;
 
             ntok();
             // Label declaration
@@ -175,7 +175,7 @@ void assemble( char * fpath )
                 else if ( tk == TOK_NAME ) // Label displacement (assembler picks mode)
                 {
                     // Store ref to symbol
-                    struct symbol * cursym = &symtbl[tkVal];
+                    struct symbol * cursym = symtbl + tkVal;
 
                     // Undefined zero page symbol
                     if ( cursym->type == SYM_DEF )
@@ -322,7 +322,7 @@ void assemble( char * fpath )
             if ( tk != TOK_NAME ) asmfail("expected a label");
 
             // Store ref to symbol
-            struct symbol * cursym = &symtbl[tkVal];
+            struct symbol * cursym = symtbl + tkVal;
 
             // Already defined symbol
             if ( cursym->type != SYM_DEF ) asmfail("label already defined");
@@ -342,6 +342,21 @@ void assemble( char * fpath )
 
             ntok();
         }
+        else if ( tk == ASM_ENT )
+        {
+            ntok();
+            if ( tk != TOK_NAME ) asmfail("expected a label");
+
+            struct symbol * cursym = symtbl + tkVal;
+
+            if ( cursym->type != SYM_TEXT ) asmfail("label must be a text label");
+
+            // Update entry position
+            entrypos = cursym->val;
+
+            ntok();
+        }
+        // This must be last!
         else if ( tk != TOK_EOL )
         {
             asmfail("invalid token");
