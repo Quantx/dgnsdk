@@ -69,7 +69,7 @@ void ntok()
             // Label excedes max length
             if ( p - pp == MAX_TOKN ) asmfail("named token exceeds max character length");
 
-            int i, k = 0;
+            int i, k = 0, fscp = 0;
             // Find a matching symbol
             while ( k < sympos )
             {
@@ -78,11 +78,12 @@ void ntok()
                 // Get all characters that implicitly match TODO case insensitivity
                 while ( i < p - pp && symtbl[k].name[i] == pp[i] ) i++;
 
-                if ( symtbl[k].type >= DGN_IONO && symtbl[k].type <= DGN_HWID ) // Assembler defined symbol
+                if ( k < ASM_SIZE ) // Assembler defined symbol
                 {
                     tk = symtbl[k].type;
                     tkVal = symtbl[k].val;
                 }
+                else if ( (symtbl[k].type & SYM_MASK) == SYM_FILE ) fscp++; // File seperator token
                 else // User defined symbol
                 {
                     tk = TOK_NAME;
@@ -91,7 +92,7 @@ void ntok()
 
                 // Exact match
                 if ( i == p - pp && !symtbl[k].name[i]
-                && (!symtbl[k].file || symtbl[k].file == curfno) )
+                && (symtbl[k].type & SYM_GLOB || fscp == curfno || k < ASM_SIZE) )
                 {
                     #if DBUG_SYM
                     write( 1, "SYM MATCH: '", 12 );
@@ -171,8 +172,8 @@ void ntok()
 
             // Set type to undefiend symbol
             symtbl[k].type = SYM_DEF;
-            // Set current file number
-            symtbl[k].file = flags & FLG_GLOB ? 0 : curfno;
+            // Make this symbol global
+            if ( flags & FLG_GLOB ) symtbl[k].type |= SYM_GLOB;
             // Set default value
             symtbl[k].val = 0;
 

@@ -59,6 +59,10 @@
 #define SYM_ZDEF  6 // Undefined zero page symbol
 #define SYM_FILE  7 // File seperator symbol
 
+#define SYM_MASK  7 // Symbol type mask
+
+#define SYM_GLOB  8 // Global flag
+
 // *** Boolean Flags ***
 #define FLG_GLOB 0b0000000000000001 // Force all undefined symbols to be global
 #define FLG_PASS 0b0000000000000010 // Which pass are we on: pass 2 == Flag Set
@@ -66,8 +70,7 @@
 struct symbol
 {
     char name[MAX_TOKN]; // Symbol name
-    unsigned char type; // Symbol type
-    unsigned char file; // What file this symbol is local to (0 = global)
+    unsigned int type; // Symbol type
     unsigned int val; // Opcode, Address, Value, etc.
 };
 

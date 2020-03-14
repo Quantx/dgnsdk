@@ -1,7 +1,8 @@
 #include "dgnasm.h"
 
+char * sepname = "SYMDELIM";
 unsigned int flags = 0; // Store misc booleans
-unsigned char curfno = 1; // Current file number
+unsigned char curfno = 0; // Current file number
 unsigned int entrypos = 0;
 
 // Output an octal number
@@ -40,7 +41,7 @@ void asmfail( char * msg )
         char tmpchr;
 
         // Output current file
-        while ( fp[i] ) i++;
+        while ( fp[i++] );
         write( 2, fp, i );
         write( 2, ":", 1 );
 
@@ -61,15 +62,15 @@ void asmfail( char * msg )
 
     // Output error message
     i = 0;
-    while ( msg[i] ) i++;
+    while ( msg[i++] );
     write( 2, msg, i );
     write( 2, "\r\n", 2 );
 
     // Output current line
     i = 0;
-    while ( lp[i] ) i++;
+    while ( lp[i++] );
     write( 2, lp, i );
-    write( 2, "\r\n", 2 );
+//    write( 2, "\r\n", 2 );
 
     // Output curpos indicator
     i = 0;
@@ -86,7 +87,7 @@ void asmfail( char * msg )
 
 int main( int argc, char ** argv )
 {
-    int i = 0;
+    int i;
 
     // Drop first argument (program name)
     char * progname = *argv;
@@ -102,8 +103,11 @@ int main( int argc, char ** argv )
     if ( !argc )
     {
         write( 2, "usage: ", 7 );
-        while( progname[i] ) i++;
+
+        i = 0;
+        while( progname[i++] );
         write( 2, progname, i );
+
         write( 2, " [-] file1.s file2.s ...\r\n", 26 );
 
         exit(1);
@@ -112,9 +116,29 @@ int main( int argc, char ** argv )
     write( 1, " *** Starting first pass ***\r\n", 30 );
 
     // *** Run first pass for each file ***
-    while ( curfno <= argc )
+    while ( curfno < argc )
     {
-        assemble( argv[curfno++ - 1] );
+        // Output the current file
+        write( 1, "Labeling file: ", 15 );
+        i = 0;
+        while ( argv[curfno][i++] );
+        write( 1, argv[curfno], i );
+        write( 1, "\r\n", 2 );
+
+        assemble( argv[curfno] );
+
+        if ( curfno < argc - 1 )
+        {
+            // Add file seperator symbol
+            struct symbol * sepsym = symtbl + sympos++;
+
+            i = 0;
+            while ( sepname[i] ) { sepsym->name[i] = sepname[i]; i++; }
+            sepsym->type = SYM_FILE;
+            sepsym->val = 0;
+        }
+
+        curfno++;
     }
 
     write( 1, "Allocating required memory\r\n", 28 );
@@ -137,13 +161,21 @@ int main( int argc, char ** argv )
     write( 1, " *** Starting second pass ***\r\n", 31 );
 
     // Reset current file number
-    curfno = 1;
+    curfno = 0;
     flags |= FLG_PASS;
 
     // *** Run second pass for each file ***
-    while ( curfno <= argc )
+    while ( curfno < argc )
     {
-        assemble( argv[curfno++ - 1] );
+        // Output the current file
+        write( 1, "Assembling file: ", 17 );
+        i = 0;
+        while ( argv[curfno][i++] );
+        write( 1, argv[curfno], i );
+        write( 1, "\r\n", 2 );
+
+        assemble( argv[curfno] );
+        curfno++;
     }
 
     // *** Output final result ***
@@ -155,7 +187,7 @@ int main( int argc, char ** argv )
 
     // Output header
     int header[8];
-    header[0] = 0410;     // Magic number (how do we load this program)
+    header[0] = 0410;     // Magic number (program load method)
     header[1] = zero.max; // Zero segment length
     header[2] = text.max; // Text segment length
     header[3] = data.max; // Data segment length
@@ -184,3 +216,4 @@ int main( int argc, char ** argv )
 
     return 0;
 }
+

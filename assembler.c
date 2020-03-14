@@ -35,7 +35,7 @@ void assemble( char * fpath )
                 // This is a high byte pointer
                 if ( tk == TOK_BYHI ) val |= 1;
 
-                segset( curseg, tkVal << 4 | cursym->type << 1 | tk != TOK_INDR, val );
+                segset( curseg, tkVal << 4 | (cursym->type & SYM_MASK) << 1 | tk != TOK_INDR, val );
             }
 
             // Allocate room for symbol in this segment
@@ -54,9 +54,9 @@ void assemble( char * fpath )
             // Label declaration
             if ( tk == TOK_LABL )
             {
-                if ( cursym->type == SYM_DEF ) // Undefined symbol
+                if ( (cursym->type & SYM_MASK) == SYM_DEF ) // Undefined symbol
                 {
-                    cursym->type = curseg->sym;
+                    cursym->type = curseg->sym | cursym->type & SYM_GLOB;
                     cursym->val = curseg->pos;
                 }
                 else if ( ~flags & FLG_PASS ) // Already defined symbol
@@ -71,7 +71,7 @@ void assemble( char * fpath )
             else
             {
                 // Write out symbol
-                segset( curseg, cursymno << 4 | cursym->type << 1, cursym->val );
+                segset( curseg, cursymno << 4 | (cursym->type & SYM_MASK) << 1, cursym->val );
 
                 // Allocate room for this symbol in the segment
                 curseg->pos++;
@@ -97,7 +97,7 @@ void assemble( char * fpath )
         {
             int optyp = tk; // Type of instruction
             int opval = tkVal; // The 16 bit instruction
-            int oprdr = SYM_ABS << 1; // Redirection bits for the instruction
+            int oprlc = SYM_ABS << 1; // Relocation bits for the instruction
 
             // I/O Instruction, need a device code and maybe an accumulator
             if ( optyp == DGN_IONO || optyp == DGN_IO || optyp == DGN_IOSK )
@@ -182,18 +182,18 @@ void assemble( char * fpath )
                     struct symbol * cursym = symtbl + tkVal;
 
                     // Undefined zero page symbol
-                    if ( cursym->type == SYM_DEF )
+                    if ( (cursym->type & SYM_MASK) == SYM_DEF )
                     {
-                        oprdr = tkVal << 4 | SYM_ZDEF << 1;
+                        oprlc = tkVal << 4 | SYM_ZDEF << 1;
                     }
                     // Zero page displacement symbol
-                    else if ( cursym->type == SYM_ZERO )
+                    else if ( (cursym->type & SYM_MASK) == SYM_ZERO )
                     {
                         opval |= cursym->val;
-                        oprdr = SYM_ZERO << 1;
+                        oprlc = SYM_ZERO << 1;
                     }
                     // Program counter relative symbol
-                    else if ( cursym->type == curseg->sym )
+                    else if ( (cursym->type & SYM_MASK) == curseg->sym )
                     {
                         int disp = cursym->val - curseg->pos;
 
@@ -293,7 +293,7 @@ void assemble( char * fpath )
                 ntok();
             }
 
-            segset( curseg, oprdr, opval );
+            segset( curseg, oprlc, opval );
 
             // Write out instruction
             curseg->pos++;
@@ -314,7 +314,7 @@ void assemble( char * fpath )
             if ( tk != TOK_NAME ) asmfail("expected a label");
 
             // Make label global
-            symtbl[tkVal].file = 0;
+            symtbl[tkVal].type |= SYM_GLOB;
 
             ntok(); // Get comma or next statement
         }
@@ -329,7 +329,7 @@ void assemble( char * fpath )
             struct symbol * cursym = symtbl + tkVal;
 
             // Already defined symbol
-            if ( cursym->type != SYM_DEF ) asmfail("label already defined");
+            if ( (cursym->type & SYM_MASK) != SYM_DEF ) asmfail("label already defined");
 
             // Get comma
             ntok();
@@ -340,9 +340,8 @@ void assemble( char * fpath )
             if ( tk != TOK_NUM ) asmfail("expected a constant value");
 
             // Assign value to absolute symbol
-            cursym->type = SYM_ABS;
+            cursym->type = SYM_ABS | SYM_GLOB;
             cursym->val = tkVal;
-            cursym->file = curfno;
 
             ntok();
         }
@@ -354,7 +353,7 @@ void assemble( char * fpath )
 
             struct symbol * cursym = symtbl + tkVal;
 
-            if ( cursym->type != SYM_TEXT ) asmfail("label must be a text label");
+            if ( (cursym->type & SYM_MASK) != SYM_TEXT ) asmfail("label must be a text label");
 
             // Update entry position
             entrypos = cursym->val;
