@@ -83,7 +83,11 @@ void ntok()
                     tk = symtbl[k].type;
                     tkVal = symtbl[k].val;
                 }
-                else if ( (symtbl[k].type & SYM_MASK) == SYM_FILE ) fscp++; // File seperator token
+                else if ( (symtbl[k].type & SYM_MASK) == SYM_FILE ) // FIle seperator token
+                {
+                    fscp++;
+                    continue;
+                }
                 else // User defined symbol
                 {
                     tk = TOK_NAME;
@@ -153,11 +157,8 @@ void ntok()
                 k++;
             }
 
-
-            if ( k == MAX_SYMS ) // Symbol table is full
-            {
-                asmfail("symbol table is full");
-            }
+            // Allocate room for new symbols
+            if ( sbrk( sizeof(struct symbol) ) == NULL ) asmfail("cannot allocate room for new symbol");
 
             // Create new symbol
             i = 0;

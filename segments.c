@@ -1,78 +1,47 @@
 // Memory segments
-struct segment text = {0, 0, NULL, NULL, SYM_TEXT };
-struct segment data = {0, 0, NULL, NULL, SYM_DATA };
-struct segment  bss = {0, 0, NULL, NULL, SYM_BSS  };
-struct segment zero = {0, 0, NULL, NULL, SYM_ZERO };
+struct segment text = {NULL, 0, 0, NULL, 0, 0, SYM_TEXT };
+struct segment data = {NULL, 0, 0, NULL, 0, 0, SYM_DATA };
+struct segment  bss = {NULL, 0, 0, NULL, 0, 0, SYM_BSS  };
+struct segment zero = {NULL, 0, 0, NULL, 0, 0, SYM_ZERO };
 // Segment currently being worked on
 struct segment * curseg;
 
 // Set a word in a segment
-void segset( struct segment * seg, unsigned char reloc, unsigned int val )
+void segset( struct segment * seg, unsigned int reloc, unsigned int val )
 {
+    struct relocate * curRloc = NULL;
+
+    // Can't output to a BSS segment
+    if ( seg->sym == SYM_BSS ) asmfail( "tried to output to BSS segment" );
+
+    // Compute relocation address and increment
+    if ( reloc )
+    {
+        write( 1, "RELOC: ", 7 );
+        octwrite( 1, reloc );
+        write( 1, "\r\n", 2 );
+
+        curRloc = seg->rloc + seg->rlocPos++;
+    }
+
     // Still on pass 1
     if ( ~flags & FLG_PASS ) return;
 
-    unsigned int addr = seg->pos;
-
     // Beyond end of memory
-    if ( addr > seg->max ) asmfail( "tried to output beyond end of segment" );
-    if ( seg->sym == SYM_BSS ) asmfail( "tried to output to BSS segment" );
+    if ( seg->dataPos > seg->dataSize ) asmfail( "tried to output beyond end of segment's data" );
+    if ( seg->rlocPos > seg->rlocSize ) asmfail( "tried to output beyond end of segment's relocation info" );
 
-    struct memblock * blk = seg->head; // Segment data
-    struct memblock * rlc = seg->rloc; // Relocation
+    // Add symbol offsets
+    if      ( seg->sym == SYM_TEXT ) val += 1 + stksize << 10;
+    else if ( seg->sym == SYM_DATA ) val += text.dataSize + (1 + stksize << 10);
 
-    while ( addr > PAGESIZE )
+    // Store actual data value
+    seg->data[seg->dataPos] = val;
+
+    // Store relocation bits if needed
+    if ( reloc )
     {
-        blk = blk->next;
-        rlc = rlc->next;
-
-        addr -= PAGESIZE;
+        curRloc->head = reloc;
+        curRloc->addr = seg->dataPos;
     }
-
-    if ( blk == NULL ) asmfail( "block was null!" );
-
-    blk->data[addr] = val;
-    rlc->data[addr] = reloc;
-}
-
-void segalloc( struct segment * seg )
-{
-    unsigned int size = seg->max;
-    struct memblock ** blk = &seg->head; // Segment data
-    struct memblock ** rlc = &seg->rloc; // Relocation
-
-    while ( size > 0 )
-    {
-        // Allocate another block
-        if ( *blk == NULL )
-        {
-            *blk = (struct memblock *) sbrk( sizeof(struct memblock) );
-            if ( *blk < 0 ) asmfail("out of memory");
-            (*blk)->next = NULL; // Terminate new segment
-
-            *rlc = (struct memblock *) sbrk( sizeof(struct memblock) );
-            if ( *rlc < 0 ) asmfail("out of memory");
-            (*rlc)->next = NULL; // Terminate new segment
-        }
-
-        blk = &(*blk)->next;
-        rlc = &(*rlc)->next;
-
-        if ( size >= PAGESIZE ) size -= PAGESIZE;
-        else size = 0;
-    }
-}
-
-void blkwrite( int sfd, struct memblock * blk, unsigned int size )
-{
-    while ( size >= PAGESIZE )
-    {
-        write( sfd, blk->data, PAGESIZE << 1 );
-
-        blk = blk->next;
-
-        size -= PAGESIZE;
-    }
-
-    if ( size ) write( sfd, blk->data, size << 1 );
 }
