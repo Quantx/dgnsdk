@@ -39,7 +39,7 @@ void assemble( char * fpath )
             }
 
             // Allocate room for symbol in this segment
-            curseg->pos++;
+            curseg->dataPos++;
 
             ntok();
         }
@@ -57,7 +57,7 @@ void assemble( char * fpath )
                 if ( (cursym->type & SYM_MASK) == SYM_DEF ) // Undefined symbol
                 {
                     cursym->type = curseg->sym | cursym->type & SYM_GLOB;
-                    cursym->val = curseg->pos;
+                    cursym->val = curseg->dataPos;
                 }
                 else if ( ~flags & FLG_PASS ) // Already defined symbol
                 {
@@ -74,21 +74,21 @@ void assemble( char * fpath )
                 segset( curseg, cursymno << 4 | (cursym->type & SYM_MASK) << 1, cursym->val );
 
                 // Allocate room for this symbol in the segment
-                curseg->pos++;
+                curseg->dataPos++;
             }
         }
         else if ( tk == TOK_NUM ) // Numerical constant
         {
             if ( curseg->sym == SYM_BSS ) // Increment pos for BSS segment
             {
-                curseg->pos += tkVal;
+                curseg->dataPos += tkVal;
             }
             else
             {
                 segset( curseg, SYM_ABS << 1, tkVal );
 
                 // Allocate room for absolute symbol in the segment
-                curseg->pos++;
+                curseg->dataPos++;
             }
 
             ntok();
@@ -190,12 +190,12 @@ void assemble( char * fpath )
                     else if ( (cursym->type & SYM_MASK) == SYM_ZERO )
                     {
                         opval |= cursym->val;
-                        oprlc = SYM_ZERO << 1;
+                        oprlc = tkVal << 4 | SYM_ZERO << 1;
                     }
                     // Program counter relative symbol
                     else if ( (cursym->type & SYM_MASK) == curseg->sym )
                     {
-                        int disp = cursym->val - curseg->pos;
+                        int disp = cursym->val - curseg->dataPos;
 
                         // Out of bounds
                         if ( disp < -128 || disp > 127 ) asmfail("label outside displacement range");
@@ -296,7 +296,7 @@ void assemble( char * fpath )
             segset( curseg, oprlc, opval );
 
             // Write out instruction
-            curseg->pos++;
+            curseg->dataPos++;
         }
         // Assembler .text directive
         else if ( tk == ASM_TEXT ) { curseg = &text; ntok(); }

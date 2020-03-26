@@ -5,12 +5,10 @@
 #define DBUG_TOK 1
 #define DBUG_SYM 1
 
-// How many symbols should we allocate for
-#define MAX_SYMS 1024
-#define MAX_LINE 256
+#define MAX_LINE 256  // Maximum number of tokens per file line
 #define MAX_TOKN 8    // The Unix6 'a.out' executable standard limits us to 8 characters
 #define PAGESIZE 1023 // 2 KB (1 KW) of memory (1 mmu page)
-#define ASM_SIZE 71  // Number of assembler defined symbols
+#define ASM_SIZE 71   // Number of assembler defined symbols
 
 // *** DGNova Instruction Parameter Formats ***
 #define DGN_IONO  8 // I/O No accumulator
@@ -51,10 +49,10 @@
 #define SYM_BYTE  1 // Byte flag
 
 #define SYM_ABS   0 // Constant value
-#define SYM_TEXT  1 // Text pointer
-#define SYM_DATA  2 // Data pointer
-#define SYM_BSS   3 // Bss  pointer
-#define SYM_ZERO  4 // Zero-page pointer
+#define SYM_ZERO  1 // Zero-page pointer
+#define SYM_TEXT  2 // Text pointer
+#define SYM_DATA  3 // Data pointer
+#define SYM_BSS   4 // Bss  pointer
 #define SYM_DEF   5 // Undefined symbol
 #define SYM_ZDEF  6 // Undefined zero page symbol
 #define SYM_FILE  7 // File seperator symbol
@@ -74,21 +72,24 @@ struct symbol
     unsigned int val; // Opcode, Address, Value, etc.
 };
 
-// Block of memory, used to hold newly defined blocks
-struct memblock
+struct relocate
 {
-    unsigned int data[PAGESIZE]; // Data
-    struct memblock * next; // Next memblock in list
+    unsigned int head;
+    unsigned int addr;
 };
 
 // Store a data segment
 struct segment
 {
-    unsigned int pos; // Current position in the segment
-    unsigned int max; // Highest position reached in the segment
+    // Segment's data as it appears in memory
+    unsigned int * data;
+    unsigned int dataPos;
+    unsigned int dataSize;
 
-    struct memblock * head; // Actuall data stored in segment
-    struct memblock * rloc; // Relocation bits for the data
+    // Relocation information for this segment
+    struct relocate * rloc;
+    unsigned int rlocPos;
+    unsigned int rlocSize;
 
     unsigned char sym; // The symbol type
 };

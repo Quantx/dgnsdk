@@ -1,4 +1,6 @@
-struct symbol symtbl[MAX_SYMS] = {
+#include "dgnasm.h"
+
+struct symbol symtbl[ASM_SIZE] = {
     // I/O Instructions (7)
     { { 'N', 'I', 'O', 0 }, DGN_IONO, 0b0110000000000000 }, // NIO
     { { 'D', 'I', 'A', 0 }, DGN_IO,   0b0110000100000000 }, // DIA
@@ -88,5 +90,15 @@ struct symbol symtbl[MAX_SYMS] = {
     { { 'R', 'T', 'C',      0 }, DGN_HWID, 014 }, // RTC - Real time clock
 };
 
-// Intialized to the total number of symbols in the table above
-int sympos = ASM_SIZE;
+int main( int argc, char ** argv )
+{
+    // Open symbols file for output
+    int ofd = creat( "symbols.dat", 0444 );
+    // Make sure we actually created the file
+    if ( ofd < 0 ) return 1;
+    // Write data structure to file
+    write( ofd, symtbl, ASM_SIZE * sizeof(struct symbol) );
+
+    close( ofd );
+    return 0;
+}
