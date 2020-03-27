@@ -14,18 +14,19 @@ void segset( struct segment * seg, unsigned int reloc, unsigned int val )
     // Can't output to a BSS segment
     if ( seg->sym == SYM_BSS ) asmfail( "tried to output to BSS segment" );
 
+    // Not on relocation pass yet
+    if ( ~flags & FLG_RLOC ) return;
+
     // Compute relocation address and increment
-    if ( reloc )
-    {
-        write( 1, "RELOC: ", 7 );
-        octwrite( 1, reloc );
-        write( 1, "\r\n", 2 );
+    if ( reloc ) curRloc = seg->rloc + seg->rlocPos++;
+//    {
+//        write( 1, "RELOC: ", 7 );
+//        octwrite( 1, reloc );
+//        write( 1, "\r\n", 2 );
+//    }
 
-        curRloc = seg->rloc + seg->rlocPos++;
-    }
-
-    // Still on pass 1
-    if ( ~flags & FLG_PASS ) return;
+    // Not on data pass yet
+    if ( ~flags & FLG_DATA ) return;
 
     // Beyond end of memory
     if ( seg->dataPos > seg->dataSize ) asmfail( "tried to output beyond end of segment's data" );

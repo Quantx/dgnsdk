@@ -24,19 +24,15 @@ void assemble( char * fpath )
             // Store ref to symbol
             struct symbol * cursym = symtbl + tkVal;
 
-            if ( flags & FLG_PASS ) // Write to output
-            {
-                unsigned int val = cursym->val;
+            unsigned int val = cursym->val;
+            // Set indirect bit if needed
+            if ( tk == TOK_INDR ) val |= 0x8000;
+            // This is a byte pointer
+            else val << 1;
+            // This is a high byte pointer
+            if ( tk == TOK_BYHI ) val |= 1;
 
-                // Set indirect bit if needed
-                if ( tk == TOK_INDR ) val |= 0x8000;
-                // This is a byte pointer
-                else val << 1;
-                // This is a high byte pointer
-                if ( tk == TOK_BYHI ) val |= 1;
-
-                segset( curseg, tkVal << 4 | (cursym->type & SYM_MASK) << 1 | tk != TOK_INDR, val );
-            }
+            segset( curseg, tkVal << 4 | (cursym->type & SYM_MASK) << 1 | tk != TOK_INDR, val );
 
             // Allocate room for symbol in this segment
             curseg->dataPos++;
@@ -59,7 +55,7 @@ void assemble( char * fpath )
                     cursym->type = curseg->sym | cursym->type & SYM_GLOB;
                     cursym->val = curseg->dataPos;
                 }
-                else if ( ~flags & FLG_PASS ) // Already defined symbol
+                else if ( ~flags & FLG_RLOC && ~flags & FLG_DATA ) // Already defined symbol
                 {
                     asmfail("symbol already defined");
                 }

@@ -164,14 +164,14 @@ int main( int argc, char ** argv )
         curfno++;
     }
 
-    write( 1, "Allocating required memory\r\n", 28 );
+//    write( 1, "Allocating required memory for segment data\r\n", 45 );
 
     // *** Reset for next pass ***
     // Record how much data space is needed and reset
-    text.dataSize = text.dataPos; text.dataPos = 0;
-    data.dataSize = data.dataPos; data.dataPos = 0;
+    text.dataSize = text.dataPos; text.dataPos = 0; text.rlocPos = 0;
+    data.dataSize = data.dataPos; data.dataPos = 0; data.rlocPos = 0;
      bss.dataSize =  bss.dataPos;  bss.dataPos = 0;
-    zero.dataSize = zero.dataPos; zero.dataPos = 0;
+    zero.dataSize = zero.dataPos; zero.dataPos = 0; zero.rlocPos = 0;
 
     // Did zero page overflow?
     if ( zero.dataSize > 0xFF ) asmfail("zero page overflow");
@@ -186,10 +186,30 @@ int main( int argc, char ** argv )
     zero.data = (unsigned int *) sbrk( zero.dataSize * sizeof(unsigned int) );
     if ( zero.data == NULL ) asmfail( "failed to allocate memory for zero segment's data" );
 
+    write( 1, " *** Running relocation pass ***\r\n", 34 );
+
+    // Reset current file number
+    curfno = 0;
+    flags |= FLG_RLOC;
+
+    // *** Run relocation pass for each file ***
+    while ( curfno < argc )
+    {
+        // Output the current file
+        write( 1, "Relocating file: ", 17 );
+        i = 0;
+        while ( argv[curfno][i++] );
+        write( 1, argv[curfno], i );
+        write( 1, "\r\n", 2 );
+
+        assemble( argv[curfno] );
+        curfno++;
+    }
     // Record how many relocation entries are needed and reset
-    text.rlocSize = text.rlocPos; text.rlocPos = 0;
-    data.rlocSize = data.rlocPos; data.rlocPos = 0;
-    zero.rlocSize = zero.rlocPos; zero.rlocPos = 0;
+    text.rlocSize = text.rlocPos; text.rlocPos = 0; text.dataPos = 0;
+    data.rlocSize = data.rlocPos; data.rlocPos = 0; data.dataPos = 0;
+    zero.rlocSize = zero.rlocPos; zero.rlocPos = 0; zero.dataPos = 0;
+                                                     bss.dataPos = 0;
 
     // Allocate memory for each segment's relocation bits
     text.rloc = (struct relocate *) sbrk( text.rlocSize * sizeof(struct relocate) );
@@ -201,13 +221,13 @@ int main( int argc, char ** argv )
     zero.rloc = (struct relocate *) sbrk( zero.rlocSize * sizeof(struct relocate) );
     if ( zero.rloc == NULL ) asmfail( "failed to allocate memory for zero segment's relocation info" );
 
-    write( 1, " *** Starting second pass ***\r\n", 31 );
+    write( 1, " *** Running assembly pass ***\r\n", 32 );
 
     // Reset current file number
     curfno = 0;
-    flags |= FLG_PASS;
+    flags |= FLG_DATA;
 
-    // *** Run second pass for each file ***
+    // *** Run data pass for each file ***
     while ( curfno < argc )
     {
         // Output the current file

@@ -2,8 +2,8 @@
 #define int short
 #define NULL 0
 
-#define DBUG_TOK 1
-#define DBUG_SYM 1
+//#define DBUG_TOK 1
+//#define DBUG_SYM 1
 
 #define MAX_LINE 256  // Maximum number of tokens per file line
 #define MAX_TOKN 8    // The Unix6 'a.out' executable standard limits us to 8 characters
@@ -63,7 +63,8 @@
 
 // *** Boolean Flags ***
 #define FLG_GLOB 0b0000000000000001 // Force all undefined symbols to be global
-#define FLG_PASS 0b0000000000000010 // Which pass are we on: pass 2 == Flag Set
+#define FLG_DATA 0b0000000000000010 // Should we write out data this pass?
+#define FLG_RLOC 0b0000000000000100 // Should we record relocation bits?
 
 struct symbol
 {
