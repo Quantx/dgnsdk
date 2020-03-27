@@ -12,7 +12,11 @@ unsigned int sympos = ASM_SIZE; // Number of symbols in the table
 // Output an octal number
 void octwrite( int nfd, unsigned int val )
 {
-    write( 1, "0", 1 );
+    if ( !val )
+    {
+        write( nfd, "0", 1 );
+        return;
+    }
 
     char tmpbuf[6];
     int tmppos = 6;
@@ -23,7 +27,7 @@ void octwrite( int nfd, unsigned int val )
         val >>= 3;
     }
 
-    write( 1, tmpbuf + tmppos, 6 - tmppos );
+    write( nfd, tmpbuf + tmppos, 6 - tmppos );
 }
 
 #include "segments.c"
@@ -341,7 +345,53 @@ int main( int argc, char ** argv )
     }
     else if ( flags & FLG_TERM ) // Virtual console output
     {
+        struct segment * curseg = &zero;
+        unsigned int org = 0;
 
+        write( ofd, "K", 1 ); // Make sure the current cell is closed
+
+        while ( curseg )
+        {
+            if ( curseg->dataSize )
+            {
+                // Open the first cell
+                octwrite( ofd, org );
+                write( ofd, "/", 1 );
+
+                i = 0;
+                while ( i < curseg->dataSize )
+                {
+                    octwrite( ofd, curseg->data[i] );
+                    write( ofd, "\n", 1 );
+                    i++;
+                }
+
+                write( ofd, "K", 1 ); // Close the last cell
+            }
+
+            if      ( curseg == &zero ) { org += (1 + stksize) << 10; curseg = &text; }
+            else if ( curseg == &text ) { org += text.dataSize; curseg = &data; }
+            else curseg = NULL;
+        }
+
+        // Output BSS segment
+        if ( bss.dataSize )
+        {
+            org += data.dataSize;
+
+            // Open first cell
+            octwrite( ofd, org );
+            write( ofd, "/", 1 );
+
+            i = 0;
+            while ( i < curseg->dataSize )
+            {
+                write( ofd, "0\n", 2 );
+                i++;
+            }
+
+            write( ofd, "K", 1 ); // Close last cell
+        }
     }
     else // Binary executable output
     {
