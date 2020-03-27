@@ -32,17 +32,16 @@ void segset( struct segment * seg, unsigned int reloc, unsigned int val )
     if ( seg->dataPos > seg->dataSize ) asmfail( "tried to output beyond end of segment's data" );
     if ( seg->rlocPos > seg->rlocSize ) asmfail( "tried to output beyond end of segment's relocation info" );
 
-    // Add symbol offsets
-    if      ( seg->sym == SYM_TEXT ) val += 1 + stksize << 10;
-    else if ( seg->sym == SYM_DATA ) val += text.dataSize + (1 + stksize << 10);
-
-    // Store actual data value
-    seg->data[seg->dataPos] = val;
-
     // Store relocation bits if needed
     if ( reloc )
     {
+        // Add symbol offsets
+        if      ( (reloc >> 1 & SYM_MASK) == SYM_TEXT ) val += 1 + stksize << 10;
+        else if ( (reloc >> 1 & SYM_MASK) == SYM_DATA ) val += text.dataSize + (1 + stksize << 10);
+
         curRloc->head = reloc;
         curRloc->addr = seg->dataPos;
     }
+
+    seg->data[seg->dataPos] = val;
 }

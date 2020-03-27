@@ -196,7 +196,8 @@ void assemble( char * fpath )
                         // Out of bounds
                         if ( disp < -128 || disp > 127 ) asmfail("label outside displacement range");
 
-                        opval |= disp;
+                        // Output displacement and mode
+                        opval |= disp & 0xFF | 0x100;
                     }
                     // Symbol not in current segment
                     else
@@ -265,7 +266,7 @@ void assemble( char * fpath )
                 ntok();
             }
             // System Control Instruction (CPU, MMU, FPU, etc.)
-            else
+            else if ( optyp >= DGN_CT && optyp <= DGN_CTAA )
             {
                 if ( optyp == DGN_CTA || optyp == DGN_CTAF || optyp == DGN_CTAA )
                 {

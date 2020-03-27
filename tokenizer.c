@@ -69,7 +69,8 @@ void ntok()
             // Label excedes max length
             if ( p - pp == MAX_TOKN ) asmfail("named token exceeds max character length");
 
-            int i, k = 0, fscp = 0;
+            unsigned int fscp = 0;
+            int i, k = 0;
             // Find a matching symbol
             while ( k < sympos )
             {

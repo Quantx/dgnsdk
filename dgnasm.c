@@ -2,7 +2,7 @@
 
 char * sepname = "SYMDELIM";
 unsigned int flags; // Store misc booleans
-unsigned char curfno; // Current file number
+unsigned int curfno; // Current file number
 unsigned int entrypos; // Starting address offset within the text segment
 unsigned int stksize; // Additional stack size
 
@@ -104,6 +104,13 @@ int main( int argc, char ** argv )
             while ( **argv >= '0' && **argv <= '9' ) stksize = stksize * 10 + *(*argv)++ - '0';
 
             if ( stksize > 31 ) asmfail( "Additional stack pages specified exceeds maximum of 31" );
+        }
+        // Output mode
+        else if ( (*argv)[1] == 'm' )
+        {
+            if      ( (*argv)[2] == 'h' ) flags |= FLG_SMH;
+            else if ( (*argv)[2] == 'a' ) flags |= FLG_SMHA;
+            else if ( (*argv)[2] == 'v' ) flags |= FLG_TERM;
         }
 
         argc--; argv++;
@@ -243,38 +250,129 @@ int main( int argc, char ** argv )
 
     // *** Output final result ***
 
+    write( 1, "*** Generating output file ***\r\n", 32 );
+
     // Open a.out for writing
     int ofd = creat( "a.out", 0755 );
     if ( ofd < 0 ) asmfail( "failed to open a.out" );
 
-    // Output header
-    unsigned int header[10];
-    header[0] = 0410;     // Magic number (program load method)
-    header[1] = zero.dataSize | stksize << 8; // Stack segment length | Zero segment length
-    header[2] = text.dataSize; // Text segment length
-    header[3] = data.dataSize; // Data segment length
-    header[4] =  bss.dataSize; // Bss  segment length
-    header[5] = sympos - ASM_SIZE; // Symbol table length
-    header[6] = (1 + stksize << 10) + entrypos; // Text segment entry offset
-    header[7] = zero.rlocPos; // Zero segment relocation length
-    header[8] = text.rlocPos; // Text segment relocation length
-    header[9] = data.rlocPos; // Data segment relocation length
+    if ( flags & FLG_SMH ) // SimH output
+    {
+        struct segment * curseg = &zero;
+        unsigned int org = 0;
+        int header[3];
 
-    write( ofd, header, 20 );
+        // Output Zero, Text, and Data segments
+        while ( curseg )
+        {
+            unsigned int bs = 0, be = 0;
+            while ( bs < curseg->dataSize )
+            {
+                be += 16;
+                if ( be > curseg->dataSize ) be = curseg->dataSize;
 
-    // Output each segment's data
-    write( ofd, zero.data, zero.dataSize * sizeof(unsigned int) );
-    write( ofd, text.data, text.dataSize * sizeof(unsigned int) );
-    write( ofd, data.data, data.dataSize * sizeof(unsigned int) );
+                header[0] = bs - be; // Negative block length
+                header[1] = org + bs; // Location to put block in memory
 
-    // Output symbol table
-    write( ofd, symtbl + ASM_SIZE, (sympos - ASM_SIZE) * sizeof(struct symbol) );
+                // Compute checksum
+                header[2] = -header[0] - header[1];
+                i = bs;
+                while ( i < be ) { header[2] -= curseg->data[i]; i++; }
 
-    // Output relocation data
-    // We use rlocPos instead of rlocSize because we can know if we're doing ZDEF or a relative offset for LDA/JMP
-    write( ofd, zero.rloc, zero.rlocPos * sizeof(struct relocate) );
-    write( ofd, text.rloc, text.rlocPos * sizeof(struct relocate) );
-    write( ofd, data.rloc, data.rlocPos * sizeof(struct relocate) );
+                write( ofd, header, 6 ); // Output header
+                write( ofd, curseg->data + bs, (be - bs) * 2 ); // Output block
+
+                bs = be;
+            }
+
+            if      ( curseg == &zero ) { org += (1 + stksize) << 10; curseg = &text; }
+            else if ( curseg == &text ) { org += text.dataSize; curseg = &data; }
+            else curseg = NULL;
+        }
+
+        org += data.dataSize;
+        i = 0;
+
+        // Output small BSS segment
+        if ( bss.dataSize <= 16 )
+        {
+            if ( bss.dataSize )
+            {
+                header[0] = -bss.dataSize;
+                header[1] = org;
+                header[2] = bss.dataSize - org;
+
+                write( ofd, header, 6 );
+
+                while ( header[0] < 0 )
+                {
+                    write( ofd, &i, 2 );
+                    header[0]++;
+                }
+            }
+        }
+        else
+        {
+            // Prime SimH with a single 0 byte block
+            header[0] = -1;
+            header[1] = org;
+            header[2] = 1 - org;
+
+            write( ofd, header, 6 );
+            write( ofd, &i, 2 );
+
+            // Send SimH a repeat block to fill out the rest of BSS
+            header[0] = -bss.dataSize + 1;
+            header[1] = org + 1;
+            header[2] = -header[0] - header[2];
+
+            write( ofd, header, 6 );
+        }
+
+        // Output start block
+        header[0] = 1;
+        header[1] = (1 + stksize << 10) + entrypos;
+        header[2] = 0;
+
+        // Should we enable auto-start
+        if ( flags & FLG_SMHA ) header[1] |= 0x8000;
+
+        write( ofd, header, 6 );
+    }
+    else if ( flags & FLG_TERM ) // Virtual console output
+    {
+
+    }
+    else // Binary executable output
+    {
+        // Output header
+        unsigned int header[10];
+        header[0] = 0407;     // Magic number (program load method)
+        header[1] = zero.dataSize | stksize << 8; // Stack segment length | Zero segment length
+        header[2] = text.dataSize; // Text segment length
+        header[3] = data.dataSize; // Data segment length
+        header[4] =  bss.dataSize; // Bss  segment length
+        header[5] = sympos - ASM_SIZE; // Symbol table length
+        header[6] = (1 + stksize << 10) + entrypos; // Text segment entry offset
+        header[7] = zero.rlocSize; // Zero segment relocation length
+        header[8] = text.rlocSize; // Text segment relocation length
+        header[9] = data.rlocSize; // Data segment relocation length
+
+        write( ofd, header, 20 );
+
+        // Output each segment's data
+        write( ofd, zero.data, zero.dataSize * sizeof(unsigned int) );
+        write( ofd, text.data, text.dataSize * sizeof(unsigned int) );
+        write( ofd, data.data, data.dataSize * sizeof(unsigned int) );
+
+        // Output symbol table
+        write( ofd, symtbl + ASM_SIZE, (sympos - ASM_SIZE) * sizeof(struct symbol) );
+
+        // Output relocation data
+        write( ofd, zero.rloc, zero.rlocSize * sizeof(struct relocate) );
+        write( ofd, text.rloc, text.rlocSize * sizeof(struct relocate) );
+        write( ofd, data.rloc, data.rlocSize * sizeof(struct relocate) );
+    }
 
     // Close a.out
     close( ofd );
