@@ -107,7 +107,7 @@ int main( int argc, char ** argv )
             argc--; argv++;
             while ( **argv >= '0' && **argv <= '9' ) stksize = stksize * 10 + *(*argv)++ - '0';
 
-            if ( stksize > 31 ) asmfail( "Additional stack pages specified exceeds maximum of 31" );
+            if ( stksize > 32 ) asmfail( "Number of stack pages specified exceeds maximum of 32" );
         }
         // Output mode
         else if ( (*argv)[1] == 'm' )
@@ -289,7 +289,7 @@ int main( int argc, char ** argv )
                 bs = be;
             }
 
-            if      ( curseg == &zero ) { org += (1 + stksize) << 10; curseg = &text; }
+            if      ( curseg == &zero ) { org += stksize ? stksize << 10 : 256; curseg = &text; }
             else if ( curseg == &text ) { org += text.dataSize; curseg = &data; }
             else curseg = NULL;
         }
@@ -335,7 +335,7 @@ int main( int argc, char ** argv )
 
         // Output start block
         header[0] = 1;
-        header[1] = (1 + stksize << 10) + entrypos;
+        header[1] = (stksize ? stksize << 10 : 256) + entrypos;
         header[2] = 0;
 
         // Should we enable auto-start
@@ -369,7 +369,7 @@ int main( int argc, char ** argv )
                 write( ofd, "K", 1 ); // Close the last cell
             }
 
-            if      ( curseg == &zero ) { org += (1 + stksize) << 10; curseg = &text; }
+            if      ( curseg == &zero ) { org += stksize ? stksize << 10 : 256; curseg = &text; }
             else if ( curseg == &text ) { org += text.dataSize; curseg = &data; }
             else curseg = NULL;
         }
@@ -403,7 +403,7 @@ int main( int argc, char ** argv )
         header[3] = data.dataSize; // Data segment length
         header[4] =  bss.dataSize; // Bss  segment length
         header[5] = sympos - ASM_SIZE; // Symbol table length
-        header[6] = (1 + stksize << 10) + entrypos; // Text segment entry offset
+        header[6] = (stksize ? stksize << 10 : 256) + entrypos; // Text segment entry offset
         header[7] = zero.rlocSize; // Zero segment relocation length
         header[8] = text.rlocSize; // Text segment relocation length
         header[9] = data.rlocSize; // Data segment relocation length
