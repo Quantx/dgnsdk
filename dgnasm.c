@@ -392,6 +392,9 @@ int main( int argc, char ** argv )
 
             write( ofd, "K", 1 ); // Close last cell
         }
+
+        // Initialize the stack pointer
+        if ( stksize ) write( ofd, "5A400\nK", 7 );
     }
     else // Binary executable output
     {
