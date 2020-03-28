@@ -2,3 +2,4 @@ dgnasm
 a.out
 tests/
 symbols.dat
+build_symbols
