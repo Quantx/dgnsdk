@@ -1,544 +1,431 @@
 #include "dgnasm.h"
 
-int main( int argc, char * argv[] )
+char * sepname = "SYMDELIM";
+unsigned int flags; // Store misc booleans
+unsigned int curfno; // Current file number
+unsigned int entrypos; // Starting address offset within the text segment
+unsigned int stksize; // Additional stack size
+
+struct symbol * symtbl; // Symbol table
+unsigned int sympos = ASM_SIZE; // Number of symbols in the table
+
+// Output an octal number
+void octwrite( int nfd, unsigned int val )
 {
-    if ( argc <= 1 )
+    if ( !val )
     {
-        printf(
-"    DGNASM - Data General Nova Assembler (c) 2019\n"
-"    Version %s by Samuel Deutsch, https://github.com/Quantx/dgnasm\n\n"
-"Syntax:\n"
-"    dgnasm [options] input_file\n"
-"    dgnasm [options] input_file output_file\n"
-"    dgnasm [options] input_file output_file list_file\n\n"
-"Options:\n"
-"    -c    Enable case sensitivity\n"
-"    -h    Format output binary for SIMH NOVA's load command\n"
-"    -ha   Format output binary for SIMH NOVA's load command with auto-start\n"
-        , DGNASM_VERSION );
-        return 0;
+        write( nfd, "0", 1 );
+        return;
     }
 
-    dgnasm state;
+    char tmpbuf[6];
+    int tmppos = 6;
 
-    state.sym = NULL;
-
-    memset(state.memory, 0, MAX_MEM_SIZE);
-
-    state.startAddr = 0;
-    state.curAddr = 0;
-    state.entAddr = 0;
-
-    state.verbosity = DEFAULT_VERBOSITY;
-    state.caseSense = 0;
-    state.simhFormat = 0;
-
-    char inPath[MAX_FILENAME_LENGTH + 1] = "";
-    char listPath[MAX_FILENAME_LENGTH + 1] = "";
-    char outPath[MAX_FILENAME_LENGTH + 1] = "";
-
-
-    int i;
-    for ( i = 1; i < argc; i++ )
+    while ( val )
     {
-        char * curArg = argv[i];
-        if ( curArg[0] == '-' )
-        {
-            decodeOption( curArg + 1, &state );
-        }
-        else
-        {
-            if ( strlen( curArg ) == MAX_FILENAME_LENGTH + 1 )
-            {
-                printf( "File Error: name %s, excedes the maximum character limit of %d\n", curArg, MAX_FILENAME_LENGTH );
-                return 1;
-            }
-            else if ( inPath[0] == '\0' )
-            {
-                strcpy( inPath, curArg );
-            }
-            else if ( outPath[0] == '\0' )
-            {
-                strcpy( outPath, curArg );
-            }
-            else if ( listPath[0] == '\0' )
-            {
-                strcpy( listPath, curArg );
-            }
-            else
-            {
-                printf( "Too many file names specified!\n" );
-                return 1;
-            }
-        }
+        tmpbuf[--tmppos] = (val & 7) + '0';
+        val >>= 3;
     }
 
-    // Make sure we got an input file
-    if ( inPath[0] == '\0' )
-    {
-        printf( "File Error: no input file specified!" );
-        return 1;
-    }
-
-    char * fext;
-    // Generate output file path if needed
-    if ( outPath[0] == '\0' )
-    {
-        strcpy( outPath, inPath );
-        fext = strrchr( outPath, '.' ) + 1;
-        strcpy( fext, "bin" );
-    }
-
-    // Generate listing file path if needed
-    if ( listPath[0] == '\0' )
-    {
-        strcpy( listPath, inPath );
-        fext = strrchr( listPath, '.' ) + 1;
-        strcpy( fext, "lst" );
-    }
-
-    // Open list file
-    state.listFile = fopen( listPath, "w" );
-
-    if ( state.listFile == NULL )
-    {
-        printf( "File Error: unable to open list file '%s'\n", listPath );
-        return 1;
-    }
-
-    // Open output file
-    state.outFile = fopen( outPath, "wb" );
-
-    if ( state.outFile == NULL )
-    {
-        printf( "File error: unable to open output file '%s'\n", outPath );
-        return 1;
-    }
-
-    // Generate the Nova ASM table
-    initOpcodeTable();
-
-    // Label the input file
-    xlog( DGNASM_LOG_DBUG, &state, "*** Starting labeling pass ***\n" );
-    int labelResult = labelFile( inPath, &state );
-    int assembleResult = 0;
-
-    if ( labelResult )
-    {
-        label * curSym;
-
-        // Count symbols
-        int lblCount = 0;
-        int conCount = 0;
-        for ( curSym = state.sym; curSym != NULL; curSym = curSym->next )
-        {
-            if ( curSym->isConst ) conCount++;
-            else lblCount++;
-        }
-        xlog( DGNASM_LOG_DBUG, &state, "Loaded %d labels and %d constants into the symbol table\n", lblCount, conCount );
-
-        // Output listing header
-        fprintf( state.listFile, "\t\t; +-----------------------+\n" );
-        fprintf( state.listFile, "\t\t; | Assembled with DGNASM |\n" );
-        fprintf( state.listFile, "\t\t; +-----------------------+\n\n" );
-
-        // Reset address
-        state.curAddr = state.startAddr;
-
-        // Assemble the input file
-        xlog( DGNASM_LOG_DBUG, &state, "*** Starting assembly pass ***\n" );
-        assembleResult = assembleFile( inPath, &state );
-
-        if ( assembleResult )
-        {
-            // Dump symbol table
-            fprintf( state.listFile, "\nLabels:\n" );
-            for ( curSym = state.sym; curSym != NULL; curSym = curSym->next )
-            {
-                if ( !curSym->isConst )
-                    fprintf( state.listFile, "%05o: '%s', number of references: %d\n",
-                             curSym->addr, curSym->name, curSym->refCount );
-            }
-
-            fprintf( state.listFile, "\nConstants:\n" );
-            for ( curSym = state.sym; curSym != NULL; curSym = curSym->next )
-            {
-                if ( curSym->isConst )
-                    fprintf( state.listFile, "'%s' = %d $%04X [%06o], number of references: %d\n",
-                             curSym->name, curSym->addr, curSym->addr, curSym->addr, curSym->refCount );
-            }
-
-            // Compute simh header
-            if ( state.simhFormat )
-            {
-                formatSimh( &state );
-            }
-            else
-            {
-                // Final output
-                fwrite( state.memory + state.startAddr, sizeof(short), state.curAddr - state.startAddr, state.outFile );
-            }
-        }
-        else
-        {
-            printf( "*** Assembly failed ***\n" );
-        }
-    }
-    else
-    {
-        printf( "*** Labeling failed ***\n" );
-    }
-
-    // Close files
-    fclose( state.listFile );
-    fclose( state.outFile );
-
-    return !(labelResult && assembleResult);
+    write( nfd, tmpbuf + tmppos, 6 - tmppos );
 }
 
-int labelFile( char * srcPath, dgnasm * state )
+#include "segments.c"
+#include "tokenizer.c"
+#include "assembler.c"
+
+void asmfail( char * msg )
 {
-    // Store debug info regarding the current file
-    state->curFile = srcPath;
-    state->curLine = 1;
+    int i = 0;
 
-    // Open the source file
-    FILE * srcFile = fopen( srcPath, "r" );
-
-    // Make sure the file exists
-    if ( srcFile == NULL )
+    if ( fp )
     {
-        printf( "File Error: Unable to open source file '%s'\n", srcPath );
-        return 0;
+        unsigned int tmppos;
+        char tmpchr;
+
+        // Output current file
+        while ( fp[i++] );
+        write( 2, fp, i );
+        write( 2, ":", 1 );
+
+        if ( p )
+        {
+            // Output current line in octal
+            octwrite( 2, curline );
+            write( 2, ":", 1 );
+
+            // Output current position in octal
+            octwrite( 2, pp - lp );
+            write( 2, ":", 1 );
+        }
+
+        // Close current file (good practice)
+        close( fd );
     }
 
-    int i;
+    // Output error message
+    i = 0;
+    while ( msg[i++] );
+    write( 2, msg, i );
+    write( 2, "\r\n", 2 );
 
-    int labelHere; // Does this line have a label on it?
+    // Output current line
+    i = 0;
+    while ( lp[i++] );
+    write( 2, lp, i );
+//    write( 2, "\r\n", 2 );
 
-    label * curSym;
-    instr * curIns;
-
-    // Store arguments
-    char * argv[MAX_ARGS];
-    int argc;
-
-    // Store current line of file
-    char line[MAX_LINE_LENGTH + 1];
-    char * ipos = NULL; // Instruction position
-    char * apos = NULL; // Argument position
-
-    // Store a copy of current line for list file
-    char listLine[MAX_LINE_LENGTH + 1];
-
-    int doInc; // Should we increment to next address?
-
-    // Labeling pass
-    state->curPass = 0;
-    while ( fgets( line, MAX_LINE_LENGTH + 1, srcFile ) != NULL )
+    // Output curpos indicator
+    i = 0;
+    while ( i < pp - lp )
     {
-        doInc = 0;
-
-        // Terminate on comments or newlines
-        for ( i = 0; line[i] != '\0' && line[i] != ';' && line[i] != '\n'; i++ );
-        line[i] = '\0';
-
-        // Check if a label exists on this line
-        ipos = strchr( line, ':' );
-        labelHere = ipos != NULL;
-
-        if ( labelHere )
-        {
-            // Replace label terminator with string terminator
-            *ipos = '\0';
-            ipos++;
-
-            // Check for extra label terminators
-            if ( strchr(ipos, ':') != NULL )
-            {
-                xlog( DGNASM_LOG_SYTX, state, "one colon per line please\n" );
-                fclose( srcFile );
-                return 0;
-            }
-
-            // Insert the label into the symbol table
-            if ( !insertLabel( line, state->curAddr, 0, state ) )
-            {
-                fclose( srcFile );
-                return 0;
-            }
-        }
-        else
-        {
-            ipos = line;
-        }
-
-        // Get start of the opcode
-        ipos = skipWhite( ipos );
-
-        // Terminate end of opcode
-        for ( i = 0; ipos[i] != '\0' && ipos[i] != ' ' && ipos[i] != '\t'; i++ );
-        if ( ipos[i] != '\0' )
-        {
-            ipos[i] = '\0';
-            // Setup argument pointer
-            apos = skipWhite(ipos + i + 1);
-        }
-        else
-        {
-            apos = NULL;
-        }
-
-        // Compute arguments
-        argc = computeArgs( apos, argv );
-        if ( argc >= MAX_ARGS )
-        {
-            xlog( DGNASM_LOG_SYTX, state, "Exceded the maximum of %d arguments\n", MAX_ARGS );
-            fclose( srcFile );
-            return 0;
-        }
-
-        // Check for LOC assembler directives
-        int dirRes = processDirective( ipos, argc, argv, labelHere, state );
-        if ( dirRes > -3 )
-        {
-            if ( dirRes == -1 ) // Error code
-            {
-                fclose( srcFile );
-                return 0;
-            }
-
-            if ( dirRes > 0 ) doInc = dirRes;
-        }
-        else if ( ipos[0] != '\0' )
-        {
-            doInc = 1;
-        }
-
-        // Increment current address
-        state->curAddr += doInc;
-
-        // Increment current line
-        state->curLine++;
+        write( 2, lp[i] == '\t' ? "\t" : " ", 1 );
+        i++;
     }
 
-    fclose( srcFile );
-    return 1;
+    write( 2, "^\r\n", 3 );
+
+    exit(1); // Quit program
 }
 
-int assembleFile( char * srcPath, dgnasm * state )
+int main( int argc, char ** argv )
 {
-    // Reset file pointer to start
-    state->curFile = srcPath;
-    state->curLine = 1;
-
-    // Open the source file
-    FILE * srcFile = fopen( srcPath, "r" );
-
-    // Make sure the file exists
-    if ( srcFile == NULL )
-    {
-        printf( "File Error: Unable to open source file '%s'\n", srcPath );
-        return 0;
-    }
-
     int i;
 
-    int labelHere; // Does this line have a label on it?
+    // Drop first argument (program name)
+    char * progname = *argv;
+    argc--; argv++;
 
-    label * curSym;
-    instr * curIns;
-
-    // Store arguments
-    char * argv[MAX_ARGS];
-    int argc;
-
-    // Store current line of file
-    char line[MAX_LINE_LENGTH + 1];
-    char * ipos = NULL; // Instruction position
-    char * apos = NULL; // Argument position
-
-    // Store a copy of current line for list file
-    char listLine[MAX_LINE_LENGTH + 1];
-
-    int doInc; // Should we increment to next address?
-
-    // Assembly pass
-    state->curPass = 1;
-    while ( fgets( line, MAX_LINE_LENGTH + 1, srcFile ) != NULL )
+    // Set all flags
+    while ( argc && **argv == '-' )
     {
-        doInc = 0;
-        // Make a copy for the listing
-        strcpy( listLine, line );
-
-        // Terminate on comments or newlines
-        for ( i = 0; line[i] != '\0' && line[i] != ';' && line[i] != '\n'; i++ );
-        line[i] = '\0';
-
-        // Check if a label exists on this line
-        ipos = strchr( line, ':' );
-        labelHere = ipos != NULL;
-
-        if ( labelHere )
+        // All symbols are global
+        if      ( (*argv)[1] == 'g' ) flags |= FLG_GLOB;
+        // Stack size follows
+        else if ( (*argv)[1] == 't' )
         {
-            *ipos = '\0';
-            ipos++;
+            argc--; argv++;
+            while ( **argv >= '0' && **argv <= '9' ) stksize = stksize * 10 + *(*argv)++ - '0';
+
+            if ( stksize > 31 ) asmfail( "Additional stack pages specified exceeds maximum of 31" );
+        }
+        // Output mode
+        else if ( (*argv)[1] == 'm' )
+        {
+            if      ( (*argv)[2] == 'h' ) flags |= FLG_SMH;
+            else if ( (*argv)[2] == 'a' ) flags |= FLG_SMHA;
+            else if ( (*argv)[2] == 'v' ) flags |= FLG_TERM;
+        }
+
+        argc--; argv++;
+    }
+
+    if ( !argc )
+    {
+        write( 2, "usage: ", 7 );
+
+        i = 0;
+        while( progname[i++] );
+        write( 2, progname, i );
+
+        write( 2, " [-] file1.s file2.s ...\r\n", 26 );
+
+        exit(1);
+    }
+
+    write( 1, " *** Loading symbols ***\r\n", 26 );
+
+    // *** Load Assembler Defined Symbols ***
+    fd = open( "symbols.dat", 0 );
+    if ( fd < 0 ) asmfail( "failed to open symbols.dat" );
+
+    symtbl = (struct symbol *) sbrk( ASM_SIZE * sizeof(struct symbol) );
+    if ( symtbl == NULL ) { close( fd ); asmfail( "failed to allocate space for assembler defiend symbols" ); }
+
+    i = read( fd, symtbl, ASM_SIZE * sizeof(struct symbol) );
+    close( fd );
+
+    if ( i < ASM_SIZE * sizeof(struct symbol) ) asmfail( "couldn't load all symbols, symbols.dat might be out of date" );
+
+    write( 1, " *** Starting first pass ***\r\n", 30 );
+
+    // *** Run first pass for each file ***
+    while ( curfno < argc )
+    {
+        // Output the current file
+        write( 1, "Labeling file: ", 15 );
+        i = 0;
+        while ( argv[curfno][i++] );
+        write( 1, argv[curfno], i );
+        write( 1, "\r\n", 2 );
+
+        assemble( argv[curfno] );
+
+        if ( curfno < argc - 1 )
+        {
+            // Add file seperator symbol
+            struct symbol * sepsym = symtbl + sympos++;
+
+            i = 0;
+            while ( sepname[i] ) { sepsym->name[i] = sepname[i]; i++; }
+            sepsym->type = SYM_FILE;
+            sepsym->val = 0;
+        }
+
+        curfno++;
+    }
+
+//    write( 1, "Allocating required memory for segment data\r\n", 45 );
+
+    // *** Reset for next pass ***
+    // Record how much data space is needed and reset
+    text.dataSize = text.dataPos; text.dataPos = 0; text.rlocPos = 0;
+    data.dataSize = data.dataPos; data.dataPos = 0; data.rlocPos = 0;
+     bss.dataSize =  bss.dataPos;  bss.dataPos = 0;
+    zero.dataSize = zero.dataPos; zero.dataPos = 0; zero.rlocPos = 0;
+
+    // Did zero page overflow?
+    if ( zero.dataSize > 0xFF ) asmfail("zero page overflow");
+
+    // Allocate memory for each segment's data, except for BSS
+    text.data = (unsigned int *) sbrk( text.dataSize * sizeof(unsigned int) );
+    if ( text.data == NULL ) asmfail( "failed to allocate memory for text segment's data" );
+
+    data.data = (unsigned int *) sbrk( data.dataSize * sizeof(unsigned int) );
+    if ( data.data == NULL ) asmfail( "failed to allocate memory for data segment's data" );
+
+    zero.data = (unsigned int *) sbrk( zero.dataSize * sizeof(unsigned int) );
+    if ( zero.data == NULL ) asmfail( "failed to allocate memory for zero segment's data" );
+
+    write( 1, " *** Running relocation pass ***\r\n", 34 );
+
+    // Reset current file number
+    curfno = 0;
+    flags |= FLG_RLOC;
+
+    // *** Run relocation pass for each file ***
+    while ( curfno < argc )
+    {
+        // Output the current file
+        write( 1, "Relocating file: ", 17 );
+        i = 0;
+        while ( argv[curfno][i++] );
+        write( 1, argv[curfno], i );
+        write( 1, "\r\n", 2 );
+
+        assemble( argv[curfno] );
+        curfno++;
+    }
+    // Record how many relocation entries are needed and reset
+    text.rlocSize = text.rlocPos; text.rlocPos = 0; text.dataPos = 0;
+    data.rlocSize = data.rlocPos; data.rlocPos = 0; data.dataPos = 0;
+    zero.rlocSize = zero.rlocPos; zero.rlocPos = 0; zero.dataPos = 0;
+                                                     bss.dataPos = 0;
+
+    // Allocate memory for each segment's relocation bits
+    text.rloc = (struct relocate *) sbrk( text.rlocSize * sizeof(struct relocate) );
+    if ( text.rloc == NULL ) asmfail( "failed to allocate memory for text segment's relocation info" );
+
+    data.rloc = (struct relocate *) sbrk( data.rlocSize * sizeof(struct relocate) );
+    if ( data.rloc == NULL ) asmfail( "failed to allocate memory for data segment's relocation info" );
+
+    zero.rloc = (struct relocate *) sbrk( zero.rlocSize * sizeof(struct relocate) );
+    if ( zero.rloc == NULL ) asmfail( "failed to allocate memory for zero segment's relocation info" );
+
+    write( 1, " *** Running assembly pass ***\r\n", 32 );
+
+    // Reset current file number
+    curfno = 0;
+    flags |= FLG_DATA;
+
+    // *** Run data pass for each file ***
+    while ( curfno < argc )
+    {
+        // Output the current file
+        write( 1, "Assembling file: ", 17 );
+        i = 0;
+        while ( argv[curfno][i++] );
+        write( 1, argv[curfno], i );
+        write( 1, "\r\n", 2 );
+
+        assemble( argv[curfno] );
+        curfno++;
+    }
+
+    // *** Output final result ***
+
+    write( 1, "*** Generating output file ***\r\n", 32 );
+
+    // Open a.out for writing
+    int ofd = creat( "a.out", 0755 );
+    if ( ofd < 0 ) asmfail( "failed to open a.out" );
+
+    if ( flags & FLG_SMH ) // SimH output
+    {
+        struct segment * curseg = &zero;
+        unsigned int org = 0;
+        int header[3];
+
+        // Output Zero, Text, and Data segments
+        while ( curseg )
+        {
+            unsigned int bs = 0, be = 0;
+            while ( bs < curseg->dataSize )
+            {
+                be += 16;
+                if ( be > curseg->dataSize ) be = curseg->dataSize;
+
+                header[0] = bs - be; // Negative block length
+                header[1] = org + bs; // Location to put block in memory
+
+                // Compute checksum
+                header[2] = -header[0] - header[1];
+                i = bs;
+                while ( i < be ) { header[2] -= curseg->data[i]; i++; }
+
+                write( ofd, header, 6 ); // Output header
+                write( ofd, curseg->data + bs, (be - bs) * 2 ); // Output block
+
+                bs = be;
+            }
+
+            if      ( curseg == &zero ) { org += (1 + stksize) << 10; curseg = &text; }
+            else if ( curseg == &text ) { org += text.dataSize; curseg = &data; }
+            else curseg = NULL;
+        }
+
+        org += data.dataSize;
+        i = 0;
+
+        // Output small BSS segment
+        if ( bss.dataSize <= 16 )
+        {
+            if ( bss.dataSize )
+            {
+                header[0] = -bss.dataSize;
+                header[1] = org;
+                header[2] = bss.dataSize - org;
+
+                write( ofd, header, 6 );
+
+                while ( header[0] < 0 )
+                {
+                    write( ofd, &i, 2 );
+                    header[0]++;
+                }
+            }
         }
         else
         {
-            ipos = line;
+            // Prime SimH with a single 0 byte block
+            header[0] = -1;
+            header[1] = org;
+            header[2] = 1 - org;
+
+            write( ofd, header, 6 );
+            write( ofd, &i, 2 );
+
+            // Send SimH a repeat block to fill out the rest of BSS
+            header[0] = -bss.dataSize + 1;
+            header[1] = org + 1;
+            header[2] = -header[0] - header[2];
+
+            write( ofd, header, 6 );
         }
 
-        // Get start of the opcode
-        ipos = skipWhite( ipos );
+        // Output start block
+        header[0] = 1;
+        header[1] = (1 + stksize << 10) + entrypos;
+        header[2] = 0;
 
-        // Terminate end of opcode
-        for ( i = 0; ipos[i] != '\0' && ipos[i] != ' ' && ipos[i] != '\t'; i++ );
-        if ( ipos[i] != '\0' )
-        {
-            ipos[i] = '\0';
-            // Setup argument pointer
-            apos = skipWhite(ipos + i + 1);
-        }
-        else
-        {
-            apos = NULL;
-        }
+        // Should we enable auto-start
+        if ( flags & FLG_SMHA ) header[1] |= 0x8000;
 
-        // Look up opcode
-        curIns = getOpcode( ipos, state );
-
-        // Compute arguments
-        argc = computeArgs( apos, argv );
-        if ( argc >= MAX_ARGS )
-        {
-            xlog( DGNASM_LOG_SYTX, state, "Exceded the maximum of %d arguments\n", MAX_ARGS );
-            fclose( srcFile );
-            return 0;
-        }
-
-        // Check for LOC assembler directives
-        int dirRes = processDirective( ipos, argc, argv, labelHere, state );
-        if ( dirRes > -3 )
-        {
-            if ( dirRes == -1 ) // Error
-            {
-                fclose( srcFile );
-                return 0;
-            }
-
-            if ( dirRes > 0 ) doInc = dirRes;
-        }
-        // Check if this is an instruction
-        else if ( curIns != NULL )
-        {
-            // Move to instruction pointer to flags
-            ipos += curIns->len;
-
-            // Compute opcode
-            if ( !buildInstruction( curIns, ipos, argc, argv, state ) )
-            {
-                fclose( srcFile );
-                return 0;
-            }
-
-            doInc = 1;
-        }
-        // Check for constant
-        else if ( ipos[0] != '\0' )
-        {
-            unsigned short data = 0;
-
-            // Set indirect flag
-            if ( ipos[0] == '@' )
-            {
-                ipos++;
-                data |= 1 << 15;
-            }
-
-            // Label constant
-            if ( isLabel( ipos ) )
-            {
-                if ( !insertReference( ipos, &data, state ) )
-                {
-                    fclose( srcFile );
-                    return 0;
-                }
-            }
-            // Literal constant
-            else
-            {
-                if ( data > 0 )
-                {
-                    xlog( DGNASM_LOG_WARN, state, "Indirect flag '@' set on a literal constant\n" );
-                }
-
-                unsigned short litVal;
-                if ( !convertNumber( ipos, &litVal, 0, 0xFFFF, state ) )
-                {
-                    fclose( srcFile );
-                    return 0;
-                }
-
-                data |= litVal;
-            }
-
-            // Load data into memory
-            state->memory[state->curAddr] = data;
-
-            doInc = 1;
-        }
-
-        // Output listing
-        for ( i = 0; i < doInc; i++ )
-        {
-            if ( i == 0 )
-            {
-                fprintf( state->listFile, "%05o: %06o | %s",
-                         state->curAddr,
-                         state->memory[state->curAddr],
-                         listLine );
-            }
-            else
-            {
-                fprintf( state->listFile, "%05o: %06o\n",
-                         state->curAddr,
-                         state->memory[state->curAddr] );
-            }
-
-            // Increment to the next address
-            state->curAddr++;
-        }
-
-        if ( i == 0 && dirRes != -2 ) // DirRes -2 is an .include
-        {
-             fprintf( state->listFile, "                %s", listLine );
-        }
-
-        // Increment current line
-        state->curLine++;
+        write( ofd, header, 6 );
     }
-
-    // Don't forget to close the file
-    fclose( srcFile );
-    return 1;
-}
-
-int decodeOption( char * arg, dgnasm * state )
-{
-    switch ( *arg )
+    else if ( flags & FLG_TERM ) // Virtual console output
     {
-        case 'c':
-            state->caseSense = 1;
-            break;
-        case 'h':
-            state->simhFormat = 1;
-            if ( arg[1] == 'a' ) state->simhStart = 1;
-            break;
-        default:
-            printf( "dgnasm: unknown option '%c'\n", *arg );
-            return 0;
+        struct segment * curseg = &zero;
+        unsigned int org = 0;
+
+        write( ofd, "K", 1 ); // Make sure the current cell is closed
+
+        while ( curseg )
+        {
+            if ( curseg->dataSize )
+            {
+                // Open the first cell
+                octwrite( ofd, org );
+                write( ofd, "/", 1 );
+
+                i = 0;
+                while ( i < curseg->dataSize )
+                {
+                    octwrite( ofd, curseg->data[i] );
+                    write( ofd, "\n", 1 );
+                    i++;
+                }
+
+                write( ofd, "K", 1 ); // Close the last cell
+            }
+
+            if      ( curseg == &zero ) { org += (1 + stksize) << 10; curseg = &text; }
+            else if ( curseg == &text ) { org += text.dataSize; curseg = &data; }
+            else curseg = NULL;
+        }
+
+        // Output BSS segment
+        if ( bss.dataSize )
+        {
+            org += data.dataSize;
+
+            // Open first cell
+            octwrite( ofd, org );
+            write( ofd, "/", 1 );
+
+            i = 0;
+            while ( i < curseg->dataSize )
+            {
+                write( ofd, "0\n", 2 );
+                i++;
+            }
+
+            write( ofd, "K", 1 ); // Close last cell
+        }
+    }
+    else // Binary executable output
+    {
+        // Output header
+        unsigned int header[10];
+        header[0] = 0407;     // Magic number (program load method)
+        header[1] = zero.dataSize | stksize << 8; // Stack segment length | Zero segment length
+        header[2] = text.dataSize; // Text segment length
+        header[3] = data.dataSize; // Data segment length
+        header[4] =  bss.dataSize; // Bss  segment length
+        header[5] = sympos - ASM_SIZE; // Symbol table length
+        header[6] = (1 + stksize << 10) + entrypos; // Text segment entry offset
+        header[7] = zero.rlocSize; // Zero segment relocation length
+        header[8] = text.rlocSize; // Text segment relocation length
+        header[9] = data.rlocSize; // Data segment relocation length
+
+        write( ofd, header, 20 );
+
+        // Output each segment's data
+        write( ofd, zero.data, zero.dataSize * sizeof(unsigned int) );
+        write( ofd, text.data, text.dataSize * sizeof(unsigned int) );
+        write( ofd, data.data, data.dataSize * sizeof(unsigned int) );
+
+        // Output symbol table
+        write( ofd, symtbl + ASM_SIZE, (sympos - ASM_SIZE) * sizeof(struct symbol) );
+
+        // Output relocation data
+        write( ofd, zero.rloc, zero.rlocSize * sizeof(struct relocate) );
+        write( ofd, text.rloc, text.rlocSize * sizeof(struct relocate) );
+        write( ofd, data.rloc, data.rlocSize * sizeof(struct relocate) );
     }
 
-    return 1;
+    // Close a.out
+    close( ofd );
+
+    return 0;
 }

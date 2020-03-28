@@ -1,131 +1,111 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
+// Pretend this is a 16-bit unix 6 system
+#define int short
+#define NULL 0
 
-#define DGNASM_VERSION "1.0.5"
+//#define DBUG_TOK 1
+#define DBUG_SYM 1
 
-// How many characters are allowed in the filename
-#define MAX_FILENAME_LENGTH 255
+#define MAX_LINE 256  // Maximum number of tokens per file line
+#define MAX_TOKN 8    // The Unix6 'a.out' executable standard limits us to 8 characters
+#define PAGESIZE 1023 // 2 KB (1 KW) of memory (1 mmu page)
+#define ASM_SIZE 71   // Number of assembler defined symbols
 
-// Max length of a source file line
-#define MAX_LINE_LENGTH 256
+// *** DGNova Instruction Parameter Formats ***
+#define DGN_IONO  8 // I/O No accumulator
+#define DGN_IO    9 // I/O
+#define DGN_IOSK 10 // I/O Skip
+#define DGN_FLOW 11 // Flow control
+#define DGN_LOAD 12 // Memory access
+#define DGN_MATH 13 // Arithmetic, Logic
+// *** DGNova Extened Instruction Parameter Formats ***
+#define DGN_TRAP 14 // Arithmetic no-op (No load, no skip)
+#define DGN_CT   15 // Control, no accumulator or flags
+#define DGN_CTA  16 // Control, acumulator
+#define DGN_CTF  17 // Control, flag
+#define DGN_CTAF 18 // Control, acumulator and flag
+#define DGN_CTAA 19 // Control, two accumulators
+// *** Assembler directive ***
+#define ASM_TEXT 20 // .text   directive
+#define ASM_DATA 21 // .data   directive
+#define ASM_BSS  22 // .bss    directive
+#define ASM_ZERO 23 // .zero   directive
+#define ASM_GLOB 24 // .glob   directive
+#define ASM_DEFN 25 // .define directive
+#define ASM_ENT  26 // .ent    directive
+// *** DGNova Constants ***
+#define DGN_SKPC 27 // Arithmetic & Logic skip condition
+#define DGN_HWID 28 // Nova Hardware ID
+// *** Token types ***
+#define TOK_NAME 29 // Named symbol (user label)
+#define TOK_NUM  30 // Numberical constant
+#define TOK_INDR 31 // Indirect bit token '@'
+#define TOK_LABL 32 // Label token ':'
+#define TOK_ARG  33 // Argument seperator token ','
+#define TOK_BYLO 34 // Low  byte indicator '>'
+#define TOK_BYHI 35 // High byte indicator '<'
+#define TOK_EOL  36 // End of line token
 
-// How much should we print by default
-#define DEFAULT_VERBOSITY 5
+// *** Symbols Type ***
+#define SYM_BYTE  1 // Byte flag
 
-// The max memory available in the DGN
-#define MAX_MEM_SIZE 32768
+#define SYM_ABS   0 // Constant value
+#define SYM_ZERO  1 // Zero-page pointer
+#define SYM_TEXT  2 // Text pointer
+#define SYM_DATA  3 // Data pointer
+#define SYM_BSS   4 // Bss  pointer
+#define SYM_DEF   5 // Undefined symbol
+#define SYM_ZDEF  6 // Undefined zero page symbol
+#define SYM_FILE  7 // File seperator symbol
 
-// Logging constants
-#define DGNASM_LOG_INFO 0
-#define DGNASM_LOG_WARN 1
-#define DGNASM_LOG_SYTX 2
-#define DGNASM_LOG_ASEM 3
-#define DGNASM_LOG_DBUG 4
+#define SYM_MASK  7 // Symbol type mask
 
-// Maximum characters in a label
-#define MAX_LABEL_SIZE 32
+#define SYM_GLOB  8 // Global flag
 
-// Maximum number of arguments per instruction
-#define MAX_ARGS 16
+// *** Boolean Flags ***
+#define FLG_GLOB 0b0000000000000001 // Force all undefined symbols to be global
+#define FLG_DATA 0b0000000000000010 // Should we write out data this pass?
+#define FLG_RLOC 0b0000000000000100 // Should we record relocation bits?
+#define FLG_SMH  0b0000000000001000 // Use SimH output
+#define FLG_SMHA 0b0000000000011000 // Use SimH output with auto start
+#define FLG_TERM 0b0000000000010000 // Use the Nova 4 virtual console output
 
-// Number of distinct instructions
-#define DGNOVA_LANG_LEN 29
-
-// Instruction type constants
-#define DGNOVA_INSTR_IOC 0 // I/O Instruction
-#define DGNOVA_INSTR_JMP 1 // Jump Instruction
-#define DGNOVA_INSTR_MEM 2 // Memory Instruction
-#define DGNOVA_INSTR_ARL 3 // Arithmetic / Logic Instruction
-#define DGNOVA_INSTR_CPC 5 // CPU Control Instruction
-#define DGNOVA_INSTR_CPD 6 // CPU Data Instruction
-
-typedef struct label
+struct symbol
 {
-    char name[MAX_LABEL_SIZE + 1];
-    unsigned short addr;
-    int refCount;
-    int isConst;
-    struct label * next;
-} label;
+    char name[MAX_TOKN]; // Symbol name
+    unsigned int type; // Symbol type
+    unsigned int val; // Opcode, Address, Value, etc.
+};
 
-typedef struct instr
+struct relocate
 {
-    char * name;
-    int len;
-    unsigned short opcode;
-    int type;
-} instr;
+    unsigned int head;
+    unsigned int addr;
+};
 
-struct instr dgnlang[DGNOVA_LANG_LEN];
-const char * skipCodes[7];
-
-typedef struct dgnasm
+// Store a data segment
+struct segment
 {
-    // Current file and line
-    char * curFile;
-    int curLine;
+    // Segment's data as it appears in memory
+    unsigned int * data;
+    unsigned int dataPos;
+    unsigned int dataSize;
 
-    FILE * listFile;
-    FILE * outFile;
+    // Relocation information for this segment
+    struct relocate * rloc;
+    unsigned int rlocPos;
+    unsigned int rlocSize;
 
-    // What pass are we on?
-    int curPass;
+    unsigned char sym; // The symbol type
+};
 
-    // Store all symbols
-    label * sym;
+// Assembly fail function
+void asmfail(char * msg);
 
-    // Buildspace
-    unsigned short memory[MAX_MEM_SIZE];
-
-    // Starting address of the program
-    unsigned short startAddr;
-    // Current address we're working on
-    unsigned short curAddr;
-    // The entry point for the program
-    unsigned short entAddr;
-
-    // How much info do we tell the user
-    int verbosity;
-    // Should we be case sensitive?
-    int caseSense;
-    // Format output for simh
-    int simhFormat;
-    // Should simh auto start the program?
-    int simhStart;
-} dgnasm;
-
-// Primary assembly routine
-int labelFile( char * srcPath, dgnasm * state );
-int assembleFile( char * scrPath, dgnasm * state );
-int decodeOption( char * arg, dgnasm * state );
-
-// Simh format routine
-int formatSimh( dgnasm * state );
-
-// Utility functions
-char * skipWhite( char * str );
-void stripEnd( char * str );
-int computeArgs( char * str, char ** argv );
-int dgnasmcmp( const char * str1, const char * str2, dgnasm * state );
-int dgnasmncmp( const char * str1, const char * str2, int len, dgnasm * state );
-int convertNumber( char * str, unsigned short * val, int halfVal, unsigned short maxVal, dgnasm * state );
-void xlog( int level, dgnasm * state, const char * format, ... );
-int checkArgs( int argc, int minArg, int maxArg, dgnasm * state );
-
-// Label processing functions
-int insertLabel( char * symName, unsigned short symAddr, int isConst, dgnasm * state );
-int insertReference( char * symName, unsigned short * outRef, dgnasm * state );
-int insertDisplacement( char * symName, unsigned short * outDisp, unsigned short * page, dgnasm * state );
-int isLabel(char * symName);
-
-// Opcode table and lookup functions
-void initOpcodeTable();
-instr * getOpcode( char * mnem, dgnasm * state );
-
-// Assembler directive functions
-int processDirective( char * direct, int argc, char ** args, int labelHere, dgnasm * state );
-
-// Instruction generation functions
-int buildInstruction( instr * curIns, char * fpos, int argc, char ** args, dgnasm * state );
+// Unix system calls
+void exit(int status);
+int creat(const char * pathname, int mode);
+int  open(const char * pathname, int flags);
+int close(int fd);
+int  read(int fd, void * buf, unsigned int count);
+int write(int fd, void * buf, unsigned int count);
+void * sbrk(int inc);
