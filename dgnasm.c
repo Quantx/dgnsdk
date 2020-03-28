@@ -1,6 +1,6 @@
 #include "dgnasm.h"
 
-char * sepname = "SYMDELIM";
+const char * sepname = "SYMDELIM";
 unsigned int flags; // Store misc booleans
 unsigned int curfno; // Current file number
 unsigned int entrypos; // Starting address offset within the text segment
@@ -30,6 +30,7 @@ void octwrite( int nfd, unsigned int val )
     write( nfd, tmpbuf + tmppos, 6 - tmppos );
 }
 
+#include "help.c"
 #include "segments.c"
 #include "tokenizer.c"
 #include "assembler.c"
@@ -120,18 +121,7 @@ int main( int argc, char ** argv )
         argc--; argv++;
     }
 
-    if ( !argc )
-    {
-        write( 2, "usage: ", 7 );
-
-        i = 0;
-        while( progname[i++] );
-        write( 2, progname, i );
-
-        write( 2, " [-] file1.s file2.s ...\r\n", 26 );
-
-        exit(1);
-    }
+    if ( !argc ) showhelp( progname );
 
     write( 1, " *** Loading symbols ***\r\n", 26 );
 
