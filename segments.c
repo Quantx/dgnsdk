@@ -36,8 +36,9 @@ void segset( struct segment * seg, unsigned int reloc, unsigned int val )
     if ( reloc )
     {
         // Add symbol offsets
-        if      ( (reloc >> 1 & SYM_MASK) == SYM_TEXT ) val += 1 + stksize << 10;
-        else if ( (reloc >> 1 & SYM_MASK) == SYM_DATA ) val += text.dataSize + (1 + stksize << 10);
+        if      ( (reloc >> 1 & SYM_MASK) == SYM_TEXT ) val +=  1 + stksize << 10;
+        else if ( (reloc >> 1 & SYM_MASK) == SYM_DATA ) val += (1 + stksize << 10) + text.dataSize;
+        else if ( (reloc >> 1 & SYM_MASK) == SYM_BSS  ) val += (1 + stksize << 10) + text.dataSize + data.dataSize;
 
         curRloc->head = reloc;
         curRloc->addr = seg->dataPos;
