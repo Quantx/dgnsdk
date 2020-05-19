@@ -32,12 +32,21 @@ void assemble( char * fpath )
             // This is a high byte pointer
             if ( tk == TOK_BYHI ) val |= 1;
 
-            segset( curseg, tkVal << 4 | (cursym->type & SYM_MASK) << 1 | tk != TOK_INDR, val );
+            // Compute relocation bits
+            unsigned int rloc = tkVal << 4 | (cursym->type & SYM_MASK) << 1 | tk != TOK_INDR;
+
+            // Add any following numbers
+            ntok();
+            if ( tk == TOK_NUM )
+            {
+                val += tkVal;
+                ntok();
+            }
+
+            segset( curseg, rloc, val );
 
             // Allocate room for symbol in this segment
             curseg->dataPos++;
-
-            ntok();
         }
         // Label declaration or label constant
         else if ( tk == TOK_NAME )
@@ -66,8 +75,17 @@ void assemble( char * fpath )
             // Some other token
             else
             {
+                unsigned int val = cursym->val;
+
+                // Add any following numbers
+                if ( tk == TOK_NUM )
+                {
+                    val += tkVal;
+                    ntok();
+                }
+
                 // Write out symbol
-                segset( curseg, cursymno << 4 | (cursym->type & SYM_MASK) << 1, cursym->val );
+                segset( curseg, cursymno << 4 | (cursym->type & SYM_MASK) << 1, val );
 
                 // Allocate room for this symbol in the segment
                 curseg->dataPos++;

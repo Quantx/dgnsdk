@@ -193,10 +193,10 @@ void ntok()
         }
         else if ( (tk >= '0' && tk <= '9') || tk == '+' || tk == '-' ) // Number
         {
-            int makeNeg = 0;
+            int spfx = 0;
             if ( tk == '-' )
             {
-                makeNeg = 1;
+                spfx = 1;
                 tk = *p++;
             }
             else if ( tk == '+' ) tk = *p++;
@@ -224,7 +224,7 @@ void ntok()
                 while ( *p >= '0' && *p <= '7' ) tkVal = (tkVal << 3) + *p++ - '0';
             }
 
-            if ( makeNeg ) tkVal = -tkVal;
+            if ( spfx ) tkVal = -tkVal;
             tk = TOK_NUM;
             return;
         }
