@@ -6,9 +6,10 @@
 #define DBUG_SYM 1
 
 #define MAX_LINE 256  // Maximum number of tokens per file line
+#define MAX_STR  256  // Maximum length of user defined strings
 #define MAX_TOKN 8    // The Unix6 'a.out' executable standard limits us to 8 characters
-#define PAGESIZE 1023 // 2 KB (1 KW) of memory (1 mmu page)
-#define ASM_SIZE 71   // Number of assembler defined symbols
+#define PAGESIZE 1024 // 2 KB (1 KW) of memory (1 mmu page)
+#define ASM_SIZE 72   // Number of assembler defined symbols
 
 // *** DGNova Instruction Parameter Formats ***
 #define DGN_IONO  8 // I/O No accumulator
@@ -32,18 +33,21 @@
 #define ASM_GLOB 24 // .glob   directive
 #define ASM_DEFN 25 // .define directive
 #define ASM_ENT  26 // .ent    directive
+#define ASM_WSTR 27 // .wstr   directive
 // *** DGNova Constants ***
-#define DGN_SKPC 27 // Arithmetic & Logic skip condition
-#define DGN_HWID 28 // Nova Hardware ID
+#define DGN_SKPC 28 // Arithmetic & Logic skip condition
+#define DGN_HWID 29 // Nova Hardware ID
 // *** Token types ***
-#define TOK_NAME 29 // Named symbol (user label)
-#define TOK_NUM  30 // Numberical constant
-#define TOK_INDR 31 // Indirect bit token '@'
-#define TOK_LABL 32 // Label token ':'
-#define TOK_ARG  33 // Argument seperator token ','
-#define TOK_BYLO 34 // Low  byte indicator '>'
-#define TOK_BYHI 35 // High byte indicator '<'
-#define TOK_EOL  36 // End of line token
+#define TOK_NAME 30 // Named symbol (user label)
+#define TOK_NUM  31 // Numberical constant
+#define TOK_INDR 32 // Indirect bit token '@'
+#define TOK_LABL 33 // Label token ':'
+#define TOK_ARG  34 // Argument seperator token ','
+#define TOK_BYLO 35 // Low  byte indicator '>'
+#define TOK_BYHI 36 // High byte indicator '<'
+#define TOK_EOL  37 // End of line token
+#define TOK_MATH 38 // Plus or minus
+#define TOK_STR  39 // User defined string
 
 // *** Symbols Type ***
 #define SYM_BYTE  1 // Byte flag

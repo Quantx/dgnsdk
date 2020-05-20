@@ -76,12 +76,20 @@ void asmfail( char * msg )
     write( 2, lp, i );
 //    write( 2, "\r\n", 2 );
 
-    // Output curpos indicator
+/*    // Output curpos indicator
     i = 0;
     while ( i < pp - lp )
     {
-        write( 2, lp[i] == '\t' ? "\t" : " ", 1 );
-        i++;
+        write( 2, lp[i++] == '\t' ? "\t" : " ", 1 );
+    }
+
+    write( 2, "^\r\n", 3 );
+*/
+    // Output curpos indicator
+    i = 0;
+    while ( i < p - lp )
+    {
+        write( 2, pp[i++] == '\t' ? "\t" : " ", 1 );
     }
 
     write( 2, "^\r\n", 3 );

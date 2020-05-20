@@ -37,9 +37,16 @@ void assemble( char * fpath )
 
             // Add any following numbers
             ntok();
-            if ( tk == TOK_NUM )
+            if ( tk == TOK_MATH )
             {
-                val += tkVal;
+                char doNeg = tkVal;
+
+                ntok();
+                if ( tk != TOK_NUM ) asmfail("expected numberical constant");
+
+                if ( doNeg ) val -= tkVal;
+                else val += tkVal;
+
                 ntok();
             }
 
@@ -78,9 +85,16 @@ void assemble( char * fpath )
                 unsigned int val = cursym->val;
 
                 // Add any following numbers
-                if ( tk == TOK_NUM )
+                if ( tk == TOK_MATH )
                 {
-                    val += tkVal;
+                    char doNeg = tkVal;
+
+                    ntok();
+                    if ( tk != TOK_NUM ) asmfail("expected numerical constant");
+
+                    if ( doNeg ) val -= tkVal;
+                    else val += tkVal;
+
                     ntok();
                 }
 
@@ -91,17 +105,60 @@ void assemble( char * fpath )
                 curseg->dataPos++;
             }
         }
-        else if ( tk == TOK_NUM ) // Numerical constant
+        else if ( tk == TOK_NUM || tk == TOK_MATH ) // Numerical constant
         {
+            unsigned int val = 0;
+            char doNeg;
+
+            // Numerical constant with prefix: -1234 or +1234
+            if ( tk == TOK_MATH )
+            {
+                doNeg = tkVal;
+
+                ntok();
+                if ( tk != TOK_NUM ) asmfail( "expected numerical constant" );
+
+                if ( doNeg ) val = -tkVal;
+                else val = tkVal;
+            }
+
+            ntok();
+            if ( tk == TOK_MATH )
+            {
+                doNeg = tkVal;
+
+                ntok();
+                if ( tk != TOK_NUM ) asmfail( "expected numerical constant" );
+
+                if ( doNeg ) val -= tkVal;
+                else val += tkVal;
+
+                ntok();
+            }
+
             if ( curseg->sym == SYM_BSS ) // Increment pos for BSS segment
             {
-                curseg->dataPos += tkVal;
+                if ( val < 0 ) asmfail("cannot decrease size of BSS segment");
+                curseg->dataPos += val;
             }
             else
             {
-                segset( curseg, SYM_ABS << 1, tkVal );
+                segset( curseg, SYM_ABS << 1, val );
 
                 // Allocate room for absolute symbol in the segment
+                curseg->dataPos++;
+            }
+        }
+        else if ( tk == TOK_STR ) // User defined string
+        {
+            unsigned int val, i = 0;
+
+            // Load string into segment
+            while ( i < tkVal )
+            {
+                val = ustr[i++] & 0xFF;
+                if ( i < tkVal ) val += (ustr[i++] & 0xFF) << 8;
+                segset( curseg, SYM_ABS << 1, val );
                 curseg->dataPos++;
             }
 
@@ -159,11 +216,20 @@ void assemble( char * fpath )
                 }
 
                 // Get displacement
-                if ( tk == TOK_NUM ) // Numerical displacement (programmer can pick mode)
+                if ( tk == TOK_NUM || tk == TOK_MATH ) // Numerical displacement (programmer can pick mode)
                 {
                     // Store displacement
                     int disp = tkVal;
                     int mode = 0;
+
+                    if ( tk == TOK_MATH )
+                    {
+                        ntok();
+                        if ( tk != TOK_NUM ) asmfail("expected numerical constant");
+
+                        if ( disp ) disp = -tkVal;
+                        else disp = tkVal;
+                    }
 
                     // Check if a mode was specified
                     ntok();
@@ -179,7 +245,7 @@ void assemble( char * fpath )
 
                     if ( !mode && (disp < 0 || disp > 0xFF) ) // Zero page access
                     {
-                        asmfail("invalid zero page address");
+                        asmfail("invalid unsigned 8-bit zero page address");
                     }
                     else if ( mode && (disp < -128 || disp > 127) ) // Two's complement displacement
                     {
@@ -193,23 +259,45 @@ void assemble( char * fpath )
                 else if ( tk == TOK_NAME ) // Label displacement (assembler picks mode)
                 {
                     // Store ref to symbol
-                    struct symbol * cursym = symtbl + tkVal;
+                    unsigned int cursymno = tkVal;
+                    struct symbol * cursym = symtbl + cursymno;
+
+                    unsigned int val = 0;
+                    ntok();
+                    if ( tk == TOK_MATH )
+                    {
+                        char doNeg = tkVal;
+
+                        ntok();
+                        if ( tk != TOK_NUM ) asmfail("expected numerical constant");
+
+                        if ( doNeg ) val -= tkVal;
+                        else val += tkVal;
+
+                        ntok();
+                    }
 
                     // Undefined zero page symbol
                     if ( (cursym->type & SYM_MASK) == SYM_DEF )
                     {
-                        oprlc = tkVal << 4 | SYM_ZDEF << 1;
+                        if ( val > 0xFF ) asmfail("label offset outside displacement range");
+
+                        opval |= val;
+                        oprlc = cursymno << 4 | SYM_ZDEF << 1;
                     }
                     // Zero page displacement symbol
                     else if ( (cursym->type & SYM_MASK) == SYM_ZERO )
                     {
-                        opval |= cursym->val;
-                        oprlc = tkVal << 4 | SYM_ZERO << 1;
+                        val += cursym->val;
+                        if ( val > 0xFF ) asmfail("label offset outside displacement range");
+
+                        opval |= val;
+                        oprlc = cursymno << 4 | SYM_ZERO << 1;
                     }
                     // Program counter relative symbol
                     else if ( (cursym->type & SYM_MASK) == curseg->sym )
                     {
-                        int disp = cursym->val - curseg->dataPos;
+                        int disp = cursym->val - curseg->dataPos + val;
 
                         // Out of bounds
                         if ( disp < -128 || disp > 127 ) asmfail("label outside displacement range");
@@ -222,8 +310,6 @@ void assemble( char * fpath )
                     {
                         asmfail("label not in current segment");
                     }
-
-                    ntok();
                 }
             }
             // Arithmetic & Logic Instructions
@@ -372,6 +458,21 @@ void assemble( char * fpath )
 
             // Update entry position
             entrypos = cursym->val;
+
+            ntok();
+        }
+        // Assembler .wstr directive (word string)
+        else if ( tk == ASM_WSTR )
+        {
+            ntok();
+            if ( tk != TOK_STR ) asmfail("expected a string");
+
+            unsigned int i = 0;
+            while ( i < tkVal )
+            {
+                segset( curseg, SYM_ABS << 1, ustr[i++] & 0xFF );
+                curseg->dataPos++;
+            }
 
             ntok();
         }

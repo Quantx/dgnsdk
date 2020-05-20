@@ -1,4 +1,4 @@
-char lp[MAX_LINE], * p, * pp, * fp = NULL, tk;
+char lp[MAX_LINE], * p, * pp, * fp = NULL, tk, ustr[MAX_STR + 1], * usp;
 unsigned int curline;
 int fd, tkVal;
 
@@ -69,6 +69,14 @@ void ntok()
             // Label excedes max length
             if ( p - pp == MAX_TOKN ) asmfail("named token exceeds max character length");
 
+            // Return current segment position
+            if ( tk == '.' && p - pp == 1 )
+            {
+                tk = TOK_NUM;
+                tkVal = curseg->dataPos;
+                return;
+            }
+
             unsigned int fscp = 0;
             int i, k = 0;
             // Find a matching symbol
@@ -91,7 +99,8 @@ void ntok()
                 }
                 else // User defined symbol
                 {
-                    tk = TOK_NAME;
+                    // Is this a defined value or a symbol
+                    tk = (symtbl[k].type & SYM_MASK) == SYM_ABS ? TOK_NUM : TOK_NAME;
                     tkVal = k;
                 }
 
@@ -110,7 +119,7 @@ void ntok()
                 }
 
                 // Didn't match base name, skip flags
-                if ( symtbl[k].name[i] || tk == TOK_NAME ) { k++; continue; }
+                if ( symtbl[k].name[i] || tk == TOK_NAME || tk == TOK_NUM ) { k++; continue; }
 
                 // Number of unmatched chars (flags)
                 int flagNum = p - pp - i;
@@ -191,16 +200,8 @@ void ntok()
             tkVal = k;
             return;
         }
-        else if ( (tk >= '0' && tk <= '9') || tk == '+' || tk == '-' ) // Number
+        else if ( tk >= '0' && tk <= '9' ) // Number
         {
-            int spfx = 0;
-            if ( tk == '-' )
-            {
-                spfx = 1;
-                tk = *p++;
-            }
-            else if ( tk == '+' ) tk = *p++;
-
             tkVal = 0;
 
             if ( tk != '0' ) // Decimal
@@ -212,7 +213,7 @@ void ntok()
             {
                 p++;
                 while ( (*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F') )
-                    tkVal = (tkVal << 4) + (*p & 15) + (*p++ >= 'A' ? 9 : 0);
+                    tkVal = (tkVal << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
             }
             else if ( *p == 'b' || *p == 'B' ) // Binary
             {
@@ -224,7 +225,6 @@ void ntok()
                 while ( *p >= '0' && *p <= '7' ) tkVal = (tkVal << 3) + *p++ - '0';
             }
 
-            if ( spfx ) tkVal = -tkVal;
             tk = TOK_NUM;
             return;
         }
@@ -234,6 +234,77 @@ void ntok()
         else if ( tk == '@' ) { tk = TOK_INDR; tkVal = 0; return; } // Indirection flag
         else if ( tk == '<' ) { tk = TOK_BYHI; tkVal = 0; return; } // Low  byte pointer flag
         else if ( tk == '>' ) { tk = TOK_BYLO; tkVal = 0; return; } // High byte pointer flag
+        else if ( tk == '+' || tk == '-' ) { tk = TOK_MATH; tkVal = tk == '-'; return; } // Plus or minus
+        else if ( tk == '"' || tk == '\'' ) // String, double quote is zero terminated
+        {
+            tkVal = 0;
+            usp = ustr;
+
+            while ( *p != tk )
+            {
+                // Out of data, get next line
+                if ( !*p && !readline() ) asmfail("expected terminating string delimiter, got end of file");
+
+                // Escape character
+                if ( *p == '\\' )
+                {
+                    p++;
+
+                    if      ( *p == 'a'  ) { *usp = '\a'; p++; }
+                    else if ( *p == 'b'  ) { *usp = '\b'; p++; }
+                    else if ( *p == 'e'  ) { *usp = '\e'; p++; }
+                    else if ( *p == 'f'  ) { *usp = '\f'; p++; }
+                    else if ( *p == 'n'  ) { *usp = '\n'; p++; }
+                    else if ( *p == 'r'  ) { *usp = '\r'; p++; }
+                    else if ( *p == 't'  ) { *usp = '\t'; p++; }
+                    else if ( *p == 'v'  ) { *usp = '\v'; p++; }
+                    else if ( *p == '\\' ) { *usp = '\\'; p++; }
+                    else if ( *p == '\'' ) { *usp = '\''; p++; }
+                    else if ( *p == '"'  ) { *usp = '"';  p++; }
+                    else if ( *p == 'x' )
+                    {
+                        if ( *++p >= '0' && *p <= '9'
+                            || *p >= 'a' && *p <= 'f'
+                            || *p >= 'A' && *p <= 'F' )
+                            // Convert first digit
+                            *usp = (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
+                        else asmfail("expected two hex digits following a \\x escape");
+
+                        // Convert possible second digit
+                        if ( *p >= '0' && *p <= '9'
+                          || *p >= 'a' && *p <= 'f'
+                          || *p >= 'A' && *p <= 'F' )
+                            *usp = (*usp << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
+                    }
+                    else if ( *p >= '0' && *p <= '7' )
+                    {
+                        *usp = *p++ - '0'; // First digit
+
+                        if ( *p >= '0' && *p <= '7' ) // Second digit
+                            *usp = (*usp << 3) + *p++ - '0';
+
+                        if ( *p >= '0' && *p <= '7' ) // Last digit
+                            *usp = (*usp << 3) + *p++ - '0';
+                    }
+                    else asmfail("unknown escape sequence");
+                }
+                else
+                {
+                    *usp = *p++;
+                }
+
+                if ( ++usp - ustr >= MAX_STR ) asmfail("string excedes maximum length");
+            }
+
+            p++; // Increment past the final delimiter
+
+            // Null termiante
+            if ( tk == '"' ) *usp++ = 0; // Null terminate
+
+            tk = TOK_STR;
+            tkVal = usp - ustr; // String length
+            return;
+        }
     }
 
     // End of line reached, use end of line token

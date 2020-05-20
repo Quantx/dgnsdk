@@ -78,6 +78,7 @@ struct symbol symtbl[ASM_SIZE] = {
     { { '.', 'G', 'L', 'O', 'B',           0 }, ASM_GLOB, 0 }, // .GLOB
     { { '.', 'D', 'E', 'F', 'I', 'N', 'E', 0 }, ASM_DEFN, 0 }, // .DEFINE
     { { '.', 'E', 'N', 'T',                0 }, ASM_ENT,  0 }, // .ENT
+    { { '.', 'W', 'S', 'T', 'R',           0 }, ASM_WSTR, 0 }, // .WSTR (Word String)
     // Hardware device aliases (8 so far)
     { { 'M', 'D', 'V',      0 }, DGN_HWID, 001 }, // MDV - Multiply & Divide
     { { 'M', 'A', 'P',      0 }, DGN_HWID, 002 }, // MAP  - Memory Management Unit
