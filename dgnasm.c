@@ -108,10 +108,12 @@ int main( int argc, char ** argv )
     // Set all flags
     while ( argc && **argv == '-' )
     {
+        (*argv)++;
+
         // All symbols are global
-        if      ( (*argv)[1] == 'g' ) flags |= FLG_GLOB;
+        if      ( **argv == 'g' ) flags |= FLG_GLOB;
         // Stack size follows
-        else if ( (*argv)[1] == 't' )
+        else if ( **argv == 't' )
         {
             argc--; argv++;
             while ( **argv >= '0' && **argv <= '9' ) stksize = stksize * 10 + *(*argv)++ - '0';
@@ -119,11 +121,12 @@ int main( int argc, char ** argv )
             if ( stksize > 32 ) asmfail( "Number of stack pages specified exceeds maximum of 32" );
         }
         // Output mode
-        else if ( (*argv)[1] == 'm' )
+        else if ( **argv == 'm' )
         {
-            if      ( (*argv)[2] == 'h' ) flags |= FLG_SMH;
-            else if ( (*argv)[2] == 'a' ) flags |= FLG_SMHA;
-            else if ( (*argv)[2] == 'v' ) flags |= FLG_TERM;
+            (*argv)++;
+            if      ( **argv == 'h' ) flags |= FLG_SMH;
+            else if ( **argv == 'a' ) flags |= FLG_SMHA;
+            else if ( **argv == 'v' ) flags |= FLG_TERM;
         }
 
         argc--; argv++;
