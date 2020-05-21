@@ -60,14 +60,14 @@ void ntok()
                ||  tk == '_' || tk == '.'  )
         {
             // Get entire token
-            while ( p - pp < MAX_TOKN
+            while ( p - pp <= MAX_TOKN
              && ( (*p >= 'a' && *p <= 'z')
              ||   (*p >= 'A' && *p <= 'Z')
              ||   (*p >= '0' && *p <= '9')
              ||    *p == '_' || *p == '#') ) p++;
 
             // Label excedes max length
-            if ( p - pp == MAX_TOKN ) asmfail("named token exceeds max character length");
+            if ( p - pp > MAX_TOKN ) asmfail("named token exceeds max character length");
 
             // Return current segment position
             if ( tk == '.' && p - pp == 1 )
