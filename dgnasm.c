@@ -176,6 +176,16 @@ int main( int argc, char ** argv )
         curfno++;
     }
 
+    // Make sure there are no undefined local labels
+    i = ASM_SIZE;
+    while ( i < sympos )
+    {
+        if ( ( (symtbl[i].type & SYM_MASK) == SYM_DEF
+            || (symtbl[i].type & SYM_MASK) == SYM_ZDEF )
+            && ~symtbl[i].type & SYM_GLOB ) asmfail("found undefined local label");
+        i++;
+    }
+
 //    write( 1, "Allocating required memory for segment data\r\n", 45 );
 
     // *** Reset for next pass ***
