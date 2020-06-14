@@ -22,7 +22,7 @@ void assemble( char * fpath )
             if ( tk != TOK_NAME ) asmfail("expected label"); // The following token MUST be a label
 
             // Store ref to symbol
-            struct symbol * cursym = symtbl + tkVal;
+            struct asmsym * cursym = symtbl + tkVal;
 
             unsigned int val = cursym->val;
             // Set indirect bit if needed
@@ -33,7 +33,7 @@ void assemble( char * fpath )
             if ( tk == TOK_BYHI ) val |= 1;
 
             // Compute relocation bits
-            unsigned int rloc = tkVal << 4 | (cursym->type & SYM_MASK) << 1 | tk != TOK_INDR;
+            unsigned int rloc = tkVal << 4 | cursym->type & SYM_MASK | tk != TOK_INDR;
 
             // Add any following numbers
             ntok();
@@ -60,7 +60,7 @@ void assemble( char * fpath )
         {
             // Store ref to symbol
             int cursymno = tkVal;
-            struct symbol * cursym = symtbl + cursymno;
+            struct asmsym * cursym = symtbl + cursymno;
 
             ntok();
             // Label declaration
@@ -99,7 +99,7 @@ void assemble( char * fpath )
                 }
 
                 // Write out symbol
-                segset( curseg, cursymno << 4 | (cursym->type & SYM_MASK) << 1, val );
+                segset( curseg, cursymno << 4 | cursym->type & SYM_MASK, val );
 
                 // Allocate room for this symbol in the segment
                 curseg->dataPos++;
@@ -143,7 +143,7 @@ void assemble( char * fpath )
             }
             else
             {
-                segset( curseg, SYM_ABS << 1, val );
+                segset( curseg, SYM_ABS, val );
 
                 // Allocate room for absolute symbol in the segment
                 curseg->dataPos++;
@@ -158,7 +158,7 @@ void assemble( char * fpath )
             {
                 val = ustr[i++] & 0xFF;
                 if ( i < tkVal ) val += (ustr[i++] & 0xFF) << 8;
-                segset( curseg, SYM_ABS << 1, val );
+                segset( curseg, SYM_ABS, val );
                 curseg->dataPos++;
             }
 
@@ -168,7 +168,7 @@ void assemble( char * fpath )
         {
             int optyp = tk; // Type of instruction
             int opval = tkVal; // The 16 bit instruction
-            int oprlc = SYM_ABS << 1; // Relocation bits for the instruction
+            int oprlc = SYM_ABS; // Relocation bits for the instruction
 
             // I/O Instruction, need a device code and maybe an accumulator
             if ( optyp == DGN_IONO || optyp == DGN_IO || optyp == DGN_IOSK )
@@ -260,7 +260,7 @@ void assemble( char * fpath )
                 {
                     // Store ref to symbol
                     unsigned int cursymno = tkVal;
-                    struct symbol * cursym = symtbl + cursymno;
+                    struct asmsym * cursym = symtbl + cursymno;
 
                     unsigned int val = 0;
                     ntok();
@@ -278,12 +278,12 @@ void assemble( char * fpath )
                     }
 
                     // Undefined zero page symbol
-                    if ( (cursym->type & SYM_MASK) == SYM_DEF )
+                    if ( (cursym->type & SYM_MASK) == SYM_ZDEF )
                     {
                         if ( val > 0xFF ) asmfail("label offset outside displacement range");
 
                         opval |= val;
-                        oprlc = cursymno << 4 | SYM_ZDEF << 1;
+                        oprlc = cursymno << 4 | SYM_ZDEF;
                     }
                     // Zero page displacement symbol
                     else if ( (cursym->type & SYM_MASK) == SYM_ZERO )
@@ -292,7 +292,7 @@ void assemble( char * fpath )
                         if ( val > 0xFF ) asmfail("label offset outside displacement range");
 
                         opval |= val;
-                        oprlc = cursymno << 4 | SYM_ZERO << 1;
+                        oprlc = cursymno << 4 | SYM_ZERO;
                     }
                     // Program counter relative symbol
                     else if ( (cursym->type & SYM_MASK) == curseg->sym )
@@ -304,6 +304,11 @@ void assemble( char * fpath )
 
                         // Output displacement and mode
                         opval |= disp & 0xFF | 0x100;
+                    }
+                    // Undefined non-zero page symbol
+                    else if ( (cursym->type & SYM_MASK) == SYM_DEF )
+                    {
+                        if ( flags & FLG_DATA ) asmfail("label is not defined");
                     }
                     // Symbol not in current segment
                     else
@@ -427,7 +432,7 @@ void assemble( char * fpath )
             if ( tk != TOK_NAME ) asmfail("expected a label");
 
             // Store ref to symbol
-            struct symbol * cursym = symtbl + tkVal;
+            struct asmsym * cursym = symtbl + tkVal;
 
             // Already defined symbol
             if ( (cursym->type & SYM_MASK) != SYM_DEF ) asmfail("label already defined");
@@ -452,12 +457,15 @@ void assemble( char * fpath )
             ntok();
             if ( tk != TOK_NAME ) asmfail("expected a label");
 
-            struct symbol * cursym = symtbl + tkVal;
+            if ( flags & FLG_DATA )
+            {
+                struct asmsym * cursym = symtbl + tkVal;
 
-            if ( (cursym->type & SYM_MASK) != SYM_TEXT ) asmfail("label must be a text label");
+                if ( (cursym->type & SYM_MASK) != SYM_TEXT ) asmfail("label must be a text label");
 
-            // Update entry position
-            entrypos = cursym->val;
+                // Update entry position
+                entrypos = cursym->val;
+            }
 
             ntok();
         }
@@ -470,7 +478,7 @@ void assemble( char * fpath )
             unsigned int i = 0;
             while ( i < tkVal )
             {
-                segset( curseg, SYM_ABS << 1, ustr[i++] & 0xFF );
+                segset( curseg, SYM_ABS, ustr[i++] & 0xFF );
                 curseg->dataPos++;
             }
 

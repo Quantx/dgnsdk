@@ -5,4 +5,5 @@ symbols: dgnasm.h symbols.c
 	gcc -fno-builtin-exit -g -rdynamic -o build_symbols symbols.c
 
 clean:
-	rm -f *.o dgnasm
+	rm -f *.o dgnasm build_symbols
+

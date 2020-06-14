@@ -1,89 +1,68 @@
-// Pretend this is a 16-bit unix 6 system
-#define int short
-#define NULL 0
+#include "../lib/novanix.h"
+#include "../lib/a.out.h"
 
 //#define DBUG_TOK 1
-#define DBUG_SYM 1
+//#define DBUG_SYM 1
 
 #define MAX_LINE 256  // Maximum number of tokens per file line
 #define MAX_STR  256  // Maximum length of user defined strings
-#define MAX_TOKN 8    // The Unix6 'a.out' executable standard limits us to 8 characters
 #define PAGESIZE 1024 // 2 KB (1 KW) of memory (1 mmu page)
 #define ASM_SIZE 72   // Number of assembler defined symbols
+#define MAX_TOKN 32   // Maximum number of characters in a single symbol
 
 // *** DGNova Instruction Parameter Formats ***
-#define DGN_IONO  8 // I/O No accumulator
-#define DGN_IO    9 // I/O
-#define DGN_IOSK 10 // I/O Skip
-#define DGN_FLOW 11 // Flow control
-#define DGN_LOAD 12 // Memory access
-#define DGN_MATH 13 // Arithmetic, Logic
+#define DGN_IONO 16 // I/O No accumulator
+#define DGN_IO   17 // I/O
+#define DGN_IOSK 18 // I/O Skip
+#define DGN_FLOW 19 // Flow control
+#define DGN_LOAD 20 // Memory access
+#define DGN_MATH 21 // Arithmetic, Logic
 // *** DGNova Extened Instruction Parameter Formats ***
-#define DGN_TRAP 14 // Arithmetic no-op (No load, no skip)
-#define DGN_CT   15 // Control, no accumulator or flags
-#define DGN_CTA  16 // Control, acumulator
-#define DGN_CTF  17 // Control, flag
-#define DGN_CTAF 18 // Control, acumulator and flag
-#define DGN_CTAA 19 // Control, two accumulators
+#define DGN_TRAP 22 // Arithmetic no-op (No load, no skip)
+#define DGN_CT   23 // Control, no accumulator or flags
+#define DGN_CTA  24 // Control, acumulator
+#define DGN_CTF  25 // Control, flag
+#define DGN_CTAF 26 // Control, acumulator and flag
+#define DGN_CTAA 27 // Control, two accumulators
 // *** Assembler directive ***
-#define ASM_TEXT 20 // .text   directive
-#define ASM_DATA 21 // .data   directive
-#define ASM_BSS  22 // .bss    directive
-#define ASM_ZERO 23 // .zero   directive
-#define ASM_GLOB 24 // .glob   directive
-#define ASM_DEFN 25 // .define directive
-#define ASM_ENT  26 // .ent    directive
-#define ASM_WSTR 27 // .wstr   directive
+#define ASM_TEXT 28 // .text   directive
+#define ASM_DATA 29 // .data   directive
+#define ASM_BSS  30 // .bss    directive
+#define ASM_ZERO 31 // .zero   directive
+#define ASM_GLOB 32 // .glob   directive
+#define ASM_DEFN 33 // .define directive
+#define ASM_ENT  34 // .ent    directive
+#define ASM_WSTR 35 // .wstr   directive
 // *** DGNova Constants ***
-#define DGN_SKPC 28 // Arithmetic & Logic skip condition
-#define DGN_HWID 29 // Nova Hardware ID
+#define DGN_SKPC 36 // Arithmetic & Logic skip condition
+#define DGN_HWID 37 // Nova Hardware ID
 // *** Token types ***
-#define TOK_NAME 30 // Named symbol (user label)
-#define TOK_NUM  31 // Numberical constant
-#define TOK_INDR 32 // Indirect bit token '@'
-#define TOK_LABL 33 // Label token ':'
-#define TOK_ARG  34 // Argument seperator token ','
-#define TOK_BYLO 35 // Low  byte indicator '>'
-#define TOK_BYHI 36 // High byte indicator '<'
-#define TOK_EOL  37 // End of line token
-#define TOK_MATH 38 // Plus or minus
-#define TOK_STR  39 // User defined string
-
-// *** Symbols Type ***
-#define SYM_BYTE  1 // Byte flag
-
-#define SYM_ABS   0 // Constant value
-#define SYM_ZERO  1 // Zero-page pointer
-#define SYM_TEXT  2 // Text pointer
-#define SYM_DATA  3 // Data pointer
-#define SYM_BSS   4 // Bss  pointer
-#define SYM_DEF   5 // Undefined symbol
-#define SYM_ZDEF  6 // Undefined zero page symbol
-#define SYM_FILE  7 // File seperator symbol
-
-#define SYM_MASK  7 // Symbol type mask
-
-#define SYM_GLOB  8 // Global flag
+#define TOK_NAME 38 // Named symbol (user label)
+#define TOK_NUM  39 // Numberical constant
+#define TOK_INDR 40 // Indirect bit token '@'
+#define TOK_LABL 41 // Label token ':'
+#define TOK_ARG  42 // Argument seperator token ','
+#define TOK_BYLO 43 // Low  byte indicator '>'
+#define TOK_BYHI 44 // High byte indicator '<'
+#define TOK_EOL  45 // End of line token
+#define TOK_MATH 46 // Plus or minus
+#define TOK_STR  47 // User defined string
 
 // *** Boolean Flags ***
 #define FLG_GLOB 0b0000000000000001 // Force all undefined symbols to be global
-#define FLG_DATA 0b0000000000000010 // Should we write out data this pass?
-#define FLG_RLOC 0b0000000000000100 // Should we record relocation bits?
+#define FLG_RLOC 0b0000000000000010 // Should we record relocation bits?
+#define FLG_DATA 0b0000000000000100 // Should we write out data this pass?
 #define FLG_SMH  0b0000000000001000 // Use SimH output
 #define FLG_SMHA 0b0000000000011000 // Use SimH output with auto start
 #define FLG_TERM 0b0000000000010000 // Use the Nova 4 virtual console output
+#define FLG_LOCL 0b0000000000100000 // Output local symbols
 
-struct symbol
+struct asmsym
 {
-    char name[MAX_TOKN]; // Symbol name
-    unsigned int type; // Symbol type
-    unsigned int val; // Opcode, Address, Value, etc.
-};
-
-struct relocate
-{
-    unsigned int head;
-    unsigned int addr;
+    char name[MAX_TOKN]; // Name of symbol
+    unsigned char type; // Type of symbol
+    unsigned char len; // Length of name in bytes
+    unsigned int val;
 };
 
 // Store a data segment
@@ -104,12 +83,3 @@ struct segment
 
 // Assembly fail function
 void asmfail(char * msg);
-
-// Unix system calls
-void exit(int status);
-int creat(const char * pathname, int mode);
-int  open(const char * pathname, int flags);
-int close(int fd);
-int  read(int fd, void * buf, unsigned int count);
-int write(int fd, void * buf, unsigned int count);
-void * sbrk(int inc);

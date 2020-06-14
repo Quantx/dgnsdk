@@ -1,7 +1,7 @@
 // Memory segments
 struct segment text = {NULL, 0, 0, NULL, 0, 0, SYM_TEXT };
 struct segment data = {NULL, 0, 0, NULL, 0, 0, SYM_DATA };
-struct segment  bss = {NULL, 0, 0, NULL, 0, 0, SYM_BSS  };
+struct segment bss  = {NULL, 0, 0, NULL, 0, 0, SYM_BSS  };
 struct segment zero = {NULL, 0, 0, NULL, 0, 0, SYM_ZERO };
 // Segment currently being worked on
 struct segment * curseg;
@@ -19,11 +19,6 @@ void segset( struct segment * seg, unsigned int reloc, unsigned int val )
 
     // Compute relocation address and increment
     if ( reloc ) curRloc = seg->rloc + seg->rlocPos++;
-//    {
-//        write( 1, "RELOC: ", 7 );
-//        octwrite( 1, reloc );
-//        write( 1, "\r\n", 2 );
-//    }
 
     // Not on data pass yet
     if ( ~flags & FLG_DATA ) return;
@@ -36,9 +31,9 @@ void segset( struct segment * seg, unsigned int reloc, unsigned int val )
     if ( reloc )
     {
         // Add symbol offsets
-        if      ( (reloc >> 1 & SYM_MASK) == SYM_TEXT ) val +=  stksize ? stksize << 10 : 256;
-        else if ( (reloc >> 1 & SYM_MASK) == SYM_DATA ) val += (stksize ? stksize << 10 : 256) + text.dataSize;
-        else if ( (reloc >> 1 & SYM_MASK) == SYM_BSS  ) val += (stksize ? stksize << 10 : 256) + text.dataSize + data.dataSize;
+        if      ( (reloc & SYM_MASK) == SYM_TEXT ) val +=  stksize ? stksize << 10 : 256;
+        else if ( (reloc & SYM_MASK) == SYM_DATA ) val += (stksize ? stksize << 10 : 256) + text.dataSize;
+        else if ( (reloc & SYM_MASK) == SYM_BSS  ) val += (stksize ? stksize << 10 : 256) + text.dataSize + data.dataSize;
 
         curRloc->head = reloc;
         curRloc->addr = seg->dataPos;

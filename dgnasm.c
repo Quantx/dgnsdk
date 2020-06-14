@@ -1,12 +1,11 @@
 #include "dgnasm.h"
 
-const char * sepname = "SYMDELIM";
 unsigned int flags; // Store misc booleans
 unsigned int curfno; // Current file number
 unsigned int entrypos; // Starting address offset within the text segment
 unsigned int stksize; // Additional stack size
 
-struct symbol * symtbl; // Symbol table
+struct asmsym * symtbl; // Symbol table
 unsigned int sympos = ASM_SIZE; // Number of symbols in the table
 
 // Output an octal number
@@ -140,13 +139,13 @@ int main( int argc, char ** argv )
     fd = open( "symbols.dat", 0 );
     if ( fd < 0 ) asmfail( "failed to open symbols.dat" );
 
-    symtbl = (struct symbol *) sbrk( ASM_SIZE * sizeof(struct symbol) );
-    if ( symtbl == NULL ) { close( fd ); asmfail( "failed to allocate space for assembler defiend symbols" ); }
+    symtbl = (struct asmsym *) sbrk( ASM_SIZE * sizeof(struct asmsym) );
+    if ( symtbl == SBRKFAIL ) { close( fd ); asmfail( "failed to allocate space for assembler defiend symbols" ); }
 
-    i = read( fd, symtbl, ASM_SIZE * sizeof(struct symbol) );
+    i = read( fd, symtbl, ASM_SIZE * sizeof(struct asmsym) );
     close( fd );
 
-    if ( i < ASM_SIZE * sizeof(struct symbol) ) asmfail( "couldn't load all symbols, symbols.dat might be out of date" );
+    if ( i < ASM_SIZE * sizeof(struct asmsym) ) asmfail( "couldn't load all symbols, symbols.dat might be out of date" );
 
     write( 1, " *** Starting first pass ***\r\n", 30 );
 
@@ -155,23 +154,21 @@ int main( int argc, char ** argv )
     {
         // Output the current file
         write( 1, "Labeling file: ", 15 );
+
         i = 0;
         while ( argv[curfno][i++] );
         write( 1, argv[curfno], i );
         write( 1, "\r\n", 2 );
 
+        // Add file seperator symbol
+        struct asmsym * sepsym = symtbl + sympos++;
+
+        *sepsym->name = 0;
+        sepsym->len = i;
+        sepsym->type = SYM_FILE;
+        sepsym->val = text.dataPos;
+
         assemble( argv[curfno] );
-
-        if ( curfno < argc - 1 )
-        {
-            // Add file seperator symbol
-            struct symbol * sepsym = symtbl + sympos++;
-
-            i = 0;
-            while ( sepname[i] ) { sepsym->name[i] = sepname[i]; i++; }
-            sepsym->type = SYM_FILE;
-            sepsym->val = 0;
-        }
 
         curfno++;
     }
@@ -200,13 +197,13 @@ int main( int argc, char ** argv )
 
     // Allocate memory for each segment's data, except for BSS
     text.data = (unsigned int *) sbrk( text.dataSize * sizeof(unsigned int) );
-    if ( text.data == NULL ) asmfail( "failed to allocate memory for text segment's data" );
+    if ( text.data == SBRKFAIL ) asmfail( "failed to allocate memory for text segment's data" );
 
     data.data = (unsigned int *) sbrk( data.dataSize * sizeof(unsigned int) );
-    if ( data.data == NULL ) asmfail( "failed to allocate memory for data segment's data" );
+    if ( data.data == SBRKFAIL ) asmfail( "failed to allocate memory for data segment's data" );
 
     zero.data = (unsigned int *) sbrk( zero.dataSize * sizeof(unsigned int) );
-    if ( zero.data == NULL ) asmfail( "failed to allocate memory for zero segment's data" );
+    if ( zero.data == SBRKFAIL ) asmfail( "failed to allocate memory for zero segment's data" );
 
     write( 1, " *** Running relocation pass ***\r\n", 34 );
 
@@ -235,13 +232,13 @@ int main( int argc, char ** argv )
 
     // Allocate memory for each segment's relocation bits
     text.rloc = (struct relocate *) sbrk( text.rlocSize * sizeof(struct relocate) );
-    if ( text.rloc == NULL ) asmfail( "failed to allocate memory for text segment's relocation info" );
+    if ( text.rloc == SBRKFAIL ) asmfail( "failed to allocate memory for text segment's relocation info" );
 
     data.rloc = (struct relocate *) sbrk( data.rlocSize * sizeof(struct relocate) );
-    if ( data.rloc == NULL ) asmfail( "failed to allocate memory for data segment's relocation info" );
+    if ( data.rloc == SBRKFAIL ) asmfail( "failed to allocate memory for data segment's relocation info" );
 
     zero.rloc = (struct relocate *) sbrk( zero.rlocSize * sizeof(struct relocate) );
-    if ( zero.rloc == NULL ) asmfail( "failed to allocate memory for zero segment's relocation info" );
+    if ( zero.rloc == SBRKFAIL ) asmfail( "failed to allocate memory for zero segment's relocation info" );
 
     write( 1, " *** Running assembly pass ***\r\n", 32 );
 
@@ -410,19 +407,20 @@ int main( int argc, char ** argv )
     else // Binary executable output
     {
         // Output header
-        unsigned int header[10];
-        header[0] = 0407;     // Magic number (program load method)
-        header[1] = zero.dataSize | stksize << 8; // Stack segment length | Zero segment length
-        header[2] = text.dataSize; // Text segment length
-        header[3] = data.dataSize; // Data segment length
-        header[4] =  bss.dataSize; // Bss  segment length
-        header[5] = sympos - ASM_SIZE; // Symbol table length
-        header[6] = (stksize ? stksize << 10 : 256) + entrypos; // Text segment entry offset
-        header[7] = zero.rlocSize; // Zero segment relocation length
-        header[8] = text.rlocSize; // Text segment relocation length
-        header[9] = data.rlocSize; // Data segment relocation length
+	struct exec header;
+        header.magic = 0; // Magic number (program load method)
+        header.stack = stksize; // Stack segment length
+        header.zero = zero.dataSize; // Zero segment length
+        header.zrsize = zero.rlocSize; // Number of relocation entries
+        header.text = text.dataSize; // Text segment length
+        header.trsize = text.rlocSize; // Text segment relocation length
+        header.data = data.dataSize; // Data segment length
+        header.drsize = data.rlocSize; // Data segment relocation length
+        header.bss = bss.dataSize; // Bss segment length
+        header.syms = sympos - ASM_SIZE; // Number of symbols in table
+        header.entry = (stksize ? stksize << 10 : 256) + entrypos; // Text segment entry offset
 
-        write( ofd, header, 20 );
+        write( ofd, &header, sizeof(struct exec) );
 
         // Output each segment's data
         write( ofd, zero.data, zero.dataSize * sizeof(unsigned int) );
@@ -430,7 +428,42 @@ int main( int argc, char ** argv )
         write( ofd, data.data, data.dataSize * sizeof(unsigned int) );
 
         // Output symbol table
-        write( ofd, symtbl + ASM_SIZE, (sympos - ASM_SIZE) * sizeof(struct symbol) );
+        unsigned int k, nameoff = 0;
+        struct symbol outsym;
+        i = ASM_SIZE;
+        while ( i < sympos )
+        {
+            if ( (symtbl[i].type & SYM_MASK) == SYM_FILE ||
+            symtbl[i].type & SYM_GLOB || flags & FLG_LOCL )
+            {
+                // Build output symbol
+                outsym.stroff = nameoff;
+                outsym.type = symtbl[i].type;
+                outsym.val  = symtbl[i].val;
+
+                write( ofd, &outsym, sizeof(struct symbol) );
+
+                // Compute offset (+1 for null terminate)
+                nameoff += symtbl[i].len + 1;
+            }
+        }
+
+        // Output string table
+        i = ASM_SIZE;
+        k = 0;
+        while ( i < sympos )
+        {
+            if ( (symtbl[i].type & SYM_MASK) == SYM_FILE )
+            {
+                write( ofd, argv[k], symtbl[i].len );
+                write( ofd, "0", 1 ); // Null terminate
+            }
+            else if ( symtbl[i].type & SYM_GLOB || flags & FLG_LOCL )
+            {
+                write( ofd, symtbl[i].name, symtbl[i].len );
+                write( ofd, "0", 1 ); // Null terminate
+            }
+        }
 
         // Output relocation data
         write( ofd, zero.rloc, zero.rlocSize * sizeof(struct relocate) );

@@ -66,11 +66,13 @@ void ntok()
              ||   (*p >= '0' && *p <= '9')
              ||    *p == '_' || *p == '#') ) p++;
 
+            unsigned char toklen = p - pp;
+
             // Label excedes max length
-            if ( p - pp > MAX_TOKN ) asmfail("named token exceeds max character length");
+            if ( toklen > MAX_TOKN ) asmfail("named token exceeds max character length");
 
             // Return current segment position
-            if ( tk == '.' && p - pp == 1 )
+            if ( tk == '.' && toklen == 1 )
             {
                 tk = TOK_NUM;
                 tkVal = curseg->dataPos;
@@ -85,16 +87,17 @@ void ntok()
                 i = 0;
 
                 // Get all characters that implicitly match TODO case insensitivity
-                while ( i < p - pp && symtbl[k].name[i] == pp[i] ) i++;
+                while ( i < toklen && symtbl[k].name[i] == pp[i] ) i++;
 
                 if ( k < ASM_SIZE ) // Assembler defined symbol
                 {
                     tk = symtbl[k].type;
                     tkVal = symtbl[k].val;
                 }
-                else if ( (symtbl[k].type & SYM_MASK) == SYM_FILE ) // FIle seperator token
+                else if ( (symtbl[k].type & SYM_MASK) == SYM_FILE ) // File seperator token
                 {
                     fscp++;
+                    k++;
                     continue;
                 }
                 else // User defined symbol
@@ -105,7 +108,8 @@ void ntok()
                 }
 
                 // Exact match
-                if ( i == p - pp && !symtbl[k].name[i]
+                if ( i == toklen && (symtbl[k].len == toklen || !symtbl[k].name[i])
+                // Is this a global symbol, a local symbol, or an assembler symbol
                 && (symtbl[k].type & SYM_GLOB || fscp == curfno || k < ASM_SIZE) )
                 {
                     #if DBUG_SYM
@@ -122,7 +126,7 @@ void ntok()
                 if ( symtbl[k].name[i] || tk == TOK_NAME || tk == TOK_NUM ) { k++; continue; }
 
                 // Number of unmatched chars (flags)
-                int flagNum = p - pp - i;
+                int flagNum = toklen - i;
 
                 // Check flags if I/O instruction
                 if ( flagNum == 1
@@ -168,11 +172,11 @@ void ntok()
             }
 
             // Allocate room for new symbols
-            if ( sbrk( sizeof(struct symbol) ) == NULL ) asmfail("cannot allocate room for new symbol");
+            if ( sbrk( sizeof(struct asmsym) ) == SBRKFAIL ) asmfail("cannot allocate room for new symbol");
 
             // Create new symbol
             i = 0;
-            while ( i < p - pp ) // Store symbol and fill rest with zeros
+            while ( i < toklen ) // Store symbol and fill rest with zeros
             {
                 symtbl[k].name[i] = pp[i];
                 i++;
@@ -183,6 +187,8 @@ void ntok()
 
             // Set type to undefiend symbol
             symtbl[k].type = SYM_DEF;
+            // Record size of symbol
+            symtbl[k].len = toklen;
             // Make this symbol global
             if ( flags & FLG_GLOB ) symtbl[k].type |= SYM_GLOB;
             // Set default value
