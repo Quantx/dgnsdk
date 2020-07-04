@@ -1,5 +1,9 @@
-dgnasm
-a.out
-tests/
-symbols.dat
-build_symbols
+dgnasm/dgnasm
+dgnasm/a.out
+dgnasm/symbols.dat
+dgnasm/build_symbols
+
+dgnmcc/dgnmcc
+dgnmcc_old/
+
+dgnova
