@@ -1,0 +1,24 @@
+		; +-----------------------+
+		; | Assembled with DGNASM |
+		; +-----------------------+
+
+                	.LOC 400
+00400: 060277 | START:	INTDS		; Disable interrupts
+00401: 074477 | 	READS 3		; AC3 = How many values to compute
+00402: 174420 | 	NEGZ 3, 3	; We can only count up
+00403: 102420 |         SUBZ 0, 0	; Set AC0 = 0
+00404: 105420 | 	INCZ 0, 1	; AC1 = Term 2
+00405: 111020 | LOOP:	MOVZ 0, 2	; AC2 = Next Term
+00406: 133020 | 	ADDZ 1, 2
+00407: 121020 | 	MOVZ 1, 0	; Term 1 = Term 2
+00410: 145020 | 	MOVZ 2, 1
+00411: 175424 | 	INCZ 3, 3, SZR
+00412: 000773 | 	JMP LOOP, 1
+00413: 063077 | 	HALT
+                	.ENT START
+
+Labels:
+00400: 'START', number of references: 1
+00405: 'LOOP', number of references: 1
+
+Constants:
