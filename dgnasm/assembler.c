@@ -467,6 +467,8 @@ void assemble( char * fpath )
         // Assembler .wstr directive (word string)
         else if ( tk == ASM_WSTR )
         {
+            if ( curseg == &bss ) asmfail("cannot write word string to bss segment");
+
             ntok();
             if ( tk != TOK_STR ) asmfail("expected a string");
 
