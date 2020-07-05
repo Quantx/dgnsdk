@@ -38,7 +38,7 @@
 
 #define SYM_MASK  7 << 1 // Symbol type mask
 
-#define SYM_GLOB  8 // Global flag
+#define SYM_GLOB  1 // Global flag
 
 struct symbol
 {

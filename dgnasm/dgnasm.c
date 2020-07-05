@@ -11,11 +11,9 @@ unsigned int sympos = ASM_SIZE; // Number of symbols in the table
 // Output an octal number
 void octwrite( int nfd, unsigned int val )
 {
-    if ( !val )
-    {
-        write( nfd, "0", 1 );
-        return;
-    }
+    write( nfd, "0", 1 );
+
+    if ( !val ) return;
 
     char tmpbuf[6];
     int tmppos = 6;
@@ -27,6 +25,28 @@ void octwrite( int nfd, unsigned int val )
     }
 
     write( nfd, tmpbuf + tmppos, 6 - tmppos );
+}
+
+void symwrite( int nfd, struct asmsym * cursym )
+{
+    int k = 0;
+    while ( cursym->name[k++] );
+    write( nfd, "NAME: ", 6 );
+    write( nfd, cursym->name, k );
+
+    write( nfd, " | ", 3 );
+    octwrite( nfd, cursym->len );
+
+    write( nfd, "\r\n", 2 );
+
+
+    write( nfd, "TYPE: ", 6);
+    octwrite( nfd, cursym->type );
+    write( nfd, "\r\n", 2 );
+
+    write( nfd, "VAL: ", 5 );
+    octwrite( nfd, cursym->val );
+    write( nfd, "\r\n", 2 );
 }
 
 #include "help.c"
@@ -177,9 +197,11 @@ int main( int argc, char ** argv )
     i = ASM_SIZE;
     while ( i < sympos )
     {
-        if ( ( (symtbl[i].type & SYM_MASK) == SYM_DEF
-            || (symtbl[i].type & SYM_MASK) == SYM_ZDEF )
-            && ~symtbl[i].type & SYM_GLOB ) asmfail("found undefined local label");
+        if ( (symtbl[i].type & SYM_MASK) == SYM_DEF && ~symtbl[i].type & SYM_GLOB )
+        {
+            symwrite( 2, symtbl + i );
+            asmfail("found undefined local label");
+        }
         i++;
     }
 
@@ -446,6 +468,8 @@ int main( int argc, char ** argv )
                 // Compute offset (+1 for null terminate)
                 nameoff += symtbl[i].len + 1;
             }
+
+            i++;
         }
 
         // Output string table
@@ -463,6 +487,8 @@ int main( int argc, char ** argv )
                 write( ofd, symtbl[i].name, symtbl[i].len );
                 write( ofd, "0", 1 ); // Null terminate
             }
+
+            i++;
         }
 
         // Output relocation data

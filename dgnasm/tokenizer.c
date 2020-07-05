@@ -79,7 +79,7 @@ void ntok()
                 return;
             }
 
-            unsigned int fscp = 0;
+            unsigned int fscp = -1;
             int i, k = 0;
             // Find a matching symbol
             while ( k < sympos )
@@ -87,12 +87,27 @@ void ntok()
                 i = 0;
 
                 // Get all characters that implicitly match TODO case insensitivity
-                while ( i < toklen && symtbl[k].name[i] == pp[i] ) i++;
+                while ( i < toklen && i < symtbl[k].len && symtbl[k].name[i] == pp[i] ) i++;
 
                 if ( k < ASM_SIZE ) // Assembler defined symbol
                 {
                     tk = symtbl[k].type;
                     tkVal = symtbl[k].val;
+
+                    // Exact match
+                    if ( i == toklen && toklen == symtbl[k].len )
+                    {
+                        #if DBUG_SYM
+                        write( 1, "ASM SYM MATCH:\r\n", 16 );
+                        symwrite( 1, symtbl + k );
+                        #endif
+                        return;
+                    }
+                    else if (!( i == symtbl[k].len && toklen > symtbl[k].len )) // No flags
+                    {
+                        k++;
+                        continue;
+                    }
                 }
                 else if ( (symtbl[k].type & SYM_MASK) == SYM_FILE ) // File seperator token
                 {
@@ -102,28 +117,21 @@ void ntok()
                 }
                 else // User defined symbol
                 {
-                    // Is this a defined value or a symbol
-                    tk = (symtbl[k].type & SYM_MASK) == SYM_ABS ? TOK_NUM : TOK_NAME;
-                    tkVal = k;
+                    if ( i == toklen && toklen == symtbl[k].len // Exact match
+                    && (symtbl[k].type & SYM_GLOB || fscp == curfno || k < ASM_SIZE) ) // Correct scope
+                    {
+                        // Is this a defined value or a symbol
+                        tk = (symtbl[k].type & SYM_MASK) == SYM_ABS ? TOK_NUM : TOK_NAME;
+                        tkVal = k;
+                        #if DBUG_SYM
+                        write( 1, "USER SYM MATCH:\r\n", 17 );
+                        symwrite( 1, symtbl + k );
+                        #endif
+                        return;
+                    }
+                    k++;
+                    continue;
                 }
-
-                // Exact match
-                if ( i == toklen && (symtbl[k].len == toklen || !symtbl[k].name[i])
-                // Is this a global symbol, a local symbol, or an assembler symbol
-                && (symtbl[k].type & SYM_GLOB || fscp == curfno || k < ASM_SIZE) )
-                {
-                    #if DBUG_SYM
-                    write( 1, "SYM MATCH: '", 12 );
-                    write( 1, symtbl[k].name, i );
-                    write( 1, "', ", 3 );
-                    octwrite( 1, tkVal );
-                    write( 1, "\r\n", 2 );
-                    #endif
-                    return;
-                }
-
-                // Didn't match base name, skip flags
-                if ( symtbl[k].name[i] || tk == TOK_NAME || tk == TOK_NUM ) { k++; continue; }
 
                 // Number of unmatched chars (flags)
                 int flagNum = toklen - i;
@@ -159,9 +167,8 @@ void ntok()
                     if ( !flagNum )
                     {
                         #if DBUG_SYM
-                        write( 1, "SYM MATH MATCH: '", 17 );
-                        write( 1, symtbl[k].name, i );
-                        write( 1, "'\r\n", 3 );
+                        write( 1, "SYM MATH MATCH:\r\n", 17 );
+                        symwrite( 1, symtbl + k );
                         #endif
 
                         return;
@@ -195,9 +202,8 @@ void ntok()
             symtbl[k].val = 0;
 
             #if DBUG_SYM
-            write( 1, "NEW SYM: ", 9 );
-            write( 1, symtbl[k].name, i );
-            write( 1, "\r\n", 2 );
+            write( 1, "NEW SYM:\r\n", 10 );
+            symwrite( 1, symtbl + k );
             #endif
 
             sympos++;

@@ -68,7 +68,7 @@ void assemble( char * fpath )
             {
                 if ( (cursym->type & SYM_MASK) == SYM_DEF ) // Undefined symbol
                 {
-                    cursym->type = curseg->sym | cursym->type & SYM_GLOB;
+                    cursym->type = curseg->sym | (cursym->type & SYM_GLOB);
                     cursym->val = curseg->dataPos;
                 }
                 else if ( ~flags & FLG_RLOC && ~flags & FLG_DATA ) // Already defined symbol
@@ -277,8 +277,8 @@ void assemble( char * fpath )
                         ntok();
                     }
 
-                    // Undefined zero page symbol
-                    if ( (cursym->type & SYM_MASK) == SYM_ZDEF )
+                    // Undefined symbol
+                    if ( (cursym->type & SYM_MASK) == SYM_DEF )
                     {
                         if ( val > 0xFF ) asmfail("label offset outside displacement range");
 
@@ -304,11 +304,6 @@ void assemble( char * fpath )
 
                         // Output displacement and mode
                         opval |= disp & 0xFF | 0x100;
-                    }
-                    // Undefined non-zero page symbol
-                    else if ( (cursym->type & SYM_MASK) == SYM_DEF )
-                    {
-                        if ( flags & FLG_DATA ) asmfail("label is not defined");
                     }
                     // Symbol not in current segment
                     else
