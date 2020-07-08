@@ -53,7 +53,7 @@ void assemble( char * fpath )
             segset( curseg, rloc, val );
 
             // Allocate room for symbol in this segment
-            curseg->dataPos++;
+            curseg->data.pos++;
         }
         // Label declaration or label constant
         else if ( tk == TOK_NAME )
@@ -69,9 +69,9 @@ void assemble( char * fpath )
                 if ( (cursym->type & SYM_MASK) == SYM_DEF ) // Undefined symbol
                 {
                     cursym->type = curseg->sym | (cursym->type & SYM_GLOB);
-                    cursym->val = curseg->dataPos;
+                    cursym->val = curseg->data.pos;
                 }
-                else if ( ~flags & FLG_RLOC && ~flags & FLG_DATA ) // Already defined symbol
+                else if ( ~flags & FLG_DATA ) // Already defined symbol
                 {
                     asmfail("symbol already defined");
                 }
@@ -102,7 +102,7 @@ void assemble( char * fpath )
                 segset( curseg, cursymno << 4 | cursym->type & SYM_MASK, val );
 
                 // Allocate room for this symbol in the segment
-                curseg->dataPos++;
+                curseg->data.pos++;
             }
         }
         else if ( tk == TOK_NUM || tk == TOK_MATH ) // Numerical constant
@@ -139,14 +139,14 @@ void assemble( char * fpath )
             if ( curseg->sym == SYM_BSS ) // Increment pos for BSS segment
             {
                 if ( val < 0 ) asmfail("cannot decrease size of BSS segment");
-                curseg->dataPos += val;
+                curseg->data.pos += val;
             }
             else
             {
                 segset( curseg, SYM_ABS, val );
 
                 // Allocate room for absolute symbol in the segment
-                curseg->dataPos++;
+                curseg->data.pos++;
             }
         }
         else if ( tk == TOK_STR ) // User defined string
@@ -159,7 +159,7 @@ void assemble( char * fpath )
                 val = ustr[i++] & 0xFF;
                 if ( i < tkVal ) val += (ustr[i++] & 0xFF) << 8;
                 segset( curseg, SYM_ABS, val );
-                curseg->dataPos++;
+                curseg->data.pos++;
             }
 
             ntok();
@@ -277,8 +277,14 @@ void assemble( char * fpath )
                         ntok();
                     }
 
-                    // Undefined symbol
-                    if ( (cursym->type & SYM_MASK) == SYM_DEF )
+                    // Convert undefined symbols to zdef
+                    if ( flags & FLG_DATA && (cursym->type & SYM_MASK) == SYM_DEF )
+                    {
+                        cursym->type = SYM_ZDEF | ~(~cursym->type | SYM_MASK);
+                    }
+
+                    // Undefined zero page symbol
+                    if ( (cursym->type & SYM_MASK) == SYM_ZDEF )
                     {
                         if ( val > 0xFF ) asmfail("label offset outside displacement range");
 
@@ -297,7 +303,7 @@ void assemble( char * fpath )
                     // Program counter relative symbol
                     else if ( (cursym->type & SYM_MASK) == curseg->sym )
                     {
-                        int disp = cursym->val - curseg->dataPos + val;
+                        int disp = cursym->val - curseg->data.pos + val;
 
                         // Out of bounds
                         if ( disp < -128 || disp > 127 ) asmfail("label outside displacement range");
@@ -397,7 +403,7 @@ void assemble( char * fpath )
             segset( curseg, oprlc, opval );
 
             // Write out instruction
-            curseg->dataPos++;
+            curseg->data.pos++;
         }
         // Assembler .text directive
         else if ( tk == ASM_TEXT ) { curseg = &text; ntok(); }
@@ -476,7 +482,7 @@ void assemble( char * fpath )
             while ( i < tkVal )
             {
                 segset( curseg, SYM_ABS, ustr[i++] & 0xFF );
-                curseg->dataPos++;
+                curseg->data.pos++;
             }
 
             ntok();

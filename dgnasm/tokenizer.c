@@ -75,7 +75,7 @@ void ntok()
             if ( tk == '.' && toklen == 1 )
             {
                 tk = TOK_NUM;
-                tkVal = curseg->dataPos;
+                tkVal = curseg->data.pos;
                 return;
             }
 
@@ -177,6 +177,8 @@ void ntok()
 
                 k++;
             }
+
+            if ( flags & FLG_DATA ) asmfail("tried to create new symbol during data pass (shouldn't be possible, contact devs)");
 
             // Allocate room for new symbols
             if ( sbrk( sizeof(struct asmsym) ) == SBRKFAIL ) asmfail("cannot allocate room for new symbol");

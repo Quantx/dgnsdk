@@ -1,4 +1,3 @@
-;	.LOC 400
 START:	INTDS		; Disable interrupts
 	READS 3		; AC3 = How many values to compute
 	NEGZ 3, 3	; We can only count up
