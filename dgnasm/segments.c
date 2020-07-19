@@ -10,7 +10,7 @@ struct segment * curseg;
 void segset( struct segment * seg, unsigned int reloc, unsigned int val )
 {
     // Can't output to a BSS segment
-    if ( seg->sym == SYM_BSS ) asmfail( "tried to output to BSS segment" );
+    if ( seg == &bss ) asmfail( "tried to output to BSS segment" );
 
     // Not on data pass yet
     if ( ~flags & FLG_DATA ) return;
