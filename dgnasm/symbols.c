@@ -1,119 +1,108 @@
-#include "dgnasm.h"
+char * symstrs[ASM_SIZE] = {
+    "NIO", "DIA", "DOA", "DIB", "DOB", "DIC", "DOC",
+    "SKPBN", "SKPBZ", "SKPDN", "SKPDZ",
+    "JMP", "JSR", "ISZ", "DSZ",
+    "LDA", "STA",
+    "COM", "NEG", "MOV", "INC", "ADC", "SUB", "ADD", "AND",
+    "TRAP",
+    "LDB", "STB",
+    "PSHA", "PSHN", "POPA", "SAV", "SAVN", "RET", "MTSP", "MTFP", "MFSP", "MFFP",
+    "INTEN", "INTDS", "READS", "MSKO", "INTA", "IORST", "HALT",
+    "MUL", "MULS", "DIV", "DIVS",
+    "SKP", "SZC", "SNC", "SZR", "SNR", "SEZ", "SBN",
 
-struct asmsym symtbl[ASM_SIZE + 1] = {
+    ".TEXT", ".DATA", ".BSS", ".ZERO", ".GLOB", ".DEFINE", ".ENT", ".WSTR",
+
+    "MDV", "MAP", "MAP1", "TTI", "TTO", "PTR", "PTP", "RTC"
+};
+
+struct asmsym ** symtail, ** symtbl, symint[ASM_SIZE] = {
     // I/O Instructions (7)
-    { { 'N', 'I', 'O', 0 }, DGN_IONO, 3, 0b0110000000000000 }, // NIO
-    { { 'D', 'I', 'A', 0 }, DGN_IO,   3, 0b0110000100000000 }, // DIA
-    { { 'D', 'O', 'A', 0 }, DGN_IO,   3, 0b0110001000000000 }, // DOA
-    { { 'D', 'I', 'B', 0 }, DGN_IO,   3, 0b0110001100000000 }, // DIB
-    { { 'D', 'O', 'B', 0 }, DGN_IO,   3, 0b0110010000000000 }, // DOB
-    { { 'D', 'I', 'C', 0 }, DGN_IO,   3, 0b0110010100000000 }, // DIC
-    { { 'D', 'O', 'C', 0 }, DGN_IO,   3, 0b0110011000000000 }, // DOC
-    // I/O Skip Instructions (4)
-    { { 'S', 'K', 'P', 'B', 'N', 0 }, DGN_IOSK, 5, 0b0110011100000000 }, // SKPBN
-    { { 'S', 'K', 'P', 'B', 'Z', 0 }, DGN_IOSK, 5, 0b0110011101000000 }, // SKPBZ
-    { { 'S', 'K', 'P', 'D', 'N', 0 }, DGN_IOSK, 5, 0b0110011110000000 }, // SKPDN
-    { { 'S', 'K', 'P', 'D', 'Z', 0 }, DGN_IOSK, 5, 0b0110011111000000 }, // SKPDZ
+    { NULL, DGN_IONO, 3, 0b0110000000000000, symint + 1 }, // NIO
+    { NULL, DGN_IO,   3, 0b0110000100000000, symint + 2 }, // DIA
+    { NULL, DGN_IO,   3, 0b0110001000000000, symint + 3 }, // DOA
+    { NULL, DGN_IO,   3, 0b0110001100000000, symint + 4 }, // DIB
+    { NULL, DGN_IO,   3, 0b0110010000000000, symint + 5 }, // DOB
+    { NULL, DGN_IO,   3, 0b0110010100000000, symint + 6 }, // DIC
+    { NULL, DGN_IO,   3, 0b0110011000000000, symint + 7 }, // DOC
+    // I/O Skip instructions (4)
+    { NULL, DGN_IOSK, 5, 0b0110011100000000, symint +  8 }, // SKPBN
+    { NULL, DGN_IOSK, 5, 0b0110011101000000, symint +  9 }, // SKPBZ
+    { NULL, DGN_IOSK, 5, 0b0110011110000000, symint + 10 }, // SKPDN
+    { NULL, DGN_IOSK, 5, 0b0110011111000000, symint + 11 }, // SKPDZ
     // Flow control instructions (4)
-    { { 'J', 'M', 'P', 0 }, DGN_FLOW, 3, 0b0000000000000000 }, // JMP
-    { { 'J', 'S', 'R', 0 }, DGN_FLOW, 3, 0b0000100000000000 }, // JSR
-    { { 'I', 'S', 'Z', 0 }, DGN_FLOW, 3, 0b0001000000000000 }, // ISZ
-    { { 'D', 'S', 'Z', 0 }, DGN_FLOW, 3, 0b0001100000000000 }, // DSZ
+    { NULL, DGN_FLOW, 3, 0b0000000000000000, symint + 12 }, // JMP
+    { NULL, DGN_FLOW, 3, 0b0000100000000000, symint + 13 }, // JSR
+    { NULL, DGN_FLOW, 3, 0b0001000000000000, symint + 14 }, // ISZ
+    { NULL, DGN_FLOW, 3, 0b0001100000000000, symint + 15 }, // DSZ
     // Memory access instructions (2)
-    { { 'L', 'D', 'A', 0 }, DGN_LOAD, 3, 0b0010000000000000 }, // LDA
-    { { 'S', 'T', 'A', 0 }, DGN_LOAD, 3, 0b0100000000000000 }, // STA
+    { NULL, DGN_LOAD, 3, 0b0010000000000000, symint + 16 }, // LDA
+    { NULL, DGN_LOAD, 3, 0b0100000000000000, symint + 17 }, // STA
     // Arithmetic & Logic instructions (8)
-    { { 'C', 'O', 'M', 0 }, DGN_MATH, 3, 0b1000000000000000 }, // COM
-    { { 'N', 'E', 'G', 0 }, DGN_MATH, 3, 0b1000000100000000 }, // NEG
-    { { 'M', 'O', 'V', 0 }, DGN_MATH, 3, 0b1000001000000000 }, // MOV
-    { { 'I', 'N', 'C', 0 }, DGN_MATH, 3, 0b1000001100000000 }, // INC
-    { { 'A', 'D', 'C', 0 }, DGN_MATH, 3, 0b1000010000000000 }, // ADC
-    { { 'S', 'U', 'B', 0 }, DGN_MATH, 3, 0b1000010100000000 }, // SUB
-    { { 'A', 'D', 'D', 0 }, DGN_MATH, 3, 0b1000011000000000 }, // ADD
-    { { 'A', 'N', 'D', 0 }, DGN_MATH, 3, 0b1000011100000000 }, // AND
+    { NULL, DGN_MATH, 3, 0b1000000000000000, symint + 18 }, // COM
+    { NULL, DGN_MATH, 3, 0b1000000100000000, symint + 19 }, // NEG
+    { NULL, DGN_MATH, 3, 0b1000001000000000, symint + 20 }, // MOV
+    { NULL, DGN_MATH, 3, 0b1000001100000000, symint + 21 }, // INC
+    { NULL, DGN_MATH, 3, 0b1000010000000000, symint + 22 }, // ADC
+    { NULL, DGN_MATH, 3, 0b1000010100000000, symint + 23 }, // SUB
+    { NULL, DGN_MATH, 3, 0b1000011000000000, symint + 24 }, // ADD
+    { NULL, DGN_MATH, 3, 0b1000011100000000, symint + 25 }, // AND
     // Trap instruction (Arithmetic no-op) (1)
-    { { 'T', 'R', 'A', 'P', 0 }, DGN_TRAP, 4, 0b1000000000001000 }, // TRAP
+    { NULL, DGN_TRAP, 4, 0b1000000000001000, symint + 26 }, // TRAP
     // Byte acess instructions (2)
-    { { 'L', 'D', 'B', 0 }, DGN_CTAA, 3, 0b0110000100000001 }, // LDB
-    { { 'S', 'T', 'B', 0 }, DGN_CTAA, 3, 0b0110010000000001 }, // STB
+    { NULL, DGN_CTAA, 3, 0b0110000100000001, symint + 27 }, // LDB
+    { NULL, DGN_CTAA, 3, 0b0110010000000001, symint + 28 }, // STB
     // Stack instructions (10)
-    { { 'P', 'S', 'H', 'A', 0 }, DGN_CTA, 4, 0b0110001100000001 }, // PSHA
-    { { 'P', 'S', 'H', 'N', 0 }, DGN_CTA, 4, 0b0110001111000001 }, // PSHN - [Undocumented] PSHA With I/O Pulse
-    { { 'P', 'O', 'P', 'A', 0 }, DGN_CTA, 4, 0b0110001110000001 }, // POPA
-    { { 'S', 'A', 'V',      0 }, DGN_CT,  3, 0b0110010100000001 }, // SAV
-    { { 'S', 'A', 'V', 'N', 0 }, DGN_CT,  4, 0b0110010111000001 }, // SAVN - [Undocumented] SAV with I/O Pulse
-    { { 'R', 'E', 'T',      0 }, DGN_CT,  3, 0b0110010110000001 }, // RET
-    { { 'M', 'T', 'S', 'P', 0 }, DGN_CTA, 4, 0b0110001000000001 }, // MTSP
-    { { 'M', 'T', 'F', 'P', 0 }, DGN_CTA, 4, 0b0110000000000001 }, // MTFP
-    { { 'M', 'F', 'S', 'P', 0 }, DGN_CTA, 4, 0b0110001010000001 }, // MFSP
-    { { 'M', 'F', 'F', 'P', 0 }, DGN_CTA, 4, 0b0110000010000001 }, // MFFP
+    { NULL, DGN_CTA, 4, 0b0110001100000001, symint + 29 }, // PSHA
+    { NULL, DGN_CTA, 4, 0b0110001111000001, symint + 30 }, // PSHN - [Undocumented] PSHA With I/O Pulse
+    { NULL, DGN_CTA, 4, 0b0110001110000001, symint + 31 }, // POPA
+    { NULL, DGN_CT,  3, 0b0110010100000001, symint + 32 }, // SAV
+    { NULL, DGN_CT,  4, 0b0110010111000001, symint + 33 }, // SAVN - [Undocumented] SAV with I/O Pulse
+    { NULL, DGN_CT,  3, 0b0110010110000001, symint + 34 }, // RET
+    { NULL, DGN_CTA, 4, 0b0110001000000001, symint + 35 }, // MTSP
+    { NULL, DGN_CTA, 4, 0b0110000000000001, symint + 36 }, // MTFP
+    { NULL, DGN_CTA, 4, 0b0110001010000001, symint + 37 }, // MFSP
+    { NULL, DGN_CTA, 4, 0b0110000010000001, symint + 38 }, // MFFP
     // CPU Control instructions (7)
-    { { 'I', 'N', 'T', 'E', 'N', 0 }, DGN_CT,   5, 0b0110000001111111 }, // INTEN
-    { { 'I', 'N', 'T', 'D', 'S', 0 }, DGN_CT,   5, 0b0110000010111111 }, // INTDS
-    { { 'R', 'E', 'A', 'D', 'S', 0 }, DGN_CTAF, 5, 0b0110000100111111 }, // READS
-    { { 'M', 'S', 'K', 'O',      0 }, DGN_CTAF, 4, 0b0110010000111111 }, // MSKO
-    { { 'I', 'N', 'T', 'A',      0 }, DGN_CTAF, 4, 0b0110001100111111 }, // INTA
-    { { 'I', 'O', 'R', 'S', 'T', 0 }, DGN_CTF,  5, 0b0110010110111111 }, // IORST
-    { { 'H', 'A', 'L', 'T',      0 }, DGN_CTF,  4, 0b0110011000111111 }, // HALT
+    { NULL, DGN_CT,   5, 0b0110000001111111, symint + 39 }, // INTEN
+    { NULL, DGN_CT,   5, 0b0110000010111111, symint + 40 }, // INTDS
+    { NULL, DGN_CTAF, 5, 0b0110000100111111, symint + 41 }, // READS
+    { NULL, DGN_CTAF, 4, 0b0110010000111111, symint + 42 }, // MSKO
+    { NULL, DGN_CTAF, 4, 0b0110001100111111, symint + 43 }, // INTA
+    { NULL, DGN_CTF,  5, 0b0110010110111111, symint + 44 }, // IORST
+    { NULL, DGN_CTF,  4, 0b0110011000111111, symint + 45 }, // HALT
     // Hardware Multiply & Divide instructions (4)
-    { { 'M', 'U', 'L',      0 }, DGN_CT, 3, 0b0111011011000001 }, // MUL
-    { { 'M', 'U', 'L', 'S', 0 }, DGN_CT, 4, 0b0111111010000001 }, // MULS
-    { { 'D', 'I', 'V',      0 }, DGN_CT, 3, 0b0111011001000001 }, // DIV
-    { { 'D', 'I', 'V', 'S', 0 }, DGN_CT, 4, 0b0111111000000001 }, // DIVS
+    { NULL, DGN_CT, 3, 0b0111011011000001, symint + 46 }, // MUL
+    { NULL, DGN_CT, 4, 0b0111111010000001, symint + 47 }, // MULS
+    { NULL, DGN_CT, 3, 0b0111011001000001, symint + 48 }, // DIV
+    { NULL, DGN_CT, 4, 0b0111111000000001, symint + 49 }, // DIVS
     // Hardware Floating Point instructions (TODO)
 
     // Arithmetic & Logic skip conditions (7)
-    { { 'S', 'K', 'P', 0 }, DGN_SKPC, 3, 01 }, // SKP
-    { { 'S', 'Z', 'C', 0 }, DGN_SKPC, 3, 02 }, // SZC
-    { { 'S', 'N', 'C', 0 }, DGN_SKPC, 3, 03 }, // SNC
-    { { 'S', 'Z', 'R', 0 }, DGN_SKPC, 3, 04 }, // SZR
-    { { 'S', 'N', 'R', 0 }, DGN_SKPC, 3, 05 }, // SNR
-    { { 'S', 'E', 'Z', 0 }, DGN_SKPC, 3, 06 }, // SEZ
-    { { 'S', 'B', 'N', 0 }, DGN_SKPC, 3, 07 }, // SBN
+    { NULL, DGN_SKPC, 3, 01, symint + 50 }, // SKP
+    { NULL, DGN_SKPC, 3, 02, symint + 51 }, // SZC
+    { NULL, DGN_SKPC, 3, 03, symint + 52 }, // SNC
+    { NULL, DGN_SKPC, 3, 04, symint + 53 }, // SZR
+    { NULL, DGN_SKPC, 3, 05, symint + 54 }, // SNR
+    { NULL, DGN_SKPC, 3, 06, symint + 55 }, // SEZ
+    { NULL, DGN_SKPC, 3, 07, symint + 56 }, // SBN
     // Assembler directives (6)
-    { { '.', 'T', 'E', 'X', 'T',           0 }, ASM_TEXT, 5, 0 }, // .TEXT
-    { { '.', 'D', 'A', 'T', 'A',           0 }, ASM_DATA, 5, 0 }, // .DATA
-    { { '.', 'B', 'S', 'S',                0 }, ASM_BSS,  4, 0 }, // .BSS
-    { { '.', 'Z', 'E', 'R', 'O',           0 }, ASM_ZERO, 5, 0 }, // .ZERO
-    { { '.', 'G', 'L', 'O', 'B',           0 }, ASM_GLOB, 5, 0 }, // .GLOB
-    { { '.', 'D', 'E', 'F', 'I', 'N', 'E', 0 }, ASM_DEFN, 7, 0 }, // .DEFINE
-    { { '.', 'E', 'N', 'T',                0 }, ASM_ENT,  4, 0 }, // .ENT
-    { { '.', 'W', 'S', 'T', 'R',           0 }, ASM_WSTR, 5, 0 }, // .WSTR (Word String)
+    { NULL, ASM_TEXT, 5, 0, symint + 57 }, // .TEXT
+    { NULL, ASM_DATA, 5, 0, symint + 58 }, // .DATA
+    { NULL, ASM_BSS,  4, 0, symint + 59 }, // .BSS
+    { NULL, ASM_ZERO, 5, 0, symint + 60 }, // .ZERO
+    { NULL, ASM_GLOB, 5, 0, symint + 61 }, // .GLOB
+    { NULL, ASM_DEFN, 7, 0, symint + 62 }, // .DEFINE
+    { NULL, ASM_ENT,  4, 0, symint + 63 }, // .ENT
+    { NULL, ASM_WSTR, 5, 0, symint + 64 }, // .WSTR (Word String)
     // Hardware device aliases (8 so far)
-    { { 'M', 'D', 'V',      0 }, DGN_HWID, 3, 001 }, // MDV - Multiply & Divide
-    { { 'M', 'A', 'P',      0 }, DGN_HWID, 3, 002 }, // MAP  - Memory Management Unit
-    { { 'M', 'A', 'P', '1', 0 }, DGN_HWID, 4, 003 }, // MAP1 - Memory Management Unit (Takes up two slots)
+    { NULL, DGN_HWID, 3, 001, symint + 65 }, // MDV - Multiply & Divide
+    { NULL, DGN_HWID, 3, 002, symint + 66 }, // MAP  - Memory Management Unit
+    { NULL, DGN_HWID, 4, 003, symint + 67 }, // MAP1 - Memory Management Unit (Takes up two slots)
 
-    { { 'T', 'T', 'I',      0 }, DGN_HWID, 3, 010 }, // TTI - TTY input
-    { { 'T', 'T', 'O',      0 }, DGN_HWID, 3, 011 }, // TTO - TTY output
-    { { 'P', 'T', 'R',      0 }, DGN_HWID, 3, 012 }, // PTR - Paper tape reader
-    { { 'P', 'T', 'P',      0 }, DGN_HWID, 3, 013 }, // PTP - Paper tape punch
-    { { 'R', 'T', 'C',      0 }, DGN_HWID, 3, 014 }, // RTC - Real time clock
-
-    { { 0 }, 0xFF, 0, 0 } // MUST BE LAST
+    { NULL, DGN_HWID, 3, 010, symint + 68 }, // TTI - TTY input
+    { NULL, DGN_HWID, 3, 011, symint + 69 }, // TTO - TTY output
+    { NULL, DGN_HWID, 3, 012, symint + 70 }, // PTR - Paper tape reader
+    { NULL, DGN_HWID, 3, 013, symint + 71 }, // PTP - Paper tape punch
+    { NULL, DGN_HWID, 3, 014, NULL }, // RTC - Real time clock
 };
-
-int main( int argc, char ** argv )
-{
-    // Open symbols file for output
-    int ofd = creat( "symbols.dat", 0444 );
-
-    // Make sure we actually created the file
-    if ( ofd < 0 )
-    {
-        write( 2, "Failed to create file symbols.dat\r\n", 35 );
-        return 1;
-    }
-    // Verify table size
-    else if ( symtbl[ASM_SIZE].type != 0xFF )
-    {
-        write( 2, "Symbol table has incorrect size\r\n", 33 );
-        return 1;
-    }
-
-    // Write data structure to file
-    write( ofd, symtbl, ASM_SIZE * sizeof(struct asmsym) );
-
-    close( ofd );
-    return 0;
-}

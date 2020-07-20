@@ -7,8 +7,7 @@ unsigned int entrypos; // Starting address offset within the text segment
 unsigned int stksize; // Additional stack size
 unsigned int copybuf[CBUF_LEN]; // Used to transfer data from one file to another
 
-struct asmsym * symtbl; // Symbol table
-unsigned int sympos = ASM_SIZE; // Number of symbols in the table
+#include "symbols.c"
 
 // Output an octal number
 void octwrite( int nfd, unsigned int val )
@@ -112,6 +111,7 @@ void asmfail( char * msg )
 int main( int argc, char ** argv )
 {
     int i;
+    struct asmsym * cursym;
 
     // Drop first argument (program name)
     char * progname = *argv;
@@ -148,17 +148,19 @@ int main( int argc, char ** argv )
 
     write( 1, " *** Loading symbols ***\r\n", 26 );
 
-    // *** Load Assembler Defined Symbols ***
-    fd = open( "symbols.dat", 0 );
-    if ( fd < 0 ) asmfail( "failed to open symbols.dat" );
+    // *** Setup Assembler Defined Symbols ***
+    cursym = symint; i = 0;
+    while ( cursym )
+    {
+        cursym->name = symstrs[i];
 
-    symtbl = (struct asmsym *) sbrk( ASM_SIZE * sizeof(struct asmsym) );
-    if ( symtbl == SBRKFAIL ) { close( fd ); asmfail( "failed to allocate space for assembler defiend symbols" ); }
+        int k = 0;
+        while ( symstrs[i][k] ) k++;
+        cursym->len = k;
 
-    i = read( fd, symtbl, ASM_SIZE * sizeof(struct asmsym) );
-    close( fd );
-
-    if ( i < ASM_SIZE * sizeof(struct asmsym) ) asmfail( "couldn't load all symbols, symbols.dat might be out of date" );
+        if ( cursym->next == NULL ) symtail = symtbl = &cursym->next;
+        cursym = cursym->next; i++;
+    }
 
     write( 1, " *** Starting first pass ***\r\n", 30 );
 
@@ -174,12 +176,17 @@ int main( int argc, char ** argv )
         write( 1, "\r\n", 2 );
 
         // Add file seperator symbol
-        struct asmsym * sepsym = symtbl + sympos++;
+        struct asmsym * sepsym = sbrk( sizeof(struct asmsym) );
+        if ( sepsym == SBRKFAIL ) asmfail( "Could not allocate room for file seperator symbol" );
 
-        *sepsym->name = 0;
+        *symtail = sepsym;
+        symtail = &sepsym->next;
+
+        sepsym->name = NULL;
         sepsym->len = i;
         sepsym->type = SYM_FILE;
         sepsym->val = text.data.pos;
+        sepsym->next = NULL;
 
         assemble( argv[curfno] );
 
@@ -187,15 +194,15 @@ int main( int argc, char ** argv )
     }
 
     // Make sure there are no undefined local labels
-    i = ASM_SIZE;
-    while ( i < sympos )
+    cursym = *symtbl;
+    while ( cursym != NULL )
     {
-        if ( (symtbl[i].type & SYM_MASK) == SYM_DEF && ~symtbl[i].type & SYM_GLOB )
+        if ( (cursym->type & SYM_MASK) == SYM_DEF && ~cursym->type & SYM_GLOB )
         {
-            symwrite( 2, symtbl + i );
+            symwrite( 2, cursym );
             asmfail("found undefined local label");
         }
-        i++;
+        cursym = cursym->next;
     }
 
     // Check for overflow
@@ -409,6 +416,10 @@ int main( int argc, char ** argv )
     }
     else // Binary executable output
     {
+        i = 0;
+        cursym = *symtbl;
+        while ( cursym ) { cursym = cursym->next; i++; }
+
         // Output header
 	struct exec header;
         header.magic = 0; // Magic number (program load method)
@@ -420,7 +431,7 @@ int main( int argc, char ** argv )
         header.data = data.data.size; // Data segment length
         header.drsize = data.rloc.size; // Data segment relocation length
         header.bss = bss.data.size; // Bss segment length
-        header.syms = sympos - ASM_SIZE; // Number of symbols in table
+        header.syms = i; // Number of symbols in table
         header.entry = (stksize ? stksize << 10 : 256) + entrypos; // Text segment entry offset
 
         write( ofd, &header, sizeof(struct exec) );
@@ -431,45 +442,39 @@ int main( int argc, char ** argv )
         while ( i = read( data.data.fd, copybuf, CBUF_LEN * sizeof(int) ) ) write( ofd, copybuf, i );
 
         // Output symbol table
-        unsigned int k, nameoff = 0;
+        unsigned int nameoff = 0;
         struct symbol outsym;
-        i = ASM_SIZE;
-        while ( i < sympos )
+        cursym = *symtbl;
+        while ( cursym )
         {
-            if ( (symtbl[i].type & SYM_MASK) == SYM_FILE ||
-            symtbl[i].type & SYM_GLOB || flags & FLG_LOCL )
-            {
-                // Build output symbol
-                outsym.stroff = nameoff;
-                outsym.type = symtbl[i].type;
-                outsym.val  = symtbl[i].val;
+            // Build output symbol
+            outsym.stroff = nameoff;
+            outsym.type = cursym->type;
+            outsym.val  = cursym->val;
 
-                write( ofd, &outsym, sizeof(struct symbol) );
+            write( ofd, &outsym, sizeof(struct symbol) );
 
-                // Compute offset (+1 for null terminate)
-                nameoff += symtbl[i].len + 1;
-            }
+            // Compute offset (+1 for null terminate)
+            nameoff += cursym->len + 1;
 
-            i++;
+            cursym = cursym->next; i++;
         }
 
         // Output string table
-        i = ASM_SIZE;
-        k = 0;
-        while ( i < sympos )
+        unsigned int k = 0;
+        cursym = *symtbl;
+        while ( cursym )
         {
-            if ( (symtbl[i].type & SYM_MASK) == SYM_FILE )
+            if ( (cursym->type & SYM_MASK) == SYM_FILE )
             {
-                write( ofd, argv[k++], symtbl[i].len );
-                write( ofd, "0", 1 ); // Null terminate
+                write( ofd, argv[k++], cursym->len + 1 );
             }
-            else if ( symtbl[i].type & SYM_GLOB || flags & FLG_LOCL )
+            else
             {
-                write( ofd, symtbl[i].name, symtbl[i].len );
-                write( ofd, "0", 1 ); // Null terminate
+                write( ofd, cursym->name, cursym->len + 1 );
             }
 
-            i++;
+            cursym = cursym->next; i++;
         }
 
         // Output each segment's data

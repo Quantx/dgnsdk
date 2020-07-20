@@ -8,10 +8,10 @@ char * p, * pp;
 char lp[MAX_LINE]; // Current line
 
 int tkVal, cursf = -1;
-char tk;
+unsigned char tk;
 
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
-char * res_words = "void int short char float long auto signed const extern register unsigned static if else case default break continue return for while do enum struct union sizeof";
+char * res_words = "void int short char float long enum struct union auto static register const extern signed unsigned if else case default break continue return for while do sizeof";
 
 int readline()
 {
@@ -19,7 +19,7 @@ int readline()
 
     // Read data in and scan for newline
     while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i++] != '\n' );
-    if ( i == MAX_LINE - 1 ) asmfail("readline overflow");
+    if ( i == MAX_LINE - 1 ) mccfail("readline overflow");
 
     // Null terminate a line if needed
     lp[i] = 0;
@@ -61,7 +61,7 @@ void ntok()
             else if ( *p == '=' ) tk = DivAss;
             else tk = Div;
             return;
-        {
+        }
         // Named symbol
         else if ( tk >= 'A' && tk <= 'Z' || tk >= 'a' && tk <= 'z' || tk == '_' )
         {
@@ -77,8 +77,7 @@ void ntok()
             if ( toklen > MAX_TOKN ) mccfail("named token exceedes max character length");
 
             // Check for reserved word
-            tk = Reserved;
-            tkVal = Void;
+            tk = Void;
             char * rpos = res_words;
             while ( *rpos )
             {
@@ -87,13 +86,13 @@ void ntok()
 
                 if ( rpos[i] == ' ' ) // Match
                 {
-                     if ( tkVal == Short ) tkVal = Int; // Shorts are always Ints
+                     if ( tk == Short ) tk = Int; // Shorts are always Ints
                      return;
                 }
 
                 while ( *rpos && *rpos++ != ' ' );
 
-                tkVal++;
+                tk++;
             }
 
             int i;
@@ -105,7 +104,7 @@ void ntok()
             {
                 // Find matching symbol
                 i = 0;
-                while ( i < toklen && i < symtbl[tkVal].len && symtbl[k].len == pp[i] ) i++;
+                while ( i < toklen && i < symtbl[tkVal].len && symtbl[tkVal].len == pp[i] ) i++;
                 if ( i == toklen && toklen == symtbl[tkVal].len ) return;
             }
 
@@ -114,13 +113,13 @@ void ntok()
 
             // Copy name
             i = 0;
-            while ( i < toklen ) { symtbl[k].name[i] = pp[i]; i++; }
+            while ( i < toklen ) { symtbl[tkVal].name[i] = pp[i]; i++; }
 
             // Record length
-            symtbl[k].len = toklen;
+            symtbl[tkVal].len = toklen;
 
             // Ensure type is zero
-            symtbl[k].type = 0;
+            symtbl[tkVal].type = 0;
 
             return;
         }
@@ -218,7 +217,7 @@ void ntok()
                 {
                     // TODO
                 }
-                else if ( *p != '\'' ) mccfail("Character constant too long")
+                else if ( *p != '\'' ) mccfail("Character constant too long");
                 // Record character constant
                 else tkVal = out;
             }
@@ -248,7 +247,7 @@ void ntok()
         }
         else if ( tk == '!' )
         {
-            if ( *p == '=' ) { p++; tk = Neq;
+            if ( *p == '=' ) { p++; tk = Neq; }
             else tk = LogNot;
             return;
         }
@@ -256,22 +255,22 @@ void ntok()
         {
             if ( *p == '<' )
             {
-                if ( *++p == '=' ) { p++; tok = ShlAss; }
-                else tok = Shl;
+                if ( *++p == '=' ) { p++; tk = ShlAss; }
+                else tk = Shl;
             }
-            else if ( *p == '=' ) { p++; tok = LessEq; }
-            else tok = Less;
+            else if ( *p == '=' ) { p++; tk = LessEq; }
+            else tk = Less;
             return;
         }
         else if ( tk == '>' )
         {
             if ( *p == '>' )
             {
-                if ( *++p == '=' ) { p++; tok = ShrAss; }
-                else tok = Shr;
+                if ( *++p == '=' ) { p++; tk = ShrAss; }
+                else tk = Shr;
             }
-            else if ( *p == '=' ) { p++; tok = GreatEq; }
-            else tok = Great;
+            else if ( *p == '=' ) { p++; tk = GreatEq; }
+            else tk = Great;
             return;
         }
         else if ( tk == '|' )

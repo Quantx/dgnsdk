@@ -16,11 +16,15 @@ enum
     Number = 128, // Numerical constant in source
     Named, // Named variable of function
 // ******* Reserved words *******
-    Void, Int, Short, Char, Float, Long, // Types
-    Auto, Signed, Const, Extern, Register, Unsigned, Static, // Storage classes
-    If, Else, Case, Default, Break, Continue, Return, // Program Structure
-    For, While, Do, // Loops
+    // *** Specifiers and qualifiers ***
+    Void, Int, Short, Char, Float, Long, // Storage types
     Enum, Struct, Union, // Data structures
+    Auto, Static, Register, Const, // Storage classes
+    Extern, Signed, Unsigned, // Storage Qualifiers
+    // *** Program structure ***
+    If, Else, Case, Default, // Branch
+    Break, Continue, Return, // Terminate
+    For, While, Do, // Loops
     Sizeof, // Technically this is an operator
 // ******* Operators *******
     Ass, AddAss, SubAss, MulAss, DivAss, ModAss, ShlAss, ShrAss, AndAss, XorAss, OrAss, // Assignment Operators
@@ -69,7 +73,7 @@ enum
 #define CPL_STAK 3 << 4 // Stack (dynamic)
 #define CPL_STORE_MASK 3 << 4 // Mask
 
-// C attribute flags
+// C Storage qualifiers
 #define CPL_SIGN 1 << 6 // Signed flag
 #define CPL_XTRN 1 << 7 // Extern flag
 #define CPL_FUNC 1 << 8 // Function flag

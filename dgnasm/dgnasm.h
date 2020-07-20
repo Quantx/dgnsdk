@@ -8,7 +8,6 @@
 #define MAX_STR  256  // Maximum length of user defined strings
 #define PAGESIZE 1024 // 2 KB (1 KW) of memory (1 mmu page)
 #define ASM_SIZE 72   // Number of assembler defined symbols
-#define MAX_TOKN 32   // Maximum number of characters in a single symbol
 #define CBUF_LEN 256  // Size of buffer used to copy from one file to another (Must be at least 16)
 
 // *** DGNova Instruction Parameter Formats ***
@@ -57,14 +56,15 @@ enum {
 #define FLG_SMH  0b0000000000000100 // Use SimH output
 #define FLG_SMHA 0b0000000000001100 // Use SimH output with auto start
 #define FLG_TERM 0b0000000000001000 // Use the Nova 4 virtual console output
-#define FLG_LOCL 0b0000000000010000 // Output local symbols
 
 struct asmsym
 {
-    char name[MAX_TOKN]; // Name of symbol
+    char * name;
     unsigned char type; // Type of symbol
     unsigned char len; // Length of name in bytes
     unsigned int val;
+
+    struct asmsym * next;
 };
 
 // Store a data segment

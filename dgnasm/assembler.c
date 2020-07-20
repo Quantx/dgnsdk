@@ -21,10 +21,7 @@ void assemble( char * fpath )
             ntok();
             if ( tk != TOK_NAME ) asmfail("expected label"); // The following token MUST be a label
 
-            // Store ref to symbol
-            struct asmsym * cursym = symtbl + tkVal;
-
-            unsigned int val = cursym->val;
+            unsigned int val = tkSym->val;
             // Set indirect bit if needed
             if ( tk == TOK_INDR ) val |= 0x8000;
             // This is a byte pointer
@@ -33,7 +30,7 @@ void assemble( char * fpath )
             if ( tk == TOK_BYHI ) val |= 1;
 
             // Compute relocation bits
-            unsigned int rloc = tkVal << 4 | cursym->type & SYM_MASK | tk != TOK_INDR;
+            unsigned int rloc = tkVal << 4 | tkSym->type & SYM_MASK | tk != TOK_INDR;
 
             // Add any following numbers
             ntok();
@@ -60,7 +57,7 @@ void assemble( char * fpath )
         {
             // Store ref to symbol
             int cursymno = tkVal;
-            struct asmsym * cursym = symtbl + cursymno;
+            struct asmsym * cursym = tkSym;
 
             ntok();
             // Label declaration
@@ -260,7 +257,7 @@ void assemble( char * fpath )
                 {
                     // Store ref to symbol
                     unsigned int cursymno = tkVal;
-                    struct asmsym * cursym = symtbl + cursymno;
+                    struct asmsym * cursym = tkSym;
 
                     unsigned int val = 0;
                     ntok();
@@ -421,7 +418,7 @@ void assemble( char * fpath )
             if ( tk != TOK_NAME ) asmfail("expected a label");
 
             // Make label global
-            symtbl[tkVal].type |= SYM_GLOB;
+            tkSym->type |= SYM_GLOB;
 
             ntok(); // Get comma or next statement
         }
@@ -433,7 +430,7 @@ void assemble( char * fpath )
             if ( tk != TOK_NAME ) asmfail("expected a label");
 
             // Store ref to symbol
-            struct asmsym * cursym = symtbl + tkVal;
+            struct asmsym * cursym = tkSym;
 
             // Already defined symbol
             if ( (cursym->type & SYM_MASK) != SYM_DEF ) asmfail("label already defined");
@@ -460,12 +457,10 @@ void assemble( char * fpath )
 
             if ( flags & FLG_DATA )
             {
-                struct asmsym * cursym = symtbl + tkVal;
-
-                if ( (cursym->type & SYM_MASK) != SYM_TEXT ) asmfail("label must be a text label");
+                if ( (tkSym->type & SYM_MASK) != SYM_TEXT ) asmfail("label must be a text label");
 
                 // Update entry position
-                entrypos = cursym->val;
+                entrypos = tkSym->val;
             }
 
             ntok();

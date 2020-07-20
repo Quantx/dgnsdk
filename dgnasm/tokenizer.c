@@ -1,6 +1,7 @@
 char lp[MAX_LINE], * p, * pp, * fp = NULL, tk, ustr[MAX_STR + 1], * usp;
 unsigned int curline;
 int fd, tkVal;
+struct asmsym * tkSym;
 
 int readline()
 {
@@ -60,16 +61,14 @@ void ntok()
                ||  tk == '_' || tk == '.'  )
         {
             // Get entire token
-            while ( p - pp <= MAX_TOKN
-             && ( (*p >= 'a' && *p <= 'z')
-             ||   (*p >= 'A' && *p <= 'Z')
-             ||   (*p >= '0' && *p <= '9')
-             ||    *p == '_' || *p == '#') ) p++;
-
-            unsigned char toklen = p - pp;
+            while ( (*p >= 'a' && *p <= 'z')
+               ||   (*p >= 'A' && *p <= 'Z')
+               ||   (*p >= '0' && *p <= '9')
+               ||    *p == '_' || *p == '#') p++;
 
             // Label excedes max length
-            if ( toklen > MAX_TOKN ) asmfail("named token exceeds max character length");
+            if ( p - pp > 255 ) asmfail("named token exceeds max character length");
+            unsigned char toklen = p - pp;
 
             // Return current segment position
             if ( tk == '.' && toklen == 1 )
@@ -80,138 +79,139 @@ void ntok()
             }
 
             unsigned int fscp = -1;
-            int i, k = 0;
-            // Find a matching symbol
-            while ( k < sympos )
+            int i;
+            tkSym = symint;
+            // Check all internal symbols
+            while ( tkSym && tkSym != *symtbl )
             {
-                i = 0;
-
                 // Get all characters that implicitly match TODO case insensitivity
-                while ( i < toklen && i < symtbl[k].len && symtbl[k].name[i] == pp[i] ) i++;
-
-                if ( k < ASM_SIZE ) // Assembler defined symbol
+                i = 0;
+                if ( tkSym->name )
                 {
-                    tk = symtbl[k].type;
-                    tkVal = symtbl[k].val;
-
-                    // Exact match
-                    if ( i == toklen && toklen == symtbl[k].len )
-                    {
-                        #if DBUG_SYM
-                        write( 1, "ASM SYM MATCH:\r\n", 16 );
-                        symwrite( 1, symtbl + k );
-                        #endif
-                        return;
-                    }
-                    else if (!( i == symtbl[k].len && toklen > symtbl[k].len )) // No flags
-                    {
-                        k++;
-                        continue;
-                    }
-                }
-                else if ( (symtbl[k].type & SYM_MASK) == SYM_FILE ) // File seperator token
-                {
-                    fscp++;
-                    k++;
-                    continue;
-                }
-                else // User defined symbol
-                {
-                    if ( i == toklen && toklen == symtbl[k].len // Exact match
-                    && (symtbl[k].type & SYM_GLOB || fscp == curfno || k < ASM_SIZE) ) // Correct scope
-                    {
-                        // Is this a defined value or a symbol
-                        tk = (symtbl[k].type & SYM_MASK) == SYM_ABS ? TOK_NUM : TOK_NAME;
-                        tkVal = k;
-                        #if DBUG_SYM
-                        write( 1, "USER SYM MATCH:\r\n", 17 );
-                        symwrite( 1, symtbl + k );
-                        #endif
-                        return;
-                    }
-                    k++;
-                    continue;
+                    //write( 1, tkSym->name, tkSym->len );
+                    while ( i < toklen && i < tkSym->len && tkSym->name[i] == pp[i] ) i++;
                 }
 
-                // Number of unmatched chars (flags)
-                int flagNum = toklen - i;
+                tk = tkSym->type;
+                tkVal = tkSym->val;
 
-                // Check flags if I/O instruction
-                if ( flagNum == 1
-                && ( tk == DGN_IO
-                ||   tk == DGN_CTF
-                ||   tk == DGN_CTAF ) )
+                if ( i == toklen && toklen == tkSym->len ) // Exact match
                 {
-                    if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000001000000; return; }
-                    if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000010000000; return; }
-                    if ( pp[i] == 'p' || pp[i] == 'P' ) { tkVal |= 0b0000000011000000; return; }
+                    #if DBUG_SYM
+                    write( 1, "ASM SYM MATCH:\r\n", 16 );
+                    symwrite( 1, tkSym );
+                    #endif
+                    return;
                 }
-                else if ( tk == DGN_MATH && flagNum >= 1 && flagNum <= 3 )
+                else if ( i == tkSym->len && toklen > tkSym->len ) // Partial match, get flags
                 {
-                    // Carry control
-                    if      ( pp[i] == 'z' || pp[i] == 'Z' ) { tkVal |= 0b0000000000010000; i++; flagNum--; }
-                    else if ( pp[i] == 'o' || pp[i] == 'O' ) { tkVal |= 0b0000000000100000; i++; flagNum--; }
-                    else if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000000110000; i++; flagNum--; }
+                    // Number of unmatched chars (flags)
+                    int flagNum = toklen - i;
 
-                    if ( flagNum ) // Shift control
+                    // Check flags if I/O instruction
+                    if ( flagNum == 1
+                    && ( tk == DGN_IO
+                    ||   tk == DGN_CTF
+                    ||   tk == DGN_CTAF ) )
                     {
-                        if      ( pp[i] == 'l' || pp[i] == 'L' ) { tkVal |= 0b0000000001000000; i++; flagNum--; }
-                        else if ( pp[i] == 'r' || pp[i] == 'R' ) { tkVal |= 0b0000000010000000; i++; flagNum--; }
-                        else if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000011000000; i++; flagNum--; }
+                        if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000001000000; return; }
+                        if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000010000000; return; }
+                        if ( pp[i] == 'p' || pp[i] == 'P' ) { tkVal |= 0b0000000011000000; return; }
                     }
-
-                    // No-Load
-                    if ( flagNum && pp[i] == '#' ) { tkVal |= 0b0000000000001000; flagNum--; }
-
-                    // Exhausted all flags
-                    if ( !flagNum )
+                    else if ( tk == DGN_MATH && flagNum >= 1 && flagNum <= 3 )
                     {
-                        #if DBUG_SYM
-                        write( 1, "SYM MATH MATCH:\r\n", 17 );
-                        symwrite( 1, symtbl + k );
-                        #endif
+                        // Carry control
+                        if      ( pp[i] == 'z' || pp[i] == 'Z' ) { tkVal |= 0b0000000000010000; i++; flagNum--; }
+                        else if ( pp[i] == 'o' || pp[i] == 'O' ) { tkVal |= 0b0000000000100000; i++; flagNum--; }
+                        else if ( pp[i] == 'c' || pp[i] == 'C' ) { tkVal |= 0b0000000000110000; i++; flagNum--; }
 
-                        return;
+                        if ( flagNum ) // Shift control
+                        {
+                            if      ( pp[i] == 'l' || pp[i] == 'L' ) { tkVal |= 0b0000000001000000; i++; flagNum--; }
+                            else if ( pp[i] == 'r' || pp[i] == 'R' ) { tkVal |= 0b0000000010000000; i++; flagNum--; }
+                            else if ( pp[i] == 's' || pp[i] == 'S' ) { tkVal |= 0b0000000011000000; i++; flagNum--; }
+                        }
+
+                        // No-Load
+                        if ( flagNum && pp[i] == '#' ) { tkVal |= 0b0000000000001000; flagNum--; }
+
+                        // Exhausted all flags
+                        if ( !flagNum )
+                        {
+                            #if DBUG_SYM
+                            write( 1, "MATH SYM MATCH:\r\n", 17 );
+                            symwrite( 1, tkSym );
+                            #endif
+
+                            return;
+                        }
                     }
                 }
 
-                k++;
+                tkSym = tkSym->next;
+            }
+
+            tkVal = 0;
+            while ( tkSym )
+            {
+                // Get all characters that implicitly match TODO case insensitivity
+                i = 0;
+                if ( tkSym->name )
+                    while ( i < toklen && i < tkSym->len && tkSym->name[i] == pp[i] ) i++;
+
+                if ( (tkSym->type & SYM_MASK) == SYM_FILE ) fscp++; // File seperator token
+                // User defined symbol
+                else if ( i == toklen && toklen == tkSym->len // Exact match
+                && (tkSym->type & SYM_GLOB || fscp < 0 || fscp == curfno) ) // Correct scope
+                {
+                    // Is this a defined value or a symbol
+                    tk = (tkSym->type & SYM_MASK) == SYM_ABS ? TOK_NUM : TOK_NAME;
+                    #if DBUG_SYM
+                    write( 1, "USER SYM MATCH:\r\n", 17 );
+                    symwrite( 1, tkSym );
+                    #endif
+                    return;
+                }
+
+                tkSym = tkSym->next;
+                tkVal++;
             }
 
             if ( flags & FLG_DATA ) asmfail("tried to create new symbol during data pass (shouldn't be possible, contact devs)");
 
             // Allocate room for new symbols
-            if ( sbrk( sizeof(struct asmsym) ) == SBRKFAIL ) asmfail("cannot allocate room for new symbol");
+            tkSym = sbrk( sizeof(struct asmsym) );
+            if ( tkSym == SBRKFAIL ) asmfail("cannot allocate room for new symbol");
+
+            *symtail = tkSym;
+            symtail = &tkSym->next;
+
+            tkSym->type = SYM_DEF;
+            if ( flags & FLG_GLOB ) tkSym->type |= SYM_GLOB;
+            tkSym->len = toklen;
+            tkSym->val = 0;
+            tkSym->next = NULL;
+
+            // Allocate room for new symbol's name
+            tkSym->name = sbrk( toklen + 1 );
+            if ( tkSym->name == SBRKFAIL ) asmfail("cannot allocate room for new symbol name");
 
             // Create new symbol
             i = 0;
-            while ( i < toklen ) // Store symbol and fill rest with zeros
+            while ( i < toklen ) // Store symbol
             {
-                symtbl[k].name[i] = pp[i];
-                i++;
+                tkSym->name[i] = pp[i]; i++;
             }
 
             // Null terminate
-            if ( i < MAX_TOKN ) symtbl[k].name[i] = 0;
-
-            // Set type to undefiend symbol
-            symtbl[k].type = SYM_DEF;
-            // Record size of symbol
-            symtbl[k].len = toklen;
-            // Make this symbol global
-            if ( flags & FLG_GLOB ) symtbl[k].type |= SYM_GLOB;
-            // Set default value
-            symtbl[k].val = 0;
+            tkSym->name[i] = 0;
 
             #if DBUG_SYM
             write( 1, "NEW SYM:\r\n", 10 );
-            symwrite( 1, symtbl + k );
+            symwrite( 1, tkSym );
             #endif
 
-            sympos++;
-
             tk = TOK_NAME;
-            tkVal = k;
             return;
         }
         else if ( tk >= '0' && tk <= '9' ) // Number
