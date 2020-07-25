@@ -1,11 +1,9 @@
 #include "../lib/novanix.h"
 #include "../lib/a.out.h"
 
-#define MAX_INCS 8    // Maximum depth of includes
 #define MAX_LINE 256  // Maximum number of tokens per file line
 #define MAX_STR  256  // Maximum length of user defined strings
 #define PAGESIZE 1024 // 2 KB (1 KW) of memory (1 mmu page)
-#define MAX_TOKN 32   // Maximum length of a symbol name
 
 // +--------------+
 // | TOKEN VALUES |
@@ -81,14 +79,19 @@ enum
 // Symbol
 struct mccsym
 {
+    char * name; // Name of symbol
     unsigned int val; // Data stored in the symbol or address of the symbol
 
-    char name[MAX_TOKN]; // Name of symbol
-    unsigned char len; // Length of symbol in bytes
+    unsigned char len; // Length of name in bytes
     unsigned char type;
 
     unsigned char indir; // Number of inderections
     unsigned char scope; // 0 = File scope, every { and } increase/decrease scope
+
+    unsigned int size; // Number of elements if this is an array
+
+    struct mccsym ** members; // List of all member symbols (or function arguments)
+    struct mccsym * next; // Store the next symbol in the table
 /*
     // For function symbols only
     unsigned char argc; // Number of arguments
@@ -100,6 +103,11 @@ struct mccsym
 
     struct symbol * next, * prev;
 */
+};
+
+struct mccmdl
+{
+     
 };
 
 // Store a data segment

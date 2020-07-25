@@ -8,6 +8,7 @@ char * p, * pp;
 char lp[MAX_LINE]; // Current line
 
 int tkVal, cursf = -1;
+struct mccsym * tkSym;
 unsigned char tk;
 
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
@@ -66,15 +67,13 @@ void ntok()
         else if ( tk >= 'A' && tk <= 'Z' || tk >= 'a' && tk <= 'z' || tk == '_' )
         {
             // Get entire symbol
-            while ( p - pp <= MAX_TOKN &&
-                ( *p >= 'a' && *p <= 'z'
-               || *p >= 'A' && *p <= 'Z'
-               || *p >= '0' && *p <= '9'
-               || *p == '_' ) ) p++;
+            while ( ( *p >= 'a' && *p <= 'z'
+                   || *p >= 'A' && *p <= 'Z'
+                   || *p >= '0' && *p <= '9'
+                   || *p == '_' ) ) p++;
 
-            int toklen = p - pp;
-
-            if ( toklen > MAX_TOKN ) mccfail("named token exceedes max character length");
+            if ( p - pp > 255 ) mccfail("named token exceedes max character length");
+            unsigned char toklen = p - pp;
 
             // Check for reserved word
             tk = Void;
@@ -100,26 +99,44 @@ void ntok()
             // Check for named symbol
             tk = Named;
             tkVal = 0;
-            while ( tkVal < sympos )
+            tkSym = symtbl;
+            while ( tkSym )
             {
                 // Find matching symbol
                 i = 0;
                 while ( i < toklen && i < symtbl[tkVal].len && symtbl[tkVal].len == pp[i] ) i++;
                 if ( i == toklen && toklen == symtbl[tkVal].len ) return;
+
+                tkSym = tkSym->next;
+                tkVal++;
             }
 
             // New symbol
-            if ( sbrk( sizeof(struct mccsym) ) == SBRKFAIL ) mccfail("cannot allocate room for new symbol");
+            tkSym = sbrk( sizeof(struct mccsym) );
+            if ( tkSym == SBRKFAIL ) mccfail("cannot allocate room for new symbol");
+
+            *symtail = tkSym;
+            symtail = &tkSym->next;
+
+            tkSym->val = 0;
+
+            tkSym->len = toklen;
+            tkSym->type = 0;
+
+            tkSym->indir = 0;
+            tkSym->scope = 0;
+
+            tkSym->members = NULL;
+            tkSym->next = NULL;
+
+            // Allocate name
+            tkSym->name = sbrk( toklen + 1 );
+            if ( tkSym->name == SBRKFAIL ) mccfail("cannot allocate room for new symbol's name");
 
             // Copy name
             i = 0;
-            while ( i < toklen ) { symtbl[tkVal].name[i] = pp[i]; i++; }
-
-            // Record length
-            symtbl[tkVal].len = toklen;
-
-            // Ensure type is zero
-            symtbl[tkVal].type = 0;
+            while ( i < toklen ) { tkSym->name[i] = pp[i]; i++; }
+            tkSym->name[i] = 0;
 
             return;
         }

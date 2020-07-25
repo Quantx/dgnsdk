@@ -5,8 +5,8 @@ unsigned int curfno; // Current file number
 unsigned int entrypos; // Starting address offset within the text segment
 unsigned int stksize; // Additional stack size
 
-struct mccsym * symtbl;
-unsigned int sympos = 0, symmax = 0; // Number of symbols in the table
+struct mccsym * symtbl, ** symtail = &symtbl; // Holds all of the symbols
+struct mccsym * mdltbl, ** mdltail = &mdltbl; // Holds prototype function and struct definitions
 
 void mccfail(char * msg)
 {
@@ -36,6 +36,7 @@ int main( char ** argv, int argc )
     // Prefrom a first pass on each file
     while ( curfno < argc )
     {
+        compile( argv[curfno] );
         curfno++;
     }
 }
