@@ -26,8 +26,8 @@ void assemble( char * fpath )
             if ( tk == TOK_INDR ) val |= 0x8000;
             // This is a byte pointer
             else val << 1;
-            // This is a high byte pointer
-            if ( tk == TOK_BYHI ) val |= 1;
+            // This is a low byte pointer
+            if ( tk == TOK_BYLO ) val |= 1;
 
             // Compute relocation bits
             unsigned int rloc = tkVal << 4 | tkSym->type & SYM_MASK | tk != TOK_INDR;
@@ -153,8 +153,8 @@ void assemble( char * fpath )
             // Load string into segment
             while ( i < tkVal )
             {
-                val = ustr[i++] & 0xFF;
-                if ( i < tkVal ) val += (ustr[i++] & 0xFF) << 8;
+                val = (ustr[i++] & 0xFF) << 8;
+                if ( i < tkVal ) val += ustr[i++] & 0xFF;
                 segset( curseg, SYM_ABS, val );
                 curseg->data.pos++;
             }
