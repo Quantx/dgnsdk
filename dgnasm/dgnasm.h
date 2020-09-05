@@ -7,7 +7,7 @@
 #define MAX_LINE 256  // Maximum number of tokens per file line
 #define MAX_STR  256  // Maximum length of user defined strings
 #define PAGESIZE 1024 // 2 KB (1 KW) of memory (1 mmu page)
-#define ASM_SIZE 72   // Number of assembler defined symbols
+#define ASM_SIZE 91   // Number of assembler defined symbols
 #define CBUF_LEN 256  // Size of buffer used to copy from one file to another (Must be at least 16)
 
 // *** DGNova Instruction Parameter Formats ***
@@ -70,19 +70,13 @@ struct asmsym
 // Store a data segment
 struct segment
 {
-    struct // Core image
+    struct
     {
        int fd;
        unsigned int pos;
        unsigned int size;
-    } data;
-
-    struct // Relocation info
-    {
-       int fd;
-       unsigned int pos;
-       unsigned int size;
-    } rloc;
+    } data, // Core image
+      rloc; // Relocation info
 
     unsigned char sym; // The symbol type
 };
