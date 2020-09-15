@@ -6,6 +6,7 @@ unsigned int curfno; // Current file number
 unsigned int entrypos; // Starting address offset within the text segment
 unsigned int stksize; // Additional stack size
 unsigned int copybuf[CBUF_LEN]; // Used to transfer data from one file to another
+unsigned char btarget = CPU_NOVA1; // Build target
 
 #include "symbols.c"
 
@@ -123,22 +124,44 @@ int main( int argc, char ** argv )
         (*argv)++;
 
         // All symbols are global
-        if      ( **argv == 'g' ) flags |= FLG_GLOB;
-        // Stack size follows
-        else if ( **argv == 't' )
+        switch ( **argv )
         {
-            argc--; argv++;
-            while ( **argv >= '0' && **argv <= '9' ) stksize = stksize * 10 + *(*argv)++ - '0';
+            case 'g': flags |= FLG_GLOB; break;
+            // Stack size follows
+            case 't':
+                argc--; argv++;
+                while ( **argv >= '0' && **argv <= '9' ) stksize = stksize * 10 + *(*argv)++ - '0';
 
-            if ( stksize > 32 ) asmfail( "Number of stack pages specified exceeds maximum of 32" );
-        }
-        // Output mode
-        else if ( **argv == 'm' )
-        {
-            (*argv)++;
-            if      ( **argv == 'h' ) flags |= FLG_SMH;
-            else if ( **argv == 'a' ) flags |= FLG_SMHA;
-            else if ( **argv == 'v' ) flags |= FLG_TERM;
+                if ( stksize > 32 ) asmfail( "Number of stack pages specified exceeds maximum of 32" );
+                break;
+            // Output mode
+            case 'm':
+                (*argv)++;
+
+                switch ( **argv )
+                {
+                    case 'h': flags |= FLG_SMH; break;
+                    case 'a': flags |= FLG_SMHA; break;
+                    case 'v': flags |= FLG_TERM; break;
+                }
+
+                break;
+            // Assembly target
+            case 'n':
+                (*argv)++;
+
+                switch ( **argv )
+                {
+                    case 'b': btarget = CPU_NOVA1; break;
+                    case 'm': btarget = CPU_MDV;   break;
+                    case '3': btarget = CPU_NOVA3; break;
+                    case '4': btarget = CPU_NOVA4; break;
+                    case '5': btarget = CPU_F9445; break;
+                }
+
+                break;
+            // Enable Virtual Instructions
+            case 'v': flags |= FLG_VIEMU; break;
         }
 
         argc--; argv++;
@@ -146,21 +169,13 @@ int main( int argc, char ** argv )
 
     if ( !argc ) showhelp( progname );
 
-    write( 1, " *** Loading symbols ***\r\n", 26 );
+//    write( 1, " *** Loading symbols ***\r\n", 26 );
 
-    // *** Setup Assembler Defined Symbols ***
-    cursym = symint; i = 0;
-    while ( cursym )
-    {
-        cursym->name = symstrs[i];
+//    // *** Setup Assembler Defined Symbols ***
+//    unsigned int instize = sizeof(insts) / sizeof(struct instruct);
+//    for ( i = 0; i < instsize - 1; i++ ) insts[i].next = insts + i + 1;
 
-        int k = 0;
-        while ( symstrs[i][k] ) k++;
-        cursym->len = k;
-
-        if ( cursym->next == NULL ) symtail = symtbl = &cursym->next;
-        cursym = cursym->next; i++;
-    }
+    symtail = &symtbl; // Initialize symbol table
 
     write( 1, " *** Starting first pass ***\r\n", 30 );
 
@@ -194,7 +209,7 @@ int main( int argc, char ** argv )
     }
 
     // Make sure there are no undefined local labels
-    cursym = *symtbl;
+    cursym = symtbl;
     while ( cursym != NULL )
     {
         if ( (cursym->type & SYM_MASK) == SYM_DEF && ~cursym->type & SYM_GLOB )
@@ -417,7 +432,7 @@ int main( int argc, char ** argv )
     else // Binary executable output
     {
         i = 0;
-        cursym = *symtbl;
+        cursym = symtbl;
         while ( cursym ) { cursym = cursym->next; i++; }
 
         // Output header
@@ -444,7 +459,7 @@ int main( int argc, char ** argv )
         // Output symbol table
         unsigned int nameoff = 0;
         struct symbol outsym;
-        cursym = *symtbl;
+        cursym = symtbl;
         while ( cursym )
         {
             // Build output symbol
@@ -462,7 +477,7 @@ int main( int argc, char ** argv )
 
         // Output string table
         unsigned int k = 0;
-        cursym = *symtbl;
+        cursym = symtbl;
         while ( cursym )
         {
             if ( (cursym->type & SYM_MASK) == SYM_FILE )

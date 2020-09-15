@@ -58,7 +58,7 @@ void ntok()
         }
         else if ( (tk >= 'a' && tk <= 'z') // Named symbol
                || (tk >= 'A' && tk <= 'Z')
-               ||  tk == '_' || tk == '.'  )
+               ||  tk == '_' || tk == '.' || tk == '~' ) // The ~ character is reserved for the C compiler
         {
             // Get entire token
             while ( (*p >= 'a' && *p <= 'z')
@@ -79,31 +79,41 @@ void ntok()
             }
 
             unsigned int fscp = -1;
-            int i;
-            tkSym = symint;
+            int i, k;
+            struct instruct * tkInst;
             // Check all internal symbols
-            while ( tkSym && tkSym != *symtbl )
+            for ( k = 0; k < sizeof(insts) / sizeof(struct instruct); k++ )
             {
-                // Get all characters that implicitly match TODO case insensitivity
-                i = 0;
-                if ( tkSym->name )
+                tk = insts[k].type;
+                tkVal = insts[k].val;
+
+                if ( !(insts[k].target & btarget) ) // Unsupported instruction
                 {
-                    //write( 1, tkSym->name, tkSym->len );
-                    while ( i < toklen && i < tkSym->len && tkSym->name[i] == pp[i] ) i++;
+                    if ( ~flags & FLG_VIEMU || insts[k].target & CPU_NOEMU ) continue; // Skip unsupported instructions
+
+                    switch ( tk ) // Update type info
+                    {
+                        case DGN_CT:   tk = DGN_VI;   break;
+                        case DGN_CTA:  tk = DGN_VIA;  break;
+                        case DGN_CTAA: tk = DGN_VIAA; break;
+                    }
+
+                    tkVal = 0b1000000000001000 | (insts[k].trap & 0x7F) << 4;
                 }
 
-                tk = tkSym->type;
-                tkVal = tkSym->val;
+                for ( i = 0; i < toklen && i < insts[k].len && ( insts[k].name[i] == pp[i] // Check uppercase
+                || ( insts[k].name[i] >= 'A' && insts[k].name[i] <= 'Z' && insts[k].name[i] + 32 == pp[i] ) ); i++ ); // Check lowercase
 
-                if ( i == toklen && toklen == tkSym->len ) // Exact match
+                if ( i == toklen && toklen == insts[k].len ) // Exact match
                 {
                     #if DBUG_SYM
                     write( 1, "ASM SYM MATCH:\r\n", 16 );
-                    symwrite( 1, tkSym );
+                    write( 1, insts[k].name, insts[k].len );
+//                    symwrite( 1, tkInst );
                     #endif
                     return;
                 }
-                else if ( i == tkSym->len && toklen > tkSym->len ) // Partial match, get flags
+                else if ( i == insts[k].len && toklen > insts[k].len ) // Partial match, get flags
                 {
                     // Number of unmatched chars (flags)
                     int flagNum = toklen - i;
@@ -140,40 +150,37 @@ void ntok()
                         {
                             #if DBUG_SYM
                             write( 1, "MATH SYM MATCH:\r\n", 17 );
-                            symwrite( 1, tkSym );
+                            write( 1, insts[k].name, insts[k].len );
+//                            symwrite( 1, tkInst );
                             #endif
 
                             return;
                         }
                     }
                 }
-
-                tkSym = tkSym->next;
             }
 
             tkVal = 0;
-            while ( tkSym )
+            for ( tkSym = symtbl; tkSym; tkSym = tkSym->next )
             {
-                // Get all characters that implicitly match TODO case insensitivity
-                i = 0;
-                if ( tkSym->name )
-                    while ( i < toklen && i < tkSym->len && tkSym->name[i] == pp[i] ) i++;
-
                 if ( (tkSym->type & SYM_MASK) == SYM_FILE ) fscp++; // File seperator token
                 // User defined symbol
-                else if ( i == toklen && toklen == tkSym->len // Exact match
+                else if ( toklen == tkSym->len // Symbol lengths match
                 && (tkSym->type & SYM_GLOB || fscp < 0 || fscp == curfno) ) // Correct scope
                 {
-                    // Is this a defined value or a symbol
-                    tk = (tkSym->type & SYM_MASK) == SYM_ABS ? TOK_NUM : TOK_NAME;
-                    #if DBUG_SYM
-                    write( 1, "USER SYM MATCH:\r\n", 17 );
-                    symwrite( 1, tkSym );
-                    #endif
-                    return;
+                    for ( i = 0; i < toklen && tkSym->name[i] == pp[i]; i++ );
+                    if ( i == toklen )
+                    {
+                        // Is this a defined value or a symbol
+                        tk = (tkSym->type & SYM_MASK) == SYM_ABS ? TOK_NUM : TOK_NAME;
+                        #if DBUG_SYM
+                        write( 1, "USER SYM MATCH:\r\n", 17 );
+                        symwrite( 1, tkSym );
+                        #endif
+                        return;
+                    }
                 }
 
-                tkSym = tkSym->next;
                 tkVal++;
             }
 

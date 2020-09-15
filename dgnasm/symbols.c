@@ -1,138 +1,118 @@
-// These strings must match the symbols in the table below
-char * symstrs[ASM_SIZE] = {
-    "NIO", "DIA", "DOA", "DIB", "DOB", "DIC", "DOC",
-    "SKPBN", "SKPBZ", "SKPDN", "SKPDZ",
-    "JMP", "JSR", "ISZ", "DSZ",
-    "LDA", "STA",
-    "COM", "NEG", "MOV", "INC", "ADC", "SUB", "ADD", "AND",
-    "TRAP",
-    "LDB", "STB",
-    "PSHA", "PSHN", "POPA", "SAV", "SAVN", "RET", "MTSP", "MTFP", "MFSP", "MFFP",
-    "INTEN", "INTDS", "READS", "MSKO", "INTA", "IORST", "HALT",
-    "MUL", "MULS", "DIV", "DIVS",
-    "SKP", "SZC", "SNC", "SZR", "SNR", "SEZ", "SBN",
+struct asmsym * symtbl = NULL, ** symtail;
 
-    // F9445 OPs
-    "OR", "NORM", "SLLD", "SALD", "SLRD", "SARD", "SKNV",
-    "PSHF", "POPF", "POPJ", "PSHR", "TOPR", "TOPW", "DSP",
-    "WAIT", "ETRP", "DTRP", "E64K", "D64K",
-
-    // Assembler mnemonics
-    ".TEXT", ".DATA", ".BSS", ".ZERO", ".GLOB", ".DEFINE", ".ENT", ".WSTR",
-
-    // Device mnemonics
-    "MDV", "MAP", "MAP1", "TTI", "TTO", "PTR", "PTP", "RTC"
-};
-
-struct asmsym ** symtail, ** symtbl, symint[ASM_SIZE] = {
-    // I/O Instructions (7)
-    { NULL, DGN_IONO, 3, 0b0110000000000000, symint +  1 }, // NIO
-    { NULL, DGN_IO,   3, 0b0110000100000000, symint +  2 }, // DIA
-    { NULL, DGN_IO,   3, 0b0110001000000000, symint +  3 }, // DOA
-    { NULL, DGN_IO,   3, 0b0110001100000000, symint +  4 }, // DIB
-    { NULL, DGN_IO,   3, 0b0110010000000000, symint +  5 }, // DOB
-    { NULL, DGN_IO,   3, 0b0110010100000000, symint +  6 }, // DIC
-    { NULL, DGN_IO,   3, 0b0110011000000000, symint +  7 }, // DOC
-    // I/O Skip instructions (4)
-    { NULL, DGN_IOSK, 5, 0b0110011100000000, symint +  8 }, // SKPBN
-    { NULL, DGN_IOSK, 5, 0b0110011101000000, symint +  9 }, // SKPBZ
-    { NULL, DGN_IOSK, 5, 0b0110011110000000, symint + 10 }, // SKPDN
-    { NULL, DGN_IOSK, 5, 0b0110011111000000, symint + 11 }, // SKPDZ
-    // Flow control instructions (4)
-    { NULL, DGN_FLOW, 3, 0b0000000000000000, symint + 12 }, // JMP
-    { NULL, DGN_FLOW, 3, 0b0000100000000000, symint + 13 }, // JSR
-    { NULL, DGN_FLOW, 3, 0b0001000000000000, symint + 14 }, // ISZ
-    { NULL, DGN_FLOW, 3, 0b0001100000000000, symint + 15 }, // DSZ
-    // Memory access instructions (2)
-    { NULL, DGN_LOAD, 3, 0b0010000000000000, symint + 16 }, // LDA
-    { NULL, DGN_LOAD, 3, 0b0100000000000000, symint + 17 }, // STA
-    // Arithmetic & Logic instructions (8)
-    { NULL, DGN_MATH, 3, 0b1000000000000000, symint + 18 }, // COM
-    { NULL, DGN_MATH, 3, 0b1000000100000000, symint + 19 }, // NEG
-    { NULL, DGN_MATH, 3, 0b1000001000000000, symint + 20 }, // MOV
-    { NULL, DGN_MATH, 3, 0b1000001100000000, symint + 21 }, // INC
-    { NULL, DGN_MATH, 3, 0b1000010000000000, symint + 22 }, // ADC
-    { NULL, DGN_MATH, 3, 0b1000010100000000, symint + 23 }, // SUB
-    { NULL, DGN_MATH, 3, 0b1000011000000000, symint + 24 }, // ADD
-    { NULL, DGN_MATH, 3, 0b1000011100000000, symint + 25 }, // AND
-    // Trap instruction (Arithmetic no-op) (1)
-    { NULL, DGN_TRAP, 4, 0b1000000000001000, symint + 26 }, // TRAP
-    // Byte acess instructions (2)
-    { NULL, DGN_CTAA, 3, 0b0110000100000001, symint + 27 }, // LDB
-    { NULL, DGN_CTAA, 3, 0b0110010000000001, symint + 28 }, // STB
-    // Stack instructions (10)
-    { NULL, DGN_CTA,  4, 0b0110001100000001, symint + 29 }, // PSHA
-    { NULL, DGN_CTA,  4, 0b0110001111000001, symint + 30 }, // PSHN - [Undocumented] PSHA With I/O Pulse
-    { NULL, DGN_CTA,  4, 0b0110001110000001, symint + 31 }, // POPA
-    { NULL, DGN_CT,   3, 0b0110010100000001, symint + 32 }, // SAV
-    { NULL, DGN_CT,   4, 0b0110010111000001, symint + 33 }, // SAVN - [Undocumented] SAV with I/O Pulse
-    { NULL, DGN_CT,   3, 0b0110010110000001, symint + 34 }, // RET
-    { NULL, DGN_CTA,  4, 0b0110001000000001, symint + 35 }, // MTSP
-    { NULL, DGN_CTA,  4, 0b0110000000000001, symint + 36 }, // MTFP
-    { NULL, DGN_CTA,  4, 0b0110001010000001, symint + 37 }, // MFSP
-    { NULL, DGN_CTA,  4, 0b0110000010000001, symint + 38 }, // MFFP
-    // CPU Control instructions (7)
-    { NULL, DGN_CT,   5, 0b0110000001111111, symint + 39 }, // INTEN
-    { NULL, DGN_CT,   5, 0b0110000010111111, symint + 40 }, // INTDS
-    { NULL, DGN_CTAF, 5, 0b0110000100111111, symint + 41 }, // READS
-    { NULL, DGN_CTAF, 4, 0b0110010000111111, symint + 42 }, // MSKO
-    { NULL, DGN_CTAF, 4, 0b0110001100111111, symint + 43 }, // INTA
-    { NULL, DGN_CTF,  5, 0b0110010110111111, symint + 44 }, // IORST
-    { NULL, DGN_CTF,  4, 0b0110011000111111, symint + 45 }, // HALT
-    // Hardware Multiply & Divide instructions (4)
-    { NULL, DGN_CT,   3, 0b0111011011000001, symint + 46 }, // MUL
-    { NULL, DGN_CT,   4, 0b0111111010000001, symint + 47 }, // MULS
-    { NULL, DGN_CT,   3, 0b0111011001000001, symint + 48 }, // DIV
-    { NULL, DGN_CT,   4, 0b0111111000000001, symint + 49 }, // DIVS
+struct instruct insts[] = {
+    // I/O Instructions (0:7)
+    { "NIO", 3, DGN_IONO, 0b0110000000000000, CPU_BASE, 0 },
+    { "DIA", 3, DGN_IO,   0b0110000100000000, CPU_BASE, 0 },
+    { "DOA", 3, DGN_IO,   0b0110001000000000, CPU_BASE, 0 },
+    { "DIB", 3, DGN_IO,   0b0110001100000000, CPU_BASE, 0 },
+    { "DOB", 3, DGN_IO,   0b0110010000000000, CPU_BASE, 0 },
+    { "DIC", 3, DGN_IO,   0b0110010100000000, CPU_BASE, 0 },
+    { "DOC", 3, DGN_IO,   0b0110011000000000, CPU_BASE, 0 },
+    // I/O Skip instructions (7:4)
+    { "SKPBN", 5, DGN_IOSK, 0b0110011100000000, CPU_BASE, 0 },
+    { "SKPBZ", 5, DGN_IOSK, 0b0110011101000000, CPU_BASE, 0 },
+    { "SKPDN", 5, DGN_IOSK, 0b0110011110000000, CPU_BASE, 0 },
+    { "SKPDZ", 5, DGN_IOSK, 0b0110011111000000, CPU_BASE, 0 },
+    // Flow control instructions (11:4)
+    { "JMP", 3, DGN_FLOW, 0b0000000000000000, CPU_BASE, 0 },
+    { "JSR", 3, DGN_FLOW, 0b0000100000000000, CPU_BASE, 0 },
+    { "ISZ", 3, DGN_FLOW, 0b0001000000000000, CPU_BASE, 0 },
+    { "DSZ", 3, DGN_FLOW, 0b0001100000000000, CPU_BASE, 0 },
+    // Memory access instructions (15:2)
+    { "LDA", 3, DGN_LOAD, 0b0010000000000000, CPU_BASE, 0 },
+    { "STA", 3, DGN_LOAD, 0b0100000000000000, CPU_BASE, 0 },
+    // Arithmetic & Logic instructions (17:8)
+    { "COM", 3, DGN_MATH, 0b1000000000000000, CPU_BASE, 0 },
+    { "NEG", 3, DGN_MATH, 0b1000000100000000, CPU_BASE, 0 },
+    { "MOV", 3, DGN_MATH, 0b1000001000000000, CPU_BASE, 0 },
+    { "INC", 3, DGN_MATH, 0b1000001100000000, CPU_BASE, 0 },
+    { "ADC", 3, DGN_MATH, 0b1000010000000000, CPU_BASE, 0 },
+    { "SUB", 3, DGN_MATH, 0b1000010100000000, CPU_BASE, 0 },
+    { "ADD", 3, DGN_MATH, 0b1000011000000000, CPU_BASE, 0 },
+    { "AND", 3, DGN_MATH, 0b1000011100000000, CPU_BASE, 0 },
+    // Arithmetic & Logic skip conditions (25:7)
+    { "SKP", 3, DGN_SKPC, 01, CPU_BASE, 0 },
+    { "SZC", 3, DGN_SKPC, 02, CPU_BASE, 0 },
+    { "SNC", 3, DGN_SKPC, 03, CPU_BASE, 0 },
+    { "SZR", 3, DGN_SKPC, 04, CPU_BASE, 0 },
+    { "SNR", 3, DGN_SKPC, 05, CPU_BASE, 0 },
+    { "SEZ", 3, DGN_SKPC, 06, CPU_BASE, 0 },
+    { "SBN", 3, DGN_SKPC, 07, CPU_BASE, 0 },
+    // Trap instruction (Arithmetic no-op) (32:1)
+    { "TRAP", 4, DGN_TRAP, 0b1000000000001000, CPU_NOVA3 | CPU_NOVA4 | CPU_F9445 | CPU_NOEMU, 0 },
+    // Byte acess instructions (33:2)
+    { "LDB", 3, DGN_CTAA, 0b0110000100000001, CPU_NOVA4 | CPU_F9445, 0 },
+    { "STB", 3, DGN_CTAA, 0b0110010000000001, CPU_NOVA4 | CPU_F9445, 0 },
+    // Stack instructions (35:10)
+    { "PSHA", 4, DGN_CTA, 0b0110001100000001, CPU_NOVA4 | CPU_NOVA3 | CPU_F9445, 0 },
+    { "PSHN", 4, DGN_CTA, 0b0110001111000001, CPU_NOVA4, 0 }, // [Undocumented] PSHA With I/O Pulse
+    { "POPA", 4, DGN_CTA, 0b0110001110000001, CPU_NOVA4 | CPU_NOVA3 | CPU_F9445, 0 },
+    { "SAV",  3, DGN_CT,  0b0110010100000001, CPU_NOVA4 | CPU_NOVA3 | CPU_F9445, 0 },
+    { "SAVN", 4, DGN_CT,  0b0110010111000001, CPU_NOVA4, 0 }, // [Undocumented] SAV with I/O Pulse
+    { "RET",  3, DGN_CT,  0b0110010110000001, CPU_NOVA4 | CPU_NOVA3 | CPU_F9445, 0 },
+    { "MTSP", 4, DGN_CTA, 0b0110001000000001, CPU_NOVA4 | CPU_NOVA3 | CPU_F9445, 0 },
+    { "MTFP", 4, DGN_CTA, 0b0110000000000001, CPU_NOVA4 | CPU_NOVA3 | CPU_F9445, 0 },
+    { "MFSP", 4, DGN_CTA, 0b0110001010000001, CPU_NOVA4 | CPU_NOVA3 | CPU_F9445, 0 },
+    { "MFFP", 4, DGN_CTA, 0b0110000010000001, CPU_NOVA4 | CPU_NOVA3 | CPU_F9445, 0 },
+    // CPU Control instructions (45:7)
+    { "INTEN", 5, DGN_CT,   0b0110000001111111, CPU_BASE, 0 },
+    { "INTDS", 5, DGN_CT,   0b0110000010111111, CPU_BASE, 0 },
+    { "READS", 5, DGN_CTAF, 0b0110000100111111, CPU_BASE, 0 },
+    { "MSKO",  4, DGN_CTAF, 0b0110010000111111, CPU_BASE, 0 },
+    { "INTA",  4, DGN_CTAF, 0b0110001100111111, CPU_BASE, 0 },
+    { "IORST", 5, DGN_CTF,  0b0110010110111111, CPU_BASE, 0 },
+    { "HALT",  4, DGN_CTF,  0b0110011000111111, CPU_BASE, 0 },
+    // Hardware Multiply & Divide instructions (52:4)
+    { "MUL",  3, DGN_CT, 0b0111011011000001, CPU_MDV | CPU_NOVA3 | CPU_NOVA4 | CPU_F9445, 0 },
+    { "MULS", 4, DGN_CT, 0b0111111010000001, CPU_NOVA4 | CPU_F9445, 0 },
+    { "DIV",  3, DGN_CT, 0b0111011001000001, CPU_MDV | CPU_NOVA3 | CPU_NOVA4 | CPU_F9445, 0 },
+    { "DIVS", 4, DGN_CT, 0b0111111000000001, CPU_NOVA4 | CPU_F9445, 0 },
+    // Virtual Instructions (56:3)
+    { "SYSCALL", 7, DGN_NULL, 0, CPU_VINST, 0 }, // Used for OS calls on Novix
+    { "SIGN",    4, DGN_NULL, 0, CPU_VINST, 0 }, // Accumulator sign extension
+    { "XOR",     3, DGN_NULL, 0, CPU_VINST, 0 }, // Bitwise Exclusive Or
     // Hardware Floating Point instructions (TODO)
 
-    // Arithmetic & Logic skip conditions (7)
-    { NULL, DGN_SKPC, 3, 01, symint + 50 }, // SKP
-    { NULL, DGN_SKPC, 3, 02, symint + 51 }, // SZC
-    { NULL, DGN_SKPC, 3, 03, symint + 52 }, // SNC
-    { NULL, DGN_SKPC, 3, 04, symint + 53 }, // SZR
-    { NULL, DGN_SKPC, 3, 05, symint + 54 }, // SNR
-    { NULL, DGN_SKPC, 3, 06, symint + 55 }, // SEZ
-    { NULL, DGN_SKPC, 3, 07, symint + 56 }, // SBN
-    // F9445 Arithmetic Instructions (7)
-    { NULL, DGN_CTAA, 2, 0b0110011100000001, symint + 57 }, // OR
-    { NULL, DGN_CT,   4, 0b0110011011000001, symint + 58 }, // NORM
-    { NULL, DGN_CT,   4, 0b0110011000000001, symint + 59 }, // SLLD
-    { NULL, DGN_CT,   4, 0b0111011000000001, symint + 60 }, // SALD
-    { NULL, DGN_CT,   4, 0b0110011010000001, symint + 61 }, // SLRD
-    { NULL, DGN_CT,   4, 0b0110011001000001, symint + 62 }, // SARD
-    { NULL, DGN_CT,   4, 0b0110111011000001, symint + 63 }, // SKNV
-    // F9445 Stack Instructions (7)
-    { NULL, DGN_CT,   4, 0b0111010101000001, symint + 64 }, // PSHF
-    { NULL, DGN_CT,   4, 0b0111010100000001, symint + 65 }, // POPF
-    { NULL, DGN_CT,   4, 0b0111010110000001, symint + 66 }, // POPJ
-    { NULL, DGN_CT,   4, 0b0111010111000001, symint + 67 }, // PSHR
-    { NULL, DGN_CTA,  4, 0b0110001111000001, symint + 68 }, // TOPR
-    { NULL, DGN_CTA,  4, 0b0110001101000001, symint + 69 }, // TOPW
-    { NULL, DGN_CT,   3, 0b0111011010000001, symint + 70 }, // DSP
-    // F9445 CPU Instructions (5)
-    { NULL, DGN_CT,   4, 0b0110111000000001, symint + 71 }, // WAIT
-    { NULL, DGN_CT,   4, 0b0111111001000001, symint + 72 }, // ETRP
-    { NULL, DGN_CT,   4, 0b0111111011000001, symint + 73 }, // DTRP
-    { NULL, DGN_CT,   4, 0b0110111001000001, symint + 74 }, // E64K
-    { NULL, DGN_CT,   4, 0b0110111011000001, symint + 75 }, // D64K
-    // Assembler directives (6)
-    { NULL, ASM_TEXT, 5, 0, symint + 76 }, // .TEXT
-    { NULL, ASM_DATA, 5, 0, symint + 77 }, // .DATA
-    { NULL, ASM_BSS,  4, 0, symint + 78 }, // .BSS
-    { NULL, ASM_ZERO, 5, 0, symint + 79 }, // .ZERO
-    { NULL, ASM_GLOB, 5, 0, symint + 80 }, // .GLOB
-    { NULL, ASM_DEFN, 7, 0, symint + 81 }, // .DEFINE
-    { NULL, ASM_ENT,  4, 0, symint + 82 }, // .ENT
-    { NULL, ASM_WSTR, 5, 0, symint + 83 }, // .WSTR (Word String)
-    // Hardware device aliases (8 so far)
-    { NULL, DGN_HWID, 3, 001, symint + 84 }, // MDV - Multiply & Divide
-    { NULL, DGN_HWID, 3, 002, symint + 85 }, // MAP  - Memory Management Unit
-    { NULL, DGN_HWID, 4, 003, symint + 86 }, // MAP1 - Memory Management Unit (Takes up two slots)
+    // F9445 Arithmetic Instructions (59:7)
+    { "OR",   2, DGN_CTAA, 0b0110011100000001, CPU_F9445, 0 },
+    { "NORM", 4, DGN_CT,   0b0110011011000001, CPU_F9445, 0 },
+    { "SLLD", 4, DGN_CT,   0b0110011000000001, CPU_F9445, 0 },
+    { "SALD", 4, DGN_CT,   0b0111011000000001, CPU_F9445, 0 },
+    { "SLRD", 4, DGN_CT,   0b0110011010000001, CPU_F9445, 0 },
+    { "SARD", 4, DGN_CT,   0b0110011001000001, CPU_F9445, 0 },
+    { "SKNV", 4, DGN_CT,   0b0110111011000001, CPU_F9445 | CPU_NOEMU, 0 },
+    // F9445 Stack Instructions (66:7)
+    { "PSHF", 4, DGN_CT,  0b0111010101000001, CPU_F9445, 0 },
+    { "POPF", 4, DGN_CT,  0b0111010100000001, CPU_F9445, 0 },
+    { "POPJ", 4, DGN_CT,  0b0111010110000001, CPU_F9445, 0 },
+    { "PSHR", 4, DGN_CT,  0b0111010111000001, CPU_F9445, 0 },
+    { "TOPR", 4, DGN_CTA, 0b0110001111000001, CPU_F9445, 0 }, // Conflicts with the Nova 4's PSHN
+    { "TOPW", 4, DGN_CTA, 0b0110001101000001, CPU_F9445, 0 },
+    { "DSP",  4, DGN_CT,  0b0111011010000001, CPU_F9445, 0 },
+    // F9445 CPU Instructions (73:5)
+    { "WAIT", 4, DGN_CT, 0b0110111000000001, CPU_F9445 | CPU_NOEMU, 0 },
+    { "ETRP", 4, DGN_CT, 0b0111111001000001, CPU_F9445 | CPU_NOEMU, 0 },
+    { "DTRP", 4, DGN_CT, 0b0111111011000001, CPU_F9445 | CPU_NOEMU, 0 }, // Disabling traps will break instruction ewmulation
+    { "E64K", 4, DGN_CT, 0b0110111001000001, CPU_F9445 | CPU_NOEMU, 0 },
+    { "D64K", 4, DGN_CT, 0b0110111011000001, CPU_F9445 | CPU_NOEMU, 0 },
+    // Assembler directives (78:6)
+    { ".TEXT",   5, ASM_TEXT, 0, CPU_BASE, 0 },
+    { ".DATA",   5, ASM_DATA, 0, CPU_BASE, 0 },
+    { ".BSS",    4, ASM_BSS,  0, CPU_BASE, 0 },
+    { ".ZERO",   5, ASM_ZERO, 0, CPU_BASE, 0 },
+    { ".GLOB",   5, ASM_GLOB, 0, CPU_BASE, 0 },
+    { ".DEFINE", 7, ASM_DEFN, 0, CPU_BASE, 0 },
+    { ".ENT",    4, ASM_ENT,  0, CPU_BASE, 0 },
+    { ".WSTR",   5, ASM_WSTR, 0, CPU_BASE, 0 },
+    // Hardware device aliases (84:8 so far)
+    { "MDV",  3, DGN_HWID, 001, CPU_BASE, 0 }, // Multiply & Divide Unit
+    { "MAP",  3, DGN_HWID, 002, CPU_BASE, 0 }, // Memory Management Unit
+    { "MAP1", 4, DGN_HWID, 003, CPU_BASE, 0 }, // Memory Management Unit (Takes up two slots)
 
-    { NULL, DGN_HWID, 3, 010, symint + 87 }, // TTI - TTY input
-    { NULL, DGN_HWID, 3, 011, symint + 88 }, // TTO - TTY output
-    { NULL, DGN_HWID, 3, 012, symint + 89 }, // PTR - Paper tape reader
-    { NULL, DGN_HWID, 3, 013, symint + 90 }, // PTP - Paper tape punch
-    { NULL, DGN_HWID, 3, 014, NULL }, // RTC - Real time clock
+    { "TTI", 3, DGN_HWID, 010, CPU_BASE, 0 }, // TTY Input
+    { "TTO", 3, DGN_HWID, 011, CPU_BASE, 0 }, // TTY Output
+    { "PTR", 3, DGN_HWID, 012, CPU_BASE, 0 }, // Paper Tape Reader
+    { "PTP", 3, DGN_HWID, 013, CPU_BASE, 0 }, // Paper Tape Punch
+    { "RTC", 3, DGN_HWID, 014, CPU_BASE, 0 }, // Real Time Clock
 };

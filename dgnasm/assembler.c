@@ -6,7 +6,7 @@ void assemble( char * fpath )
     fp = fpath; // Save file path string
     curline = 0; // Reset current line
     p = NULL; // Set default value for p
-    tk = TOK_EOL; // Set EOL token for readline inint
+    tk = TOK_EOL; // Set EOL token for readline init
     fd = open( fpath, 0 ); // Open file for reading
 
     // Cannot open file
@@ -161,7 +161,7 @@ void assemble( char * fpath )
 
             ntok();
         }
-        else if ( tk >= DGN_IONO && tk <= DGN_CTAA ) // DGNova instruction
+        else if ( tk >= DGN_IONO && tk <= DGN_VIAA ) // DGNova instruction
         {
             int optyp = tk; // Type of instruction
             int opval = tkVal; // The 16 bit instruction
@@ -375,7 +375,7 @@ void assemble( char * fpath )
             // System Control Instruction (CPU, MMU, FPU, etc.)
             else if ( optyp >= DGN_CT && optyp <= DGN_CTAA )
             {
-                if ( optyp == DGN_CTA || optyp == DGN_CTAF || optyp == DGN_CTAA )
+                if ( optyp >= DGN_CTA )
                 {
                     // Get accumulator
                     ntok();
@@ -396,11 +396,51 @@ void assemble( char * fpath )
 
                 ntok();
             }
+            // Virtual Instruction Emulation
+            else if ( optyp >= DGN_VI && optyp <= DGN_VIAA )
+            {
+                if ( optyp >= DGN_VIA )
+                {
+                    // Get accumulator
+                    ntok();
+                    if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an accumulator");
+                    opval |= tkVal << 13;
+
+                    if ( optyp == DGN_VIAA )
+                    {
+                        ntok();
+                        if ( tk != TOK_ARG ) asmfail("expected a comma");
+
+                        // Get second accumulator
+                        ntok();
+                        if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected a second accumulator");
+                        opval |= tkVal << 11;
+                    }
+                }
+
+                if ( btarget & CPU_ETRAP ) // Emulate trap instruction intro
+                {
+                    // STA 3, 046
+                    segset( curseg, SYM_ABS, 054046 );
+                    curseg->data.pos++;
+                }
+
+                ntok();
+            }
+
 
             segset( curseg, oprlc, opval );
 
             // Write out instruction
             curseg->data.pos++;
+
+            // Emulate trap instruction outro
+            if ( optyp >= DGN_VI && optyp <= DGN_VIAA && btarget & CPU_ETRAP )
+            {
+                // JMP@ 47
+                segset( curseg, SYM_ABS, 002057 );
+                curseg->data.pos++;
+            }
         }
         // Assembler .text directive
         else if ( tk == ASM_TEXT ) { curseg = &text; ntok(); }

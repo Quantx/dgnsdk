@@ -1,0 +1,4 @@
+	ADD 0, 3
+	MUL
+	SUB 3, 0
+	POPA 2
