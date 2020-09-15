@@ -309,7 +309,7 @@ void assemble( char * fpath )
                         opval |= disp & 0xFF | 0x100;
                     }
                     // Symbol not in current segment
-                    else
+                    else if ( flags & FLG_DATA )
                     {
                         asmfail("label not in current segment");
                     }

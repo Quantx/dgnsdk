@@ -109,6 +109,7 @@ void ntok()
                     #if DBUG_SYM
                     write( 1, "ASM SYM MATCH:\r\n", 16 );
                     write( 1, insts[k].name, insts[k].len );
+                    write( 1, "\r\n", 2 );
 //                    symwrite( 1, tkInst );
                     #endif
                     return;
@@ -151,6 +152,7 @@ void ntok()
                             #if DBUG_SYM
                             write( 1, "MATH SYM MATCH:\r\n", 17 );
                             write( 1, insts[k].name, insts[k].len );
+                            write( 1, "\r\n", 1 );
 //                            symwrite( 1, tkInst );
                             #endif
 
