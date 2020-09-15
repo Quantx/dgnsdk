@@ -1,5 +1,5 @@
-struct segment zero = { {-1, 0, 0}, {-1, 0, 0} };
-struct segment text = { {-1, 0, 0}, {-1, 0, 0} };
-struct segment cnst = { {-1, 0, 0}, {-1, 0, 0} }; // Read-only data
-struct segment data = { {-1, 0, 0}, {-1, 0, 0} };
-struct segment bss  = { {-1, 0, 0}, {-1, 0, 0} };
+struct segment zero = { -1, 0, 0 },
+               text = { -1, 0, 0 },
+               cnst = { -1, 0, 0 }, // Read-only data
+               data = { -1, 0, 0 },
+               bss  = { -1, 0, 0 };

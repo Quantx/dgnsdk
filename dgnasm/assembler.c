@@ -251,7 +251,7 @@ void assemble( char * fpath )
 
                     // Set mode and displacement
                     opval |= mode << 8;
-                    opval |= disp;
+                    opval |= disp & 0xFF;
                 }
                 else if ( tk == TOK_NAME ) // Label displacement (assembler picks mode)
                 {

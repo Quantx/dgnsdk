@@ -1,14 +1,18 @@
 // File info
-int fd;
+int sfd;
 unsigned int ln; // Current line number
 char * fp; // Name of the file
 
 // Line into
 char * p, * pp;
-char lp[MAX_LINE]; // Current line
+char lp[MAX_LINE]; // Stores current line
 
-int tkVal, cursf = -1;
-struct mccsym * tkSym;
+// What name space are we searching for text tokens
+struct mccnsp * tkNsp = &glbnsp;
+
+// Token information
+int tkVal;
+void * tkPtr;
 unsigned char tk;
 
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
@@ -19,7 +23,7 @@ int readline()
     int i = 0;
 
     // Read data in and scan for newline
-    while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i++] != '\n' );
+    while ( i < MAX_LINE - 1 && read( sfd, lp + i, 1 ) && lp[i++] != '\n' );
     if ( i == MAX_LINE - 1 ) mccfail("readline overflow");
 
     // Null terminate a line if needed
@@ -31,6 +35,42 @@ int readline()
     p = lp;
 
     return i;
+}
+
+int searchNspace( struct mccnsp * sernsp )
+{
+    int i;
+    struct mccsym * cursym;
+    struct mccnsp * curnsp;
+
+    // Check for named symbol
+    for ( cursym = sernsp->symtbl; cursym; cursym = cursym->next )
+    {
+        // Find matching symbol
+        for ( i = 0; i < tkVal && i < cursym->len && cursym->len == pp[i]; i++ );
+        if ( i == tkVal && tkVal == cursym->len )
+        {
+            tk = Symbol;
+            tkPtr = cursym;
+            return 1;
+        }
+    }
+
+    // Check for struct definition
+    for ( curnsp = sernsp->nsptbl; curnsp; curnsp = curnsp->next )
+    {
+        for ( i = 0; i < tkVal && i < curnsp->len && curnsp->len == pp[i]; i++ );
+        if ( i == tkVal && tkVal == curnsp->len )
+        {
+            tk = Nspace;
+            tkPtr = curnsp;
+            return 1;
+        }
+        // Search anonymous child namespaces
+        else if ( curnsp->name && searchNspace( curnsp ) ) return 1;
+    }
+
+    return 0;
 }
 
 void ntok()
@@ -59,13 +99,15 @@ void ntok()
                 continue;
             }
             // Division
-            else if ( *p == '=' ) tk = DivAss;
+            else if ( *p == '=' ) { p++; tk = DivAss; }
             else tk = Div;
             return;
         }
         // Named symbol
         else if ( tk >= 'A' && tk <= 'Z' || tk >= 'a' && tk <= 'z' || tk == '_' )
         {
+            int i;
+
             // Get entire symbol
             while ( ( *p >= 'a' && *p <= 'z'
                    || *p >= 'A' && *p <= 'Z'
@@ -73,15 +115,15 @@ void ntok()
                    || *p == '_' ) ) p++;
 
             if ( p - pp > 255 ) mccfail("named token exceedes max character length");
-            unsigned char toklen = p - pp;
+            tkVal = p - pp;
 
             // Check for reserved word
             tk = Void;
             char * rpos = res_words;
             while ( *rpos )
             {
-                int i = 0;
-                while ( i < toklen && rpos[i] && rpos[i] != ' ' && rpos[i] == pp[i] ) i++;
+                i = 0;
+                while ( i < tkVal && rpos[i] && rpos[i] != ' ' && rpos[i] == pp[i] ) i++;
 
                 if ( rpos[i] == ' ' ) // Match
                 {
@@ -94,49 +136,29 @@ void ntok()
                 tk++;
             }
 
-            int i;
+            if ( !tkNsp ) mccfail("token namespace was null");
 
-            // Check for named symbol
-            tk = Named;
-            tkVal = 0;
-            tkSym = symtbl;
-            while ( tkSym )
+            // Search all parent namespaces
+            i = 0;
+            for ( struct mccnsp * sernsp = tkNsp; sernsp; sernsp = sernsp->parent )
             {
-                // Find matching symbol
-                i = 0;
-                while ( i < toklen && i < symtbl[tkVal].len && symtbl[tkVal].len == pp[i] ) i++;
-                if ( i == toklen && toklen == symtbl[tkVal].len ) return;
+                if ( searchNspace( sernsp ) )
+                {
+                    tkVal = i;
+                    return;
+                }
 
-                tkSym = tkSym->next;
-                tkVal++;
+                i++;
             }
 
-            // New symbol
-            tkSym = sbrk( sizeof(struct mccsym) );
-            if ( tkSym == SBRKFAIL ) mccfail("cannot allocate room for new symbol");
-
-            *symtail = tkSym;
-            symtail = &tkSym->next;
-
-            tkSym->val = 0;
-
-            tkSym->len = toklen;
-            tkSym->type = 0;
-
-            tkSym->indir = 0;
-            tkSym->scope = 0;
-
-            tkSym->members = NULL;
-            tkSym->next = NULL;
-
-            // Allocate name
-            tkSym->name = sbrk( toklen + 1 );
-            if ( tkSym->name == SBRKFAIL ) mccfail("cannot allocate room for new symbol's name");
+            // New user defined Named
+            tk = Named;
+            tkPtr = sbrk( tkVal + 1 );
+            if ( tkPtr == SBRKFAIL ) mccfail("cannot allocate room for new Named");
 
             // Copy name
-            i = 0;
-            while ( i < toklen ) { tkSym->name[i] = pp[i]; i++; }
-            tkSym->name[i] = 0;
+            for ( i = 0; i < tkVal; i++ ) ((char *)tkPtr)[i] = pp[i];
+            ((char *)tkPtr)[i] = 0;
 
             return;
         }
@@ -168,13 +190,14 @@ void ntok()
                 while ( *p >= '0' && *p <= '7' ) tkVal = (tkVal << 3) + *p++ - '0';
             }
 
-            tk = Number;
+            if ( *p == 'l' || *p == 'L' ) { p++; tk = LongNumber; }
+            else tk = Number;
             return;
         }
         else if ( tk == '\'' || tk == '"' ) // Character or String constant
         {
             // Record initial value
-            if ( tk == '"' ) tkVal = cnst.data.pos;
+            if ( tk == '"' ) tkVal = cnst.pos;
             else tkVal = *p;
 
             while ( *p || readline() )
@@ -232,7 +255,7 @@ void ntok()
                 // Write string to cnst segment
                 if ( tk == '"' )
                 {
-                    // TODO
+                    // TODO write string to const segment
                 }
                 else if ( *p != '\'' ) mccfail("Character constant too long");
                 // Record character constant
@@ -241,6 +264,12 @@ void ntok()
 
             // End of input feed
             mccfail("failed to find closing quotation on string");
+        }
+        else if ( tk == '.' )
+        {
+            if ( *p == '.' && p[1] == '.' ) { p += 2; tk = Variadic; }
+            else tk = Dot;
+            return;
         }
         else if ( tk == '=' )
         {
@@ -259,6 +288,7 @@ void ntok()
         {
             if ( *p == '-' ) { p++; tk = Dec; }
             else if ( *p == '=' ) { p++; tk = SubAss; }
+            else if ( *p == '>' ) { p++; tk = Arrow; }
             else tk = Sub;
             return;
         }
@@ -325,7 +355,7 @@ void ntok()
         }
         else if ( tk == '?' ) { tk = Tern; return; }
         else if ( tk == '[' ) { tk = Brak; return; }
-        else if ( tk == ']' || ',' || tk == ';' || tk == ':' || tk == '{' || tk == '}' || tk == '(' || tk == ')' ) return;
+        else if ( tk == ']' || tk == ',' || tk == ';' || tk == ':' || tk == '{' || tk == '}' || tk == '(' || tk == ')' ) return;
     }
 
     tk = 0; // End of input feed

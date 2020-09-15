@@ -2,13 +2,30 @@
 
 unsigned int flags; // Store misc booleans
 unsigned int curfno; // Current file number
-unsigned int entrypos; // Starting address offset within the text segment
 unsigned int stksize; // Additional stack size
 
-struct mccsym * symtbl, ** symtail = &symtbl; // Holds all of the symbols
-struct mccsym * mdltbl, ** mdltail = &mdltbl; // Holds prototype function and struct definitions
+struct mccnsp glbnsp = { NULL, 0, 0, 0, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
 
-void mccfail(char * msg)
+// Output an octal number
+void octwrite( int nfd, unsigned int val )
+{
+    write( nfd, "0", 1 );
+
+    if ( !val ) return;
+
+    char tmpbuf[6];
+    int tmppos = 6;
+
+    while ( val )
+    {
+        tmpbuf[--tmppos] = (val & 7) + '0';
+        val >>= 3;
+    }
+
+    write( nfd, tmpbuf + tmppos, 6 - tmppos );
+}
+
+void mccfail( char * msg )
 {
     int i = 0;
     while ( msg[i] ) i++;
@@ -21,7 +38,7 @@ void mccfail(char * msg)
 #include "tokenizer.c"
 #include "compiler.c"
 
-int main( char ** argv, int argc )
+int main( int argc, char ** argv )
 {
     char * progname = *argv++; argc--;
 

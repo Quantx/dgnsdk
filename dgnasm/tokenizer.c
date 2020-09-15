@@ -257,7 +257,7 @@ void ntok()
         else if ( tk == '@' ) { tk = TOK_INDR; tkVal = 0; return; } // Indirection flag
         else if ( tk == '<' ) { tk = TOK_BYHI; tkVal = 0; return; } // Low  byte pointer flag
         else if ( tk == '>' ) { tk = TOK_BYLO; tkVal = 0; return; } // High byte pointer flag
-        else if ( tk == '+' || tk == '-' ) { tk = TOK_MATH; tkVal = tk == '-'; return; } // Plus or minus
+        else if ( tk == '+' || tk == '-' ) { tkVal = tk == '-'; tk = TOK_MATH; return; } // Plus or minus
         else if ( tk == '"' || tk == '\'' ) // String, double quote is zero terminated
         {
             tkVal = 0;
