@@ -104,8 +104,7 @@ void assemble( char * fpath )
         }
         else if ( tk == TOK_NUM || tk == TOK_MATH ) // Numerical constant
         {
-            unsigned int val = 0;
-            char doNeg;
+            int doNeg, val = tkVal;
 
             // Numerical constant with prefix: -1234 or +1234
             if ( tk == TOK_MATH )
