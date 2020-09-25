@@ -419,8 +419,9 @@ void assemble( char * fpath )
 
                 if ( btarget & CPU_ETRAP ) // Emulate trap instruction intro
                 {
-                    // STA 3, 046
-                    segset( curseg, SYM_ABS, 054046 );
+                    segset( curseg, SYM_ABS, 054046 ); // STA 3, 046
+                    curseg->data.pos++;
+                    segset( curseg, SYM_ABS, 006047 ); // JSR@ 047
                     curseg->data.pos++;
                 }
 
@@ -432,14 +433,6 @@ void assemble( char * fpath )
 
             // Write out instruction
             curseg->data.pos++;
-
-            // Emulate trap instruction outro
-            if ( optyp >= DGN_VI && optyp <= DGN_VIAA && btarget & CPU_ETRAP )
-            {
-                // JMP@ 47
-                segset( curseg, SYM_ABS, 002057 );
-                curseg->data.pos++;
-            }
         }
         // Assembler .text directive
         else if ( tk == ASM_TEXT ) { curseg = &text; ntok(); }
