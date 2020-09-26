@@ -1,57 +1,57 @@
 		.text
-		pc_ptr:		ac0		; Need a temp register to store PC in
+		actbl_ptr:	ac0		; Need a temp register to store PC in
 		ac3_ptr:   	ac3
-		dstsrc_ptr:	dstsrc
 
 viemu:		.glob viemu			; Entry point, stored in 047
 #if TARGET_NOVA < 3
 		; Exchange 046 with AC3
-		STA 3, @pc_ptr			; Save return address
+		STA 3, @actbl_ptr	 	; Save return address
 
 		LDA 3, 046			; Move AC3 into trap_ac3
 		STA 3, @ac3_ptr
 
-		LDA 3, @pc_ptr			; Move return address into 046
+		LDA 3, @actbl_ptr		; Move return address into 046
 		STA 3, 046
 
 		LDA 3, @ac3_ptr			; Recover AC3
 		; System state now mirrors an actual trap instruction
 #endif
 		STA 3, @ac3_ptr			; Save all accumulators
-		LDA 3, ac3_ptr			; Address the rest of the AC save table by ac3_ptr
-		STA 2, -1, 3
-		STA 1, -2, 3
-		STA 0, -3, 3
+		LDA 3, actbl_ptr		; AC3 will contain pointer to actbl for rest of routine
+		STA 0, 0, 3
+		STA 1, 1, 3
+		STA 2, 2, 3
 
 		SUBCL 0, 0			; Store carry
-		STA 0, 1, 3
+		STA 0, 4, 3
 
 		; Compute emutbl offset
 		LDA 0, @046			; Load trap instruction
-		LDA 3, emutbl_mask		; Load trap mask: 11111110
+		LDA 2, emutbl_mask		; Load trap mask: 11111110
 		MOVR 0, 0			; Shift right 3 times
 		MOVR 0, 0
 		MOVR 0, 0
-		ANDZR 0, 3			; AND with mask and shift right final time
+		ANDZR 0, 2			; AND with mask and shift right final time
 		LDA 1, emutbl_ptr
-		ADD 1, 3			; Add offset to start of table
+		ADD 1, 2			; Add offset to start of table
 
 		; Get Destination Accumulator (bits 3 & 4 of trap)
-		LDA 2, ac_mask
-		MOVS 0, 0			; Bits 14-15 now contain DST AC
-		AND 0, 2
-		MOVS 2, 2			; Prepare AC2 for SRC AC
+		LDA 1, ac_mask
+		MOVS 0, 0			; Bits 14-15 now contain DST AC number
+		AND 0, 1			; AC1 now contains DST AC number
+		ADD 3, 1			; AC1 now contains pointer to DST AC
+		STA 1, 8, 3			; Store pointer to DST AC in dac
 
 		; Get Source Accumulator (bits 1 & 2 of trap)
 		LDA 1, ac_mask
 		MOVR 0, 0
-		MOVR 0, 0			; Bits 14-15 now contain SRC AC
-		AND 0, 1			; AC1 now contians SRC AC
-		ADD 1, 2			; AC2 now contains DST AC and SRC AC
-		STA 2, @dstsrc_ptr
+		MOVR 0, 0			; Bits 14-15 now contain SRC AC number
+		AND 0, 1			; AC1 now contians SRC AC  number
+		ADD 3, 1			; AC1 now contains pointer to SRC AC
+		STA 1, 7, 3			; Store pointer to SRC AC in sac
 
 		; Enter trap table
-		JMP 0, 3
+		JMP 0, 2
 emutbl_mask:	0xFE
 ac_mask:	3
 emutbl_ptr:	emutbl
@@ -98,7 +98,8 @@ ac3:		1
 cbit:		1
 stack:		1
 frame:		1
-dstsrc:		1				; Bits 0-7: DST AC, Bits 8-15: SRC AC
+sac:		1				; Points to the source accumulator
+dac:		1				; Points to the destination accumulator
 
 #include "syscall.asm"
 
