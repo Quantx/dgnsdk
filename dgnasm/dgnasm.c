@@ -345,20 +345,13 @@ int main( int argc, char ** argv )
         }
         else
         {
-            // Prime SimH with a single 0 byte block
-            header[0] = -1;
-            header[1] = org;
-            header[2] = 1 - org;
-
-            write( ofd, header, 6 );
-            write( ofd, &i, 2 );
-
             // Send SimH a repeat block to fill out the rest of BSS
-            header[0] = -bss.data.size + 1;
-            header[1] = org + 1;
+            header[0] = -bss.data.size;
+            header[1] = org;
             header[2] = -header[0] - header[2];
 
             write( ofd, header, 6 );
+            write( ofd, &i, 2 );
         }
 
         // Output start block

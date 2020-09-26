@@ -37,11 +37,23 @@ viemu:		.glob viemu			; Entry point, stored in 047
 		MOVR 0, 0
 		MOVR 0, 0
 		ANDR 0, 3			; AND with mask and shift right final time
-		LDA 0, @emutbl_ptr
+		LDA 0, emutbl
 		ADD 0, 3			; Add offset to start of table
 		JMP 0, 3			; Enter table
 emutbl_mask:	0xFE
-emutbl_ptr:	emutbl
+
+emutbl:         ;syscall
+                ; Multiply & Divide instructions
+                mul
+                div
+                ; Nova 3 instructions
+                ; Nova 4 instructions
+                ldb
+                stb
+                muls
+                divs
+                ; F9445 instructions
+                ; Virtual instructions
 
                .bss
 ac0:            1                               ; These registers temp store Nova registers
@@ -52,35 +64,20 @@ cbit:           1
 stack:          1
 frame:          1
 
-		.data
-emutbl:		;syscall
-		; Multiply & Divide instructions
-		mul
-		div
-		; Nova 3 instructions
-		; Nova 4 instructions
-		ldb
-		stb
-		muls
-		divs
-		; F9445 instructions
-		; Virtual instructions
-
 #if TARGET_NOVA < 2
-#include <mul.asm>
-#include <div.asm>
+#include "mul.asm"
+#include "div.asm"
 #else
 		.bss
 mul:		1
 div:		1
 #endif
 
-
-#if TRAGET_NOVA < 4
-#include <ldb.asm>
-#include <stb.asm>
-#include <muls.asm>
-#include <divs.asm>
+#if TARGET_NOVA < 4
+#include "ldb.asm"
+#include "stb.asm"
+#include "muls.asm"
+#include "divs.asm"
 #else
 		.bss
 ldb:		1
