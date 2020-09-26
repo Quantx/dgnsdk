@@ -18,12 +18,12 @@ viemu:		.glob viemu			; Entry point, stored in 047
 #endif
 		STA 3, @ac3_ptr			; Save all accumulators
 		LDA 3, actbl_ptr		; AC3 will contain pointer to actbl for rest of routine
-		STA 0, 0, 3
-		STA 1, 1, 3
-		STA 2, 2, 3
+		STA 0, t_ac0, 3
+		STA 1, t_ac1, 3
+		STA 2, t_ac2, 3
 
 		SUBCL 0, 0			; Store carry
-		STA 0, 4, 3
+		STA 0, t_cbit, 3
 
 		; Compute emutbl offset
 		LDA 0, @046			; Load trap instruction
@@ -40,7 +40,7 @@ viemu:		.glob viemu			; Entry point, stored in 047
 		MOVS 0, 0			; Bits 14-15 now contain DST AC number
 		AND 0, 1			; AC1 now contains DST AC number
 		ADD 3, 1			; AC1 now contains pointer to DST AC
-		STA 1, 8, 3			; Store pointer to DST AC in dac
+		STA 1, t_dac, 3			; Store pointer to DST AC in dac
 
 		; Get Source Accumulator (bits 1 & 2 of trap)
 		LDA 1, ac_mask
@@ -48,7 +48,7 @@ viemu:		.glob viemu			; Entry point, stored in 047
 		MOVR 0, 0			; Bits 14-15 now contain SRC AC number
 		AND 0, 1			; AC1 now contians SRC AC  number
 		ADD 3, 1			; AC1 now contains pointer to SRC AC
-		STA 1, 7, 3			; Store pointer to SRC AC in sac
+		STA 1, t_sac, 3			; Store pointer to SRC AC in sac
 
 		; Enter trap table
 		JMP 0, 2
@@ -100,6 +100,16 @@ stack:		1
 frame:		1
 sac:		1				; Points to the source accumulator
 dac:		1				; Points to the destination accumulator
+
+		.define t_ac0, 0		; Offsets relative from actbl pointers
+		.define t_ac1, 1
+		.define t_ac2, 2
+		.define t_ac3, 3
+		.define t_cbit, 4
+		.define t_stack, 5
+		.define t_frame, 6
+		.define t_sac, 7
+		.define t_dac, 8
 
 #include "syscall.asm"
 

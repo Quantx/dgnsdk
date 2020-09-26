@@ -1,40 +1,24 @@
 		.text
-stb_dstsrc:	dstsrc
-stb_ac_mask:	3
-stb_actbl:	ac0
 stb_bytemask:	0xFF
 
-trap_stb:	LDA 0, @stb_dstsrc
-
-		LDA 1, stb_ac_mask      ; Compute SRC AC
-                AND 0, 1
-                LDA 3, stb_actbl
-                ADD 1, 3
-
-		LDA 3, 0, 3		; Load contents of SRC AC
+trap_stb:	LDA 0, @7, 3		; Load contents of SRC AC into AC0 (AC3 still contains pointer to actbl)
 		LDA 1, stb_bytemask
-		AND 3, 1		; AC1 now contains byte to store
+		AND 1, 0		; AC0 now contains byte to store
 
-		LDA 2, stb_ac_mask	; Compute DST AC
-		MOVS 0, 0
-		AND 0, 2
-		LDA 3, stb_actbl
-		ADD 2, 3
-
-		LDA 3, 0, 3		; Load contents of DST AC
-		MOVZR 3, 3		; Align byte pointer
-		LDA 0, 0, 3		; Load word to store byte in into AC0
-		MOV 3, 3, SNC		; Swap bytes if needed
-		MOVS 0, 0
-		LDA 2, stb_bytemask
-		AND 2, 0
-		ADD 1, 0		; AC0 now contains stored byte
-		MOV 3, 3, SNC		; Carry must be the same as before
-		MOVS 0, 0
-		STA 0, 0, 3		; Store word back into memory
+		LDA 2, @8, 3		; Load contents of DST AC into AC2
+		MOVZR 2, 2		; Align byte pointer
+		LDA 1, 0, 2		; Load word to store byte in into AC1
+		MOV 2, 2, SNC		; Swap bytes if needed
+		MOVS 1, 1
+		LDA 2, stb_bytemask	; We loose the contents of DST AC here
+		AND 2, 1
+		ADD 0, 1		; AC1 now contains stored byte
+		LDA 2, @8, 3		; Load contents of DST AC back into AC2
+		MOVZR 2, 2, SNC		; Align byte pointer and skip switch if needed
+		MOVS 1, 1
+		STA 1, 0, 2		; Store word back into memory
 
                 ; Reset CPU state
-                LDA 3, stb_actbl
                 LDA 0, 4, 3             ; Restore carry
                 MOVR 0, 0
 
