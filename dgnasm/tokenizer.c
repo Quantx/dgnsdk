@@ -173,8 +173,9 @@ void ntok()
                     for ( i = 0; i < toklen && tkSym->name[i] == pp[i]; i++ );
                     if ( i == toklen )
                     {
-                        // Is this a defined value or a symbol
-                        tk = (tkSym->type & SYM_MASK) == SYM_ABS ? TOK_NUM : TOK_NAME;
+                        tk = TOK_NAME;
+                        // Defines are only a number on the second pass
+                        if ( flags & FLG_DATA && (tkSym->type & SYM_MASK) == SYM_ABS ) tk = TOK_NUM;
                         #if DBUG_SYM
                         write( 1, "USER SYM MATCH:\r\n", 17 );
                         symwrite( 1, tkSym );

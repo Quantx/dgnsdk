@@ -312,6 +312,16 @@ void assemble( char * fpath )
                     {
                         asmfail("label not in current segment");
                     }
+
+                    // Might be an undefined .define constant, eat an argument
+                    if ( ~flags & FLG_DATA && tk == TOK_ARG &&
+                    (  (cursym->type & SYM_MASK) == SYM_DEF
+                    || (cursym->type & SYM_MASK) == SYM_ABS ) )
+                    {
+                        ntok();
+                        if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an index mode");
+                        ntok();
+                    }
                 }
             }
             // Arithmetic & Logic Instructions
@@ -447,10 +457,18 @@ void assemble( char * fpath )
         {
             // Get label
             ntok();
-            if ( tk != TOK_NAME ) asmfail("expected a label");
+            if ( flags & FLG_DATA )
+            {
+                // Might be a define constant here
+                if ( tk != TOK_NAME && tk != TOK_NUM ) asmfail("expected a label");
+            }
+            else
+            {
+                if ( tk != TOK_NAME ) asmfail("expected a label");
 
-            // Make label global
-            tkSym->type |= SYM_GLOB;
+                // Make label global
+                tkSym->type |= SYM_GLOB;
+            }
 
             ntok(); // Get comma or next statement
         }
@@ -459,26 +477,39 @@ void assemble( char * fpath )
         {
             // Get label
             ntok();
-            if ( tk != TOK_NAME ) asmfail("expected a label");
+            if ( flags & FLG_DATA )
+            {
+                // Nothing to do here but check tokens
+                if ( tk != TOK_NUM ) asmfail("expected a label"); // Trust me, this makes sense
 
-            // Store ref to symbol
-            struct asmsym * cursym = tkSym;
+                ntok();
+                if ( tk != TOK_ARG ) asmfail("expected a comma");
 
-            // Already defined symbol
-            if ( (cursym->type & SYM_MASK) != SYM_DEF ) asmfail("label already defined");
+                ntok();
+                if ( tk != TOK_NUM ) asmfail("expected a constant value");
+            }
+            else
+            {
+                if ( tk != TOK_NAME ) asmfail("expected a label");
 
-            // Get comma
-            ntok();
-            if ( tk != TOK_ARG ) asmfail("expected a comma");
+                // Store ref to symbol
+                struct asmsym * cursym = tkSym;
 
-            // Get numerical value to assign
-            ntok();
-            if ( tk != TOK_NUM ) asmfail("expected a constant value");
+                // Already defined symbol
+                if ( (cursym->type & SYM_MASK) != SYM_DEF ) asmfail("label already defined");
 
-            // Assign value to absolute symbol
-            cursym->type = SYM_ABS | SYM_GLOB;
-            cursym->val = tkVal;
+                // Get comma
+                ntok();
+                if ( tk != TOK_ARG ) asmfail("expected a comma");
 
+                // Get numerical value to assign
+                ntok();
+                if ( tk != TOK_NUM ) asmfail("expected a constant value");
+
+                // Assign value to absolute symbol
+                cursym->type = SYM_ABS;
+                cursym->val = tkVal;
+            }
             ntok();
         }
         // Assembler .ent directive
