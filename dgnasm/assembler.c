@@ -312,16 +312,6 @@ void assemble( char * fpath )
                     {
                         asmfail("label not in current segment");
                     }
-
-                    // Might be an undefined .define constant, eat an argument
-                    if ( ~flags & FLG_DATA && tk == TOK_ARG &&
-                    (  (cursym->type & SYM_MASK) == SYM_DEF
-                    || (cursym->type & SYM_MASK) == SYM_ABS ) )
-                    {
-                        ntok();
-                        if ( tk != TOK_NUM || tkVal < 0 || tkVal > 3 ) asmfail("expected an index mode");
-                        ntok();
-                    }
                 }
             }
             // Arithmetic & Logic Instructions
@@ -371,13 +361,29 @@ void assemble( char * fpath )
                 }
             }
             // Trap instruction
-            // Needs an 11-bit trap number
+            // Needs an 2 accumulators and a 7-bit trap number
             else if ( optyp == DGN_TRAP )
             {
-                // Ensure this is an 11-bit numerical constant
+                // Get source accumulator
                 ntok();
-                if ( tk != TOK_NUM || tk < 0 || tk > 2047 ) asmfail("invalid trap code");
-                opval |= tkVal < 4;
+                if ( tk != TOK_NUM || tk < 0 || tk > 3 ) asmfail("expected source accumulator");
+                opval |= tkVal << 13;
+
+                ntok();
+                if ( tk != TOK_ARG ) asmfail("expected a comma");
+
+                // Get destination accumulator
+                ntok();
+                if ( tk != TOK_NUM || tk < 0 || tk > 3 ) asmfail("expected destination accumulator");
+                opval |= tkVal << 11;
+
+                ntok();
+                if ( tk != TOK_ARG ) asmfail("epxected a comma");
+
+                // Get 7 bit trap number
+                ntok();
+                if ( tk != TOK_NUM || tk < 0 || tk > 127 ) asmfail("invalid trap code, expected 0 through 127");
+                opval |= tkVal << 4;
 
                 ntok();
             }
@@ -457,59 +463,28 @@ void assemble( char * fpath )
         {
             // Get label
             ntok();
-            if ( flags & FLG_DATA )
-            {
-                // Might be a define constant here
-                if ( tk != TOK_NAME && tk != TOK_NUM ) asmfail("expected a label");
-            }
-            else
-            {
-                if ( tk != TOK_NAME ) asmfail("expected a label");
+            if ( tk != TOK_NAME ) asmfail("expected a label");
 
-                // Make label global
-                tkSym->type |= SYM_GLOB;
-            }
+            // Make label global
+            tkSym->type |= SYM_GLOB;
 
             ntok(); // Get comma or next statement
         }
-        // Assembler .define directive
-        else if ( tk == ASM_DEFN )
+        // Assembler .loc directive
+        else if ( tk == ASM_LOC )
         {
-            // Get label
             ntok();
-            if ( flags & FLG_DATA )
+            if ( tk != TOK_NUM ) asmfail("expected a number");
+
+            while ( tkVal )
             {
-                // Nothing to do here but check tokens
-                if ( tk != TOK_NUM ) asmfail("expected a label"); // Trust me, this makes sense
+                // Don't actually write to bss
+                if ( curseg != &bss ) segset( curseg, SYM_ABS, 0 );
+                curseg->data.pos++;
 
-                ntok();
-                if ( tk != TOK_ARG ) asmfail("expected a comma");
-
-                ntok();
-                if ( tk != TOK_NUM ) asmfail("expected a constant value");
+                tkVal--;
             }
-            else
-            {
-                if ( tk != TOK_NAME ) asmfail("expected a label");
 
-                // Store ref to symbol
-                struct asmsym * cursym = tkSym;
-
-                // Already defined symbol
-                if ( (cursym->type & SYM_MASK) != SYM_DEF ) asmfail("label already defined");
-
-                // Get comma
-                ntok();
-                if ( tk != TOK_ARG ) asmfail("expected a comma");
-
-                // Get numerical value to assign
-                ntok();
-                if ( tk != TOK_NUM ) asmfail("expected a constant value");
-
-                // Assign value to absolute symbol
-                cursym->type = SYM_ABS;
-                cursym->val = tkVal;
-            }
             ntok();
         }
         // Assembler .ent directive

@@ -10,8 +10,12 @@ start:		.ent start
 		LDA 0, viemu_ptr	; Initialize Virtual Instruction Emulation
 		STA 0, 047
 
+		LDA 2, bit_pat
+		MOVOS 2, 3
+
 		LDA 0, lsb_empty_ptr
 		LDA 1, bit_pat_ptr
+
 		LDB 1, 1
 		STB 1, 0
 		HALT

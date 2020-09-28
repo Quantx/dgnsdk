@@ -93,11 +93,30 @@ void declare( struct mccnsp * curnsp, struct mccnsp * nsptype, char ctype, char 
 
         if ( curnsp != &glbnsp && !functype->size && !functype->inder ) mccfail("cannot declare function outside of file scope");
 
+        // Create argument namespace
+        functype->argnsp = sbrk( sizeof(struct mccnsp) );
+        if ( functype->argnsp == SBRKFAIL ) mccfail( "unable to allocate space for func arg namespace" );
+
+        functype->argnsp->name = NULL;
+        functype->argnsp->len = 0;
+
+        functype->argnsp->type = CPL_FUNC;
+        functype->argnsp->size = 0;
+
+        functype->argnsp->symtbl = NULL;
+        functype->argnsp->nsptbl = NULL;
+
+        functype->argnsp->symtail = &functype->argnsp->symtbl;
+        functype->argnsp->nsptail = &functype->argnsp->nsptbl;
+
+        functype->argnsp->parent = curnsp;
+        functype->argnsp->next = NULL;
+
         ntok();
 
         while ( tk != ')' )
         {
-            struct mccnsp * argnsp = NULL;
+            struct mccnsp * ansp = NULL;
 
             if ( tk == Struct || tk == Enum || tk == Union )
             {
@@ -105,7 +124,7 @@ void declare( struct mccnsp * curnsp, struct mccnsp * nsptype, char ctype, char 
 
                 if ( tk != Nspace ) mccfail( "expected namespace" );
 
-                argnsp = tkPtr;
+                ansp = tkPtr;
 
                 ntok();
             }
@@ -162,21 +181,25 @@ void define( struct mccnsp * curnsp )
 
     tkNsp = curnsp;
 
-    // Determine linkage
     ntok();
-    switch ( tk )
-    {
-        case Extern: lnk = LNK_XTRN; ntok(); break;
-        case Static: lnk = LNK_STAT; ntok(); break;
-    }
 
-    // Check storage type
-    switch ( tk ) // Check for storage type
+    if ( curnsp->type == CPL_FILE || curnsp->type == CPL_BLOC )
     {
-        case Auto:     mccfail("file scope storage type 'auto' is invalid");
-        case Const:    ctype |= CPL_TEXT; ntok(); break;
-        case Register: ctype |= CPL_ZERO; ntok(); break;
-        default: ctype |= CPL_DATA;
+        // Determine linkage
+        switch ( tk )
+        {
+            case Extern: lnk = LNK_XTRN; ntok(); break;
+            case Static: lnk = LNK_STAT; ntok(); break;
+        }
+
+        // Check storage type
+        switch ( tk ) // Check for storage type
+        {
+            case Const:    ctype |= CPL_TEXT; ntok(); break;
+            case Register: ctype |= CPL_ZERO; ntok(); break;
+            case Auto:
+            default: ctype |= CPL_DATA;
+        }
     }
 
     if ( tk == Unsigned )
@@ -233,8 +256,8 @@ void define( struct mccnsp * curnsp )
                 struct mccsym * tmpsym = tkPtr;
 
                 tk = Named;
-                tkPtr = tempsym->name;
-                tkVal = tempsym->len;
+                tkPtr = tmpsym->name;
+                tkVal = tmpsym->len;
             }
 
             newnsp = sbrk( sizeof(struct mccnsp) );
@@ -304,6 +327,6 @@ void define( struct mccnsp * curnsp )
     // Process declarations
     while ( tk != ';' )
     {
-        declare( curnsp, ctype, lnk );
+        declare( curnsp, newnsp, ctype, lnk );
     }
 }

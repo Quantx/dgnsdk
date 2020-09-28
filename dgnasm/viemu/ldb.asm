@@ -20,4 +20,4 @@ trap_ldb:	LDA 2, @t_sac, 3	; Load contents of SRC AC (AC3 still holds pointer to
 		LDA 3, t_ac3, 3
 
 		ISZ 046			; Return to address after TRAP
-		JMP 046
+		JMP @046

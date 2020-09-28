@@ -28,4 +28,4 @@ trap_stb:	LDA 0, @7, 3		; Load contents of SRC AC into AC0 (AC3 still contains p
                 LDA 3, 3, 3
 
                 ISZ 046                 ; Return to address after TRAP
-                JMP 046
+                JMP @046

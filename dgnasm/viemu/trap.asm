@@ -1,3 +1,13 @@
+#define t_ac0 0
+#define t_ac1 1
+#define t_ac2 2
+#define t_ac3 3
+#define t_cbit 4
+#define t_stack 5
+#define t_frame 6
+#define t_sac 7
+#define t_dac 8
+
 		.text
 		actbl_ptr:	ac0		; Need a temp register to store PC in
 		ac3_ptr:   	ac3
@@ -12,11 +22,10 @@ viemu:		.glob viemu			; Entry point, stored in 047
 
 		LDA 3, @actbl_ptr		; Move return address into 046
 		STA 3, 046
-
-		LDA 3, @ac3_ptr			; Recover AC3
 		; System state now mirrors an actual trap instruction
-#endif
+#else
 		STA 3, @ac3_ptr			; Save all accumulators
+#endif
 		LDA 3, actbl_ptr		; AC3 will contain pointer to actbl for rest of routine
 		STA 0, t_ac0, 3
 		STA 1, t_ac1, 3
@@ -31,9 +40,9 @@ viemu:		.glob viemu			; Entry point, stored in 047
 		MOVR 0, 0			; Shift right 3 times
 		MOVR 0, 0
 		MOVR 0, 0
-		ANDZR 0, 2			; AND with mask and shift right final time
+		ANDZR 0, 2			; AND with mask and shift right to align trap number in AC2
 		LDA 1, emutbl_ptr
-		ADD 1, 2			; Add offset to start of table
+		ADD 1, 2			; AC2 now contains pointer into trap table
 
 		; Get Destination Accumulator (bits 3 & 4 of trap)
 		LDA 1, ac_mask
@@ -51,11 +60,12 @@ viemu:		.glob viemu			; Entry point, stored in 047
 		STA 1, t_sac, 3			; Store pointer to SRC AC in sac
 
 		; Enter trap table
-		JMP 0, 2
+		JMP @0, 2
 emutbl_mask:	0xFE
 ac_mask:	3
 emutbl_ptr:	emutbl
 
+		.data
 emutbl:		trap_syscall			; 0
 		; Multiply & Divide instructions
 		trap_mul			; 1
@@ -89,6 +99,7 @@ emutbl:		trap_syscall			; 0
 		; Virtual instructions
 		trap_sign			; 26
 		trap_xor			; 27
+		.LOC 120			; Allocate space for rest of table (aprox 128 words)
 
 		.bss
 ac0:		1				; These registers temp store Nova registers
@@ -100,16 +111,6 @@ stack:		1
 frame:		1
 sac:		1				; Points to the source accumulator
 dac:		1				; Points to the destination accumulator
-
-		.define t_ac0, 0		; Offsets relative from actbl pointers
-		.define t_ac1, 1
-		.define t_ac2, 2
-		.define t_ac3, 3
-		.define t_cbit, 4
-		.define t_stack, 5
-		.define t_frame, 6
-		.define t_sac, 7
-		.define t_dac, 8
 
 #include "syscall.asm"
 

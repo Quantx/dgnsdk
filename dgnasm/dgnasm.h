@@ -29,14 +29,14 @@ enum {
     DGN_VIA,  // Virtual Instruction, accumulator
     DGN_VIAA, // Virtual Instruction, two accumulators
 // *** Assembler directive ***
-    ASM_TEXT, // .text   directive
-    ASM_DATA, // .data   directive
-    ASM_BSS,  // .bss    directive
-    ASM_ZERO, // .zero   directive
-    ASM_GLOB, // .glob   directive
-    ASM_DEFN, // .define directive
-    ASM_ENT,  // .ent    directive
-    ASM_WSTR, // .wstr   directive
+    ASM_TEXT, // .text directive
+    ASM_DATA, // .data directive
+    ASM_BSS,  // .bss  directive
+    ASM_ZERO, // .zero directive
+    ASM_GLOB, // .glob directive
+    ASM_LOC,  // .loc  directive
+    ASM_ENT,  // .ent  directive
+    ASM_WSTR, // .wstr directive
 // *** DGNova Constants ***
     DGN_SKPC, // Arithmetic & Logic skip condition
     DGN_HWID, // Nova Hardware ID

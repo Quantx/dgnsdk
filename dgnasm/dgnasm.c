@@ -33,7 +33,7 @@ void octwrite( int nfd, unsigned int val )
 void symwrite( int nfd, struct asmsym * cursym )
 {
     int k = 0;
-    while ( cursym->name[k++] );
+    while ( cursym->name[k] ) k++;
     write( nfd, "NAME: ", 6 );
     write( nfd, cursym->name, k );
 
@@ -67,7 +67,7 @@ void asmfail( char * msg )
         char tmpchr;
 
         // Output current file
-        while ( fp[i++] );
+        while ( fp[i] ) i++;
         write( 2, fp, i );
         write( 2, ":", 1 );
 
@@ -88,13 +88,13 @@ void asmfail( char * msg )
 
     // Output error message
     i = 0;
-    while ( msg[i++] );
+    while ( msg[i] ) i++;
     write( 2, msg, i );
     write( 2, "\r\n", 2 );
 
     // Output current line
     i = 0;
-    while ( lp[i++] );
+    while ( lp[i] ) i++;
     write( 2, lp, i );
 
     // Output curpos indicator
@@ -186,7 +186,7 @@ int main( int argc, char ** argv )
         write( 1, "Labeling file: ", 15 );
 
         i = 0;
-        while ( argv[curfno][i++] );
+        while ( argv[curfno][i] ) i++;
         write( 1, argv[curfno], i );
         write( 1, "\r\n", 2 );
 
@@ -263,7 +263,7 @@ int main( int argc, char ** argv )
         // Output the current file
         write( 1, "Assembling file: ", 17 );
         i = 0;
-        while ( argv[curfno][i++] );
+        while ( argv[curfno][i] ) i++;
         write( 1, argv[curfno], i );
         write( 1, "\r\n", 2 );
 
@@ -321,10 +321,18 @@ int main( int argc, char ** argv )
             else if ( seg == &text ) { org += text.data.size; seg = &data; }
             else seg = NULL;
         }
-
+/*
+        write( 1, "DATA: ", 6 );
+        octwrite( 1, org );
+        write( 1, "\r\n", 2 );
+*/
         org += data.data.size;
         i = 0;
-
+/*
+        write( 1, "BSS: ", 5 );
+        octwrite( 1, org );
+        write( 1, "\r\n", 2 );
+*/
         // Output small BSS segment
         if ( bss.data.size <= 16 )
         {
@@ -348,7 +356,7 @@ int main( int argc, char ** argv )
             // Send SimH a repeat block to fill out the rest of BSS
             header[0] = -bss.data.size;
             header[1] = org;
-            header[2] = -header[0] - header[2];
+            header[2] = bss.data.size - org;
 
             write( ofd, header, 6 );
             write( ofd, &i, 2 );
@@ -357,7 +365,7 @@ int main( int argc, char ** argv )
         // Output start block
         header[0] = 1;
         header[1] = (stksize ? stksize << 10 : 256) + entrypos;
-        header[2] = 0;
+        header[2] = -1 - header[1];
 
         // Should we enable auto-start
         if ( flags & FLG_SMHA ) header[1] |= 0x8000;

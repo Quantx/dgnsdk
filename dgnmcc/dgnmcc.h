@@ -46,12 +46,13 @@ enum
 // |0000|0|000
 // |    | |Namespace type
 
-#define CPL_BLOC 0 // File or Block scope
-#define CPL_STRC 1 // Struct
-#define CPL_UNIN 2 // Union
-#define CPL_ENUM 3 // Enumeration
-#define CPL_FUNC 4 // Function arguments
-#define CPL_VFUNC 5 // Variadic Function arguments
+#define CPL_FILE 0 // File scope
+#define CPL_BLOC 1 // Block scope
+#define CPL_STRC 2 // Struct
+#define CPL_UNIN 3 // Union
+#define CPL_ENUM 4 // Enumeration
+#define CPL_FUNC 5 // Function arguments
+#define CPL_VFUNC 6 // Variadic Function arguments
 #define CPL_NSPACE_MASK 7
 
 // NameSPace
