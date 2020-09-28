@@ -1,5 +1,6 @@
 		.text
 stb_bytemask:	0xFF
+stb_exit:	viemu_exit
 
 trap_stb:	LDA 0, @7, 3		; Load contents of SRC AC into AC0 (AC3 still contains pointer to actbl)
 		LDA 1, stb_bytemask
@@ -18,14 +19,4 @@ trap_stb:	LDA 0, @7, 3		; Load contents of SRC AC into AC0 (AC3 still contains p
 		MOVS 1, 1
 		STA 1, 0, 2		; Store word back into memory
 
-                ; Reset CPU state
-                LDA 0, 4, 3             ; Restore carry
-                MOVR 0, 0
-
-                LDA 0, 0, 3             ; Restore registers
-                LDA 1, 1, 3
-                LDA 2, 2, 3
-                LDA 3, 3, 3
-
-                ISZ 046                 ; Return to address after TRAP
-                JMP @046
+		JMP @stb_exit
