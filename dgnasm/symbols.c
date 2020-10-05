@@ -70,26 +70,26 @@ struct instruct insts[] = {
     { "DIVS", 4, DGN_CT, 0b0111111000000001, CPU_NOVA4 | CPU_F9445, 14 },
     // Virtual Instructions (3)
     { "SYSCALL", 7, DGN_NULL, 0, CPU_VINST, 0 }, // Used for OS calls on Novix
-    { "SIGN",    4, DGN_NULL, 0, CPU_VINST, 26 }, // Accumulator sign extension
-    { "XOR",     3, DGN_NULL, 0, CPU_VINST, 27 }, // Bitwise Exclusive Or
+    { "SIGN",    4, DGN_NULL, 0, CPU_VINST, 25 }, // Accumulator sign extension
+    { "XOR",     3, DGN_NULL, 0, CPU_VINST, 26 }, // Bitwise Exclusive Or
     // Hardware Floating Point instructions (TODO)
 
     // F9445 Arithmetic Instructions (7)
     { "OR",   2, DGN_CTAA, 0b0110011100000001, CPU_F9445, 15 },
-    { "NORM", 4, DGN_CT,   0b0110011011000001, CPU_F9445, 16 },
-    { "SLLD", 4, DGN_CT,   0b0110011000000001, CPU_F9445, 17 },
-    { "SALD", 4, DGN_CT,   0b0111011000000001, CPU_F9445, 18 },
-    { "SLRD", 4, DGN_CT,   0b0110011010000001, CPU_F9445, 19 },
-    { "SARD", 4, DGN_CT,   0b0110011001000001, CPU_F9445, 20 },
+    { "NORM", 4, DGN_CT,   0b0110011011000001, CPU_F9445 | CPU_NOEMU, 0 },
+    { "SLLD", 4, DGN_CT,   0b0110011000000001, CPU_F9445, 16 },
+    { "SALD", 4, DGN_CT,   0b0111011000000001, CPU_F9445, 17 },
+    { "SLRD", 4, DGN_CT,   0b0110011010000001, CPU_F9445, 18 },
+    { "SARD", 4, DGN_CT,   0b0110011001000001, CPU_F9445, 19 },
     { "SKNV", 4, DGN_CT,   0b0110111011000001, CPU_F9445 | CPU_NOEMU, 0 },
     // F9445 Stack Instructions (7)
     { "PSHF", 4, DGN_CT,  0b0111010101000001, CPU_F9445 | CPU_NOEMU, 0 },
     { "POPF", 4, DGN_CT,  0b0111010100000001, CPU_F9445 | CPU_NOEMU, 0 },
-    { "POPJ", 4, DGN_CT,  0b0111010110000001, CPU_F9445, 21 },
-    { "PSHR", 4, DGN_CT,  0b0111010111000001, CPU_F9445, 22 },
-    { "TOPR", 4, DGN_CTA, 0b0110001111000001, CPU_F9445, 23 }, // Conflicts with the Nova 4's PSHN
-    { "TOPW", 4, DGN_CTA, 0b0110001101000001, CPU_F9445, 24 },
-    { "DSP",  4, DGN_CT,  0b0111011010000001, CPU_F9445, 25 },
+    { "POPJ", 4, DGN_CT,  0b0111010110000001, CPU_F9445, 20 },
+    { "PSHR", 4, DGN_CT,  0b0111010111000001, CPU_F9445, 21 },
+    { "TOPR", 4, DGN_CTA, 0b0110001111000001, CPU_F9445, 22 }, // Conflicts with the Nova 4's PSHN
+    { "TOPW", 4, DGN_CTA, 0b0110001101000001, CPU_F9445, 23 },
+    { "DSP",  4, DGN_CT,  0b0111011010000001, CPU_F9445, 24 },
     // F9445 CPU Instructions (5)
     { "WAIT", 4, DGN_CT, 0b0110111000000001, CPU_F9445 | CPU_NOEMU, 0 },
     { "ETRP", 4, DGN_CT, 0b0111111001000001, CPU_F9445 | CPU_NOEMU, 0 },

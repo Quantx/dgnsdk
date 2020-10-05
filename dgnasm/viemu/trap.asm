@@ -100,20 +100,19 @@ emutbl:		trap_syscall			; 0
 		trap_divs			; 14
 		; F9445 instructions
 		trap_or				; 15
-		trap_norm			; 16
-		trap_slld			; 17
-		trap_sald			; 18
-		trap_slrd			; 19
-		trap_sard			; 20
-		trap_popj			; 21
-		trap_pshr			; 22
-		trap_topr			; 23
-		trap_topw			; 24
-		trap_dsp			; 25
+		trap_slld			; 16
+		trap_sald			; 17
+		trap_slrd			; 18
+		trap_sard			; 19
+		trap_popj			; 20
+		trap_pshr			; 21
+		trap_topr			; 22
+		trap_topw			; 23
+		trap_dsp			; 24
 		; Virtual instructions
-		trap_sign			; 26
-		trap_xor			; 27
-		.LOC 120			; Allocate space for rest of table (aprox 128 words)
+		trap_sign			; 25
+		trap_xor			; 26
+		.LOC 101			; Allocate space for rest of table (aprox 128 words)
 
 		.bss
 ac0:		1				; These registers temp store Nova registers
@@ -173,7 +172,6 @@ trap_divs:	1
 
 #if TARGET_NOVA < 5
 #include "or.asm"
-#include "norm.asm"
 #include "slld.asm"
 #include "sald.asm"
 #include "slrd.asm"
@@ -186,7 +184,6 @@ trap_divs:	1
 #else
 		.bss
 trap_or:	1
-trap_norm:	1
 trap_slld:	1
 trap_sald:	1
 trap_slrd:	1
