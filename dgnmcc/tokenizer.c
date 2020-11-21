@@ -7,16 +7,14 @@ char * fp; // Name of the file
 char * p, * pp;
 char lp[MAX_LINE]; // Stores current line
 
-// What name space are we searching for text tokens
-struct mccnsp * tkNsp = &glbnsp;
-
 // Token information
-int tkVal;
-void * tkPtr;
 unsigned char tk;
+int tkVal;
+long tkLong;
+char tkStr[256];
 
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
-char * res_words = "void int short char float long enum struct union auto static register const extern signed unsigned if else case default break continue return for while do sizeof";
+char * res_words = "void int short char float long enum struct union auto static register const extern signed unsigned if else case default break continue return for while do goto sizeof";
 
 int readline()
 {
@@ -35,42 +33,6 @@ int readline()
     p = lp;
 
     return i;
-}
-
-int searchNspace( struct mccnsp * sernsp )
-{
-    int i;
-    struct mccsym * cursym;
-    struct mccnsp * curnsp;
-
-    // Check for named symbol
-    for ( cursym = sernsp->symtbl; cursym; cursym = cursym->next )
-    {
-        // Find matching symbol
-        for ( i = 0; i < tkVal && i < cursym->len && cursym->len == pp[i]; i++ );
-        if ( i == tkVal && tkVal == cursym->len )
-        {
-            tk = Symbol;
-            tkPtr = cursym;
-            return 1;
-        }
-    }
-
-    // Check for struct definition
-    for ( curnsp = sernsp->nsptbl; curnsp; curnsp = curnsp->next )
-    {
-        for ( i = 0; i < tkVal && i < curnsp->len && curnsp->len == pp[i]; i++ );
-        if ( i == tkVal && tkVal == curnsp->len )
-        {
-            tk = Nspace;
-            tkPtr = curnsp;
-            return 1;
-        }
-        // Search anonymous child namespaces
-        else if ( curnsp->name && searchNspace( curnsp ) ) return 1;
-    }
-
-    return 0;
 }
 
 void ntok()
@@ -136,41 +98,22 @@ void ntok()
                 tk++;
             }
 
-            if ( !tkNsp ) mccfail("token namespace was null");
-
-            // Search all parent namespaces
-            i = 0;
-            for ( struct mccnsp * sernsp = tkNsp; sernsp; sernsp = sernsp->parent )
-            {
-                if ( searchNspace( sernsp ) )
-                {
-                    tkVal = i;
-                    return;
-                }
-
-                i++;
-            }
-
-            // New user defined Named
+            // User defined Named
             tk = Named;
-            tkPtr = sbrk( tkVal + 1 );
-            if ( tkPtr == SBRKFAIL ) mccfail("cannot allocate room for new Named");
-
-            // Copy name
-            for ( i = 0; i < tkVal; i++ ) ((char *)tkPtr)[i] = pp[i];
-            ((char *)tkPtr)[i] = 0;
+            for ( i = 0; i < tkVal; i++ ) tkStr[i] = pp[i];
+            tkStr[i] = 0;
 
             return;
         }
         // Numerical constant
         else if ( tk >= '0' && tk <= '9' )
         {
-            tkVal = 0;
+            tkLong = 0;
 
             if ( tk != '0' ) // Decimal
             {
-                tkVal = tk - '0';
-                while ( *p >= '0' && *p <= '9' ) tkVal = tkVal * 10 + *p++ - '0';
+                tkLong = tk - '0';
+                while ( *p >= '0' && *p <= '9' ) tkLong = (tkLong << 3) + tkLong + tkLong + *p++ - '0';
             }
             else if ( *p == 'x' || *p == 'X' ) // Hexadecimal
             {
@@ -178,18 +121,19 @@ void ntok()
                 while ( *p >= '0' && *p <= '9'
                      || *p >= 'a' && *p <= 'f'
                      || *p >= 'A' && *p <= 'F' )
-                    tkVal = (tkVal << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
+                    tkLong = (tkLong << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
             }
             else if ( *p == 'b' || *p == 'B' ) // Binary
             {
                 p++;
-                while ( *p == '0' || *p == '1' ) tkVal = (tkVal << 1) + *p++ - '0';
+                while ( *p == '0' || *p == '1' ) tkLong = (tkLong << 1) + *p++ - '0';
             }
             else // Octal
             {
-                while ( *p >= '0' && *p <= '7' ) tkVal = (tkVal << 3) + *p++ - '0';
+                while ( *p >= '0' && *p <= '7' ) tkLong = (tkLong << 3) + *p++ - '0';
             }
 
+            tkVal = (int)tkLong;
             if ( *p == 'l' || *p == 'L' ) { p++; tk = LongNumber; }
             else tk = Number;
             return;
@@ -279,14 +223,14 @@ void ntok()
         }
         else if ( tk == '+' )
         {
-            if ( *p == '+' ) { p++; tk = Inc; }
+            if ( *p == '+' ) { p++; tk = PostInc; }
             else if ( *p == '=' ) { p++; tk = AddAss; }
             else tk = Add;
             return;
         }
         else if ( tk == '-' )
         {
-            if ( *p == '-' ) { p++; tk = Dec; }
+            if ( *p == '-' ) { p++; tk = PostDec; }
             else if ( *p == '=' ) { p++; tk = SubAss; }
             else if ( *p == '>' ) { p++; tk = Arrow; }
             else tk = Sub;
@@ -353,9 +297,14 @@ void ntok()
             else tk = Mul;
             return;
         }
-        else if ( tk == '?' ) { tk = Tern; return; }
         else if ( tk == '[' ) { tk = Brak; return; }
-        else if ( tk == ']' || tk == ',' || tk == ';' || tk == ':' || tk == '{' || tk == '}' || tk == '(' || tk == ')' ) return;
+        else if ( tk == '?' ) { tk = Tern; return; }
+        else if ( tk == ':'
+               || tk == ','
+               || tk == ';'
+               || tk == ']'
+               || tk == '{' || tk == '}'
+               || tk == '(' || tk == ')' ) return;
     }
 
     tk = 0; // End of input feed

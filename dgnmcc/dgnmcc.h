@@ -1,9 +1,11 @@
 #include "../lib/novanix.h"
 #include "../lib/a.out.h"
 
-#define MAX_LINE 256  // Maximum number of tokens per file line
-#define MAX_STR  256  // Maximum length of user defined strings
-#define PAGESIZE 1024 // 2 KB (1 KW) of memory (1 mmu page)
+#define MAX_LINE      256  // Maximum number of tokens per file line
+#define MAX_STR       256  // Maximum length of user defined strings
+#define PAGESIZE      1024 // 2 KB (1 KW) of memory (1 mmu page)
+#define MAX_EXPR_OPER 64   // Maximum size of the expression operator stack
+#define MAX_EXPR_NODE 256  // Maximum size of the expression node stack
 
 // +--------------+
 // | TOKEN VALUES |
@@ -11,11 +13,9 @@
 // Start at 128 so that we don't overlap ASCII tokens
 enum
 {
-    Number = 128, LongNumber, // Numerical constant in source
-    Named, Symbol, Nspace, // User defined symbols/types
 // ******* Reserved words *******
     // *** Specifiers and qualifiers ***
-    Void, Int, Short, Char, Float, Long, // Storage types
+    Void = 128, Int, Short, Char, Float, Long, // Storage types
     Enum, Struct, Union, // Data structures
     Auto, Static, Register, Const, // Storage classes
     Extern, Signed, Unsigned, // Storage Qualifiers
@@ -23,7 +23,13 @@ enum
     If, Else, Case, Default, // Branch
     Break, Continue, Return, // Terminate
     For, While, Do, // Loops
-    Sizeof, Variadic, // Compiler
+    Goto, // Blasphemy
+    Sizeof, // Technically an operator
+// ******* Misc *******
+    Variadic,
+// ******* Expression tokens *******
+    Number, LongNumber, // Numerical constant in source
+    Named, //Symbol, Nspace, // User defined symbols/types
 // ******* Operators *******
     Ass, AddAss, SubAss, MulAss, DivAss, ModAss, ShlAss, ShrAss, AndAss, XorAss, OrAss, // Assignment Operators
     Tern, // Ternary Conditional
@@ -37,23 +43,27 @@ enum
     Shl, Shr, // Bitshift left and right
     Add, Sub, // Addition and Subtraction
     Mul, Div, Mod, // Multiplication, Division, Modulus
-    LogNot, Not, Inc, Dec, // Logical not, bitwise not, increment and decrement
-    Brak, Dot, Arrow // Square bracket (array access), Dot (structure access), Arrow (structure access via pointer)
+    LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Logical not, bitwise not, increment, decrement
+    Brak, Dot, Arrow, PostInc, PostDec // Open square bracket (array access), Dot (structure access), Arrow (structure access via pointer)
 };
 
-// Namespace attributes bitmask
+/* Namespace attributes bitmask
 
-// |0000|0|000
-// |    | |Namespace type
+|0000|0|000
+|    | |Namespace type
+|    |Defined flag
 
-#define CPL_FILE 0 // File scope
-#define CPL_BLOC 1 // Block scope
-#define CPL_STRC 2 // Struct
-#define CPL_UNIN 3 // Union
-#define CPL_ENUM 4 // Enumeration
-#define CPL_FUNC 5 // Function arguments
-#define CPL_VFUNC 6 // Variadic Function arguments
+*/
+
+#define CPL_BLOC 0 // Block scope
+#define CPL_STRC 1 // Struct
+#define CPL_UNIN 2 // Union
+#define CPL_ENUM 3 // Enumeration
+#define CPL_FUNC 4 // Function arguments
+#define CPL_VFUNC 5 // Variadic Function arguments
 #define CPL_NSPACE_MASK 7
+
+#define CPL_DEFN 8 // Defined flag
 
 // NameSPace
 struct mccnsp
@@ -72,22 +82,43 @@ struct mccnsp
     struct mccnsp * next; // Next namespace in this list
 };
 
-struct mccfunc
+/* Type example (because I keep forgetting)
+
+int (*test)();
+
+mccsym->name = test;
+mccsym->ptype = int;
+
+mccsym->type = mcctype1
+
+mcctype1->inder = 1
+mcctype1->type = mcctype2
+
+mcctype2->ftype = mccnsp
+
+*/
+
+// Type information
+struct mcctype
 {
-    unsigned int size; // Function array size
-    unsigned char inder; // Number of indirections
+    // Total number of indirections = inder + arrays;
+    unsigned char inder; // Number of inderections
+    unsigned char arrays; // Number of sizes
 
-    unsigned char argc;
+    unsigned int * sizes; // List of array sizes
 
-    struct mccnsp * argnsp; // Argument namespace
+    struct mccnsp * ftype; // Function namespace (NULL if not a function)
+    struct mcctype * type; // Sub type
 };
 
-// Data type bitmask
+/* Data type bitmask
 
-// |00|0|00|000
-// |  | |  |Primative datatype
-// |  | |Storage type
-// |  |Extern flag
+|0|0|00|0000
+| | |  |Primative datatype
+| | |Storage type
+| |Extern flag
+
+*/
 
 #define CPL_VOID 0  // ( 0 bits) Void
 #define CPL_CHR  1  // ( 8 bits) Signed Character
@@ -96,30 +127,19 @@ struct mccfunc
 #define CPL_UINT 4  // (16 bits) Unsigned Integer
 #define CPL_LNG  5  // (32 bits) Signed Long
 #define CPL_ULNG 6  // (32 bits) Unsigned Long
-#define CPL_FPV  7  // (32 bits) Float
-#define CPL_DTYPE_MASK 7 // Mask
+#define CPL_FPV  7  // (32 bits) DG Nova Float
+#define CPL_DBL  8  // (64 bits) DG Nova Double
+#define CPL_DTYPE_MASK 8 // Mask
 
 // C Storage types
-#define CPL_TEXT 0 << 3 // Text (write only) (functions and constants)
-#define CPL_ZERO 1 << 3 // Zero page (register)
-#define CPL_DATA 2 << 3 // Data (static)
-#define CPL_STAK 3 << 3 // Stack (dynamic)
-#define CPL_STORE_MASK 3 << 3 // Mask
+#define CPL_TEXT 0 << 4 // Text (write only) (functions and constants)
+#define CPL_ZERO 1 << 4 // Zero page (register)
+#define CPL_DATA 2 << 4 // Data (static)
+#define CPL_STAK 3 << 4 // Stack (dynamic)
+#define CPL_STORE_MASK 3 << 4 // Mask
 
 // C Storage qualifiers
-#define CPL_XTRN 1 << 5 // Extern flag
-
-struct mcctype
-{
-    unsigned char type; // Primative type data
-    unsigned char inder; // Number of inderections (in addition to the one implied by size)
-
-    unsigned int size; // Number of elements in array (anything but 0 implies one level of inderection)
-
-    struct mccfunc * ftype; // NULL if not a function
-
-    struct mccnsp * stype; // Struct type (Overrides primative datatype)
-};
+#define CPL_XTRN 1 << 6 // Extern flag
 
 // Symbol
 struct mccsym
@@ -127,9 +147,29 @@ struct mccsym
     char * name;
     unsigned char len;
 
-    struct mcctype type; // What type is this symbol?
+    unsigned char ptype; // Primative datatype
+    struct mccnsp * stype; // Struct type
+
+    unsigned int addr;
+
+    struct mcctype type; // Complex type information
 
     struct mccsym * next; // Store the next symbol in the table
+};
+
+// Tree node
+struct mccnode
+{
+    unsigned char type; // What operation or datatype does this node represent
+
+    // Either a constant value, or a symbol
+    union {
+        unsigned int val;
+        unsigned long valLong;
+        struct mccsym * sym;
+    };
+
+    struct mccnode * left, * right;
 };
 
 // Store a data segment

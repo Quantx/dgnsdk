@@ -4,7 +4,7 @@ unsigned int flags; // Store misc booleans
 unsigned int curfno; // Current file number
 unsigned int stksize; // Additional stack size
 
-struct mccnsp glbnsp = { NULL, 0, 0, CPL_FILE, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
+struct mccnsp glbnsp = { NULL, 0, 0, CPL_BLOC, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
 
 // Output an octal number
 void octwrite( int nfd, unsigned int val )
@@ -36,6 +36,8 @@ void mccfail( char * msg )
 
 #include "segments.c"
 #include "tokenizer.c"
+#include "symbols.c"
+#include "expression.c"
 #include "compiler.c"
 
 int main( int argc, char ** argv )

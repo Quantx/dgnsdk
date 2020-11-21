@@ -7,169 +7,104 @@ void compile()
     }
 }
 
-void declare( struct mccnsp * curnsp, struct mccnsp * nsptype, char ctype, char lnk )
+void declare( struct mccsym * cursym, struct mcctype * curtype )
 {
-    // Count number of inderections
-    unsigned char aster = 0;
-    while ( tk == Mul ) { aster++; ntok(); }
+    // Initialize type
+    curtype->inder = 0;
+    curtype->arrays = 0;
 
-    struct mccfunc * functype = NULL;
+    curtype->sizes = NULL;
 
-    if ( tk == '(' ) // Function pointer declaration
+    curtype->ftype = NULL;
+    curtype->type = NULL;
+
+    // Get number of indirects
+    while ( tk == Mul ) { curtype->inder++; ntok(); }
+
+    // Get any subtypes
+    if ( tk == '(' )
     {
-        functype = sbrk( sizeof(struct mccfunc) );
-        if ( functype == SBRKFAIL ) mccfail( "unable to allocate space for func ptr type" );
+        curtype->type = sbrk( sizeof(struct mcctype) );
+        if ( curtype->type == SBRKFAIL ) mccfail("unable to allocate space for subtype");
 
-        functype->size = 0;
-        functype->inder = 0;
-        functype->argc = 0;
+        declare( cursym, curtype->type );
 
-        functype->argnsp = NULL;
+        if ( tk != ')' ) mccfail("expected closing parenthasis");
+    }
+    // Get symbol name
+    else if ( tk != Named ) mccfail("expected declaration name");
+    else
+    {
+        // Allocate room for symbol name
+        cursym->name = sbrk( tkVal );
+        if ( cursym->name == SBRKFAIL ) mccfail("unable to allocate space for symbol name");
 
-        ntok();
-        while ( tk == Mul ) { functype->inder++; ntok(); }
+        // Copy symbol name
+        int i;
+        for ( i = 0; i < tkVal; i++ ) cursym->name[i] = tkStr[i];
+        cursym->len = tkVal;
     }
 
-    if ( tk == Nspace ) // mccfail( "tried to use a struct type as a symbol" );
-    if ( tk == Symbol ) // mccfail( "symbol already declared" );
-    if ( tk != Named  ) mccfail( "expected name in declaration" );
-
-    struct mccsym * cursym = sbrk( sizeof(struct mccsym) );
-    if ( cursym == SBRKFAIL ) mccfail( "unable to allocate space for new symbol" );
-
-    cursym->name = tkPtr;
-    cursym->len = tkVal;
-
-    cursym->type.type = ctype; // Record type information
-    cursym->type.inder = aster; // Record number of inderections
-
-    cursym->type.ftype = functype; // Record function information
-    cursym->type.stype = curnsp; // Record if this is a struct or not
-
-    ntok();
-
-    if ( functype || tk == '(' ) // Function declaration
+    // Get array declarations
+    if ( tk == '[' )
     {
-        if ( functype )
+        // Point sizes to end of current program break
+        curtype->sizes = sbrk(0);
+
+        while ( tk == '[' )
         {
-            if ( tk == Brak )
-            {
-                ntok();
+            unsigned int * cas = sbrk( sizeof(unsigned int) );
+            if ( cas == SBRKFAIL ) mccfail("unable to allocate space for array size");
 
-                if ( tk == Number )
-                {
-                    if ( tkVal <= 0 ) mccfail( "func ptr array size must be at least 1" );
+            // TODO resolve constant expression and store into 'cas'
 
-                    functype->size = tkVal;
+            curtype->arrays++;
 
-                    ntok();
-                }
-                else if ( tk == ']' ) functype->size = 1;
-
-                if ( tk != ']' ) mccfail( "expected closing bracket on func ptr array" );
-
-                ntok();
-            }
-
-            if ( tk != ')' ) mccfail( "expected closing parenthasis" );
-
-            ntok();
-
-            if ( tk != '(' ) mccfail( "expected func args following func ptr" );
+            if ( tk != ']' ) mccfail("expected closing bracket");
         }
-        else // Function definition
-        {
-            functype = sbrk( sizeof(struct mccfunc) );
-            if ( functype == SBRKFAIL ) mccfail( "unable to allocate space for func definition" );
+    }
+    else if ( tk == '(' ) // Get function declarations
+    {
+        struct mccnsp * curnsp = curtype->ftype = sbrk( sizeof(struct mccnsp) );
 
-            functype->size = 0;
-            functype->inder = 0;
-            functype->argc = 0;
+        curnsp->name = NULL;
+        curnsp->len = 0;
 
-            functype->argnsp = NULL;
+        curnsp->type = CPL_FUNC;
 
-            cursym->type.ftype = functype;
-        }
+        curnsp->size = 0;
 
-        if ( curnsp != &glbnsp && !functype->size && !functype->inder ) mccfail("cannot declare function outside of file scope");
+        curnsp->symtbl = NULL;
+        curnsp->nsptbl = NULL;
 
-        // Create argument namespace
-        functype->argnsp = sbrk( sizeof(struct mccnsp) );
-        if ( functype->argnsp == SBRKFAIL ) mccfail( "unable to allocate space for func arg namespace" );
+        curnsp->symtail = &curnsp->symtbl;
+        curnsp->nsptail = &curnsp->nsptbl;
 
-        functype->argnsp->name = NULL;
-        functype->argnsp->len = 0;
-
-        functype->argnsp->type = CPL_FUNC;
-        functype->argnsp->size = 0;
-
-        functype->argnsp->symtbl = NULL;
-        functype->argnsp->nsptbl = NULL;
-
-        functype->argnsp->symtail = &functype->argnsp->symtbl;
-        functype->argnsp->nsptail = &functype->argnsp->nsptbl;
-
-        functype->argnsp->parent = curnsp;
-        functype->argnsp->next = NULL;
+        curnsp->parent = NULL;
+        curnsp->next = NULL;
 
         ntok();
-
         while ( tk != ')' )
         {
-            struct mccnsp * ansp = NULL;
-
-            if ( tk == Struct || tk == Enum || tk == Union )
+            // This is a variadic function
+            if ( tk == Variadic )
             {
-                ntok();
-
-                if ( tk != Nspace ) mccfail( "expected namespace" );
-
-                ansp = tkPtr;
+                curnsp->type = CPL_VFUNC;
 
                 ntok();
+                if ( tk != ')' ) mccfail("expected closing parenthasis");
+                break;
             }
 
-            unsigned char argaster = 0;
-            while ( tk == Mul ) { argaster++; ntok(); }
+            define( curnsp );
 
-            // TODO read in arguments
+            if ( tk == ',' ) ntok();
+            else if ( tk != ')' ) mccfail("expected closing parenthasis");
         }
+
+        // Mark as defined (shouldn't really matter)
+        curnsp->type |= CPL_DEFN;
     }
-    else if ( tk == '=' ) // Assignment
-    {
-        ntok();
-
-        if ( tk == '{' )
-        {
-            while ( tk != '}' )
-            {
-
-            }
-        }
-        else if ( tk != Number ) mccfail("expected constant value");
-
-        ntok();
-    }
-    else if ( tk == Brak ) // Array declaration
-    {
-        ntok();
-        if ( tk == Number )
-        {
-            if ( tkVal <= 0 ) mccfail( "array size must be at least 1" );
-
-            cursym->type.size = tkVal;
-
-            ntok();
-        }
-        else if ( tk == ']' ) cursym->type.size = 1;
-
-        if ( tk != ']' ) mccfail( "expected constant value" );
-
-        ntok();
-    }
-
-    if ( tk == ',' ) ntok();
-    else if ( tk != ';' ) mccfail( "expected comma or end of declaration" );
 }
 
 // (extern|static) (const|register) (signed|unsigned) <void|char|int|...etc>
@@ -179,11 +114,9 @@ void define( struct mccnsp * curnsp )
     #define LNK_STAT 2
     unsigned char ctype = 0, cnsp = 0, lnk = 0;
 
-    tkNsp = curnsp;
-
     ntok();
 
-    if ( curnsp->type == CPL_FILE || curnsp->type == CPL_BLOC )
+    if ( (curnsp->type & CPL_NSPACE_MASK) == CPL_BLOC )
     {
         // Determine linkage
         switch ( tk )
@@ -198,7 +131,7 @@ void define( struct mccnsp * curnsp )
             case Const:    ctype |= CPL_TEXT; ntok(); break;
             case Register: ctype |= CPL_ZERO; ntok(); break;
             case Auto:
-            default: ctype |= CPL_DATA;
+            default: ctype |= curnsp == &glbnsp ? CPL_DATA : CPL_STAK;
         }
     }
 
@@ -247,54 +180,36 @@ void define( struct mccnsp * curnsp )
     // Get struct name or anonymous definition
     if ( cnsp & CPL_NSPACE_MASK )
     {
-        int scope = -1;
-
-        if ( tk == Named || tk == Symbol ) // New struct
+        if ( tk == Named || tk == '{' )
         {
-            if ( tk == Symbol )
+            if ( tk == Named )
             {
-                struct mccsym * tmpsym = tkPtr;
-
-                tk = Named;
-                tkPtr = tmpsym->name;
-                tkVal = tmpsym->len;
+                newnsp = getNamespace( curnsp, tkStr, tkVal );
             }
 
-            newnsp = sbrk( sizeof(struct mccnsp) );
-            if ( newnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
-
-            // Name of the namespace
-            newnsp->name = tkPtr;
-            newnsp->len = tkVal;
-
-            ntok();
-        }
-        else if ( tk == Nspace ) // Existing struct
-        {
-            newnsp = tkPtr;
-            scope = tkVal;
-            ntok();
-        }
-        else if ( tk != '{' ) mccfail("expected struct name or anonymous struct definition");
-
-        // Struct definition
-        if ( tk == '{' )
-        {
-            if ( scope > 0 ) // Create a new struct in this scope
+            if ( !newnsp ) // Generate new struct
             {
-                struct mccnsp * tmpnsp = newnsp;
-
                 newnsp = sbrk( sizeof(struct mccnsp) );
                 if ( newnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
 
-                // Copy name
-                for ( int i = 0; i < tmpnsp->len; i++ ) newnsp->name[i] = tmpnsp->name[i];
-                newnsp->len = tmpnsp->len;
-            }
+                if ( tk == Named )
+                {
+                    // Copy name
+                    newnsp->name = sbrk( tkVal );
+                    if ( newnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
 
-            if ( !scope ) mccfail("struct already defined at this scope");
-            else // Setup rest of struct
-            {
+                    int i;
+                    for ( i = 0; i < tkVal; i++ ) newnsp->name[i] = tkStr[i];
+                    newnsp->len = tkVal;
+
+                    ntok();
+                }
+                else // Anonymous struct
+                {
+                    newnsp->name = NULL;
+                    newnsp->len = 0;
+                }
+
                 // Record namespace type
                 newnsp->type = cnsp;
 
@@ -313,20 +228,84 @@ void define( struct mccnsp * curnsp )
                 *curnsp->nsptail = newnsp;
                 curnsp->nsptail = &newnsp->next;
             }
+            // Type check existing struct
+            else if ( (newnsp->type & CPL_NSPACE_MASK) != (cnsp & CPL_NSPACE_MASK) ) mccfail("struct type missmatch");
+        }
+        else mccfail("expected struct name or anonymous struct definition");
 
-            while ( tk != '}' )
+        // Struct definition
+        if ( tk == '{' )
+        {
+            // Don't redfine things
+            if ( newnsp->type & CPL_DEFN ) mccfail("struct redefinition");
+            newnsp->type |= CPL_DEFN;
+
+            if ( cnsp == CPL_ENUM )
             {
-                define(newnsp);
+                while ( tk != '}' )
+                {
+                    ntok();
+                    if ( tk != Named ) mccfail("expected named symbol");
+                }
+            }
+            else
+            {
+                while ( tk != '}' )
+                {
+                    define(newnsp);
+                }
             }
 
-            tkNsp = curnsp;
-            ntok(); // Discard last }
+            ntok(); // Discard last
         }
     }
 
-    // Process declarations
     while ( tk != ';' )
     {
-        declare( curnsp, newnsp, ctype, lnk );
+        /*
+        Allocate new symbol
+
+        Used for type checking with an existing symbol
+        It will be deallocated later if it already exists
+        Count number of inderections
+        */
+
+        struct mccsym * cursym = sbrk( sizeof(struct mccsym) );
+        if ( cursym == SBRKFAIL ) mccfail( "unable to allocate space for new symbol" );
+
+        cursym->name = NULL;
+        cursym->len = 0;
+
+        cursym->ptype = ctype; // Record primative datatype
+        cursym->stype = curnsp; // Record if this is a struct or not
+
+        cursym->addr = 0;
+
+        cursym->next = NULL;
+
+        // Process type information
+        declare( cursym, &cursym->type );
+
+        // TODO check if new declaration matches an existing one
+
+        // Function declaration
+        if ( cursym->type.ftype && tk == '{' )
+        {
+            if ( cursym->type.ftype->type & CPL_DEFN ) mccfail("function already declared");
+
+            ntok();
+            while ( tk != '}' )
+            {
+
+            }
+
+            ntok();
+        }
+
+        // Only declare one variable per definition
+        if ( (curnsp->type & CPL_NSPACE_MASK) == CPL_FUNC
+          || (curnsp->type & CPL_NSPACE_MASK) == CPL_VFUNC ) break;
+        else if ( tk == ',' ) ntok();
+        else if ( tk != ';' ) mccfail("expected comma or semi-colon");
     }
 }

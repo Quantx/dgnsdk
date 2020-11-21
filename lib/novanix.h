@@ -12,4 +12,5 @@ int close(int fd);
 int  read(int fd, void * buf, unsigned int count);
 int write(int fd, void * buf, unsigned int count);
 void * sbrk(int inc);
+int brk(void * addr);
 #define SBRKFAIL (void *)-1
