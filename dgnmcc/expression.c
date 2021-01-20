@@ -163,7 +163,21 @@ struct mccnode * expr(struct mccnsp * curnsp)
         }
         else
         {
-            // Remember: '(' has a prec of -1
+            // Convert to unary operators as needed
+            if (mode)
+            {
+                switch (tk)
+                {
+                    case PostInc: tk = PreInc; break;
+                    case PostDec: tk = PreDec; break;
+                    case Add: tk = Plus; break;
+                    case Sub: tk = Minus; break;
+                    case Mul: tk = Deref; break;
+                    case And: tk = Inder; break;
+                }
+            }
+
+            // Remember: '(' and '[' has a prec of -1
             prec = getPrec(tk);
             while ( otop && getPrec(ostk[otop - 1]) >= prec )
             {
@@ -205,20 +219,6 @@ struct mccnode * expr(struct mccnsp * curnsp)
                 }
 
                 nstk[ntop++] = n;
-            }
-
-            // Convert to unary operators as needed
-            if (mode)
-            {
-                switch (tk)
-                {
-                    case PostInc: tk = PreInc; break;
-                    case PostDec: tk = PreDec; break;
-                    case Add: tk = Plus; break;
-                    case Sub: tk = Minus; break;
-                    case Mul: tk = Deref; break;
-                    case And: tk = Inder; break;
-                }
             }
 
 #ifdef DEBUG_EXPR
