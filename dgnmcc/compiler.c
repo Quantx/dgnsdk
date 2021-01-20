@@ -1,6 +1,13 @@
-void compile()
+void compile( int8_t * fname )
 {
-    tk = 1;
+    // Prime tokenizer
+    sfd = open( fp = fname, 0 );
+    if ( sfd < 0 ) mccfail( "Unable to open file for compilation" );
+
+    ln = 1;
+    readline();
+
+    ntok();
     while ( tk )
     {
         define(&glbnsp);
@@ -29,7 +36,7 @@ void declare( struct mccsym * cursym, struct mcctype * curtype )
 
         declare( cursym, curtype->type );
 
-        if ( tk != ')' ) mccfail("expected closing parenthasis");
+        if ( tk != ')' ) mccfail("expected closing parenthasis 0");
     }
     // Get symbol name
     else if ( tk != Named ) mccfail("expected declaration name");
@@ -40,23 +47,25 @@ void declare( struct mccsym * cursym, struct mcctype * curtype )
         if ( cursym->name == SBRKFAIL ) mccfail("unable to allocate space for symbol name");
 
         // Copy symbol name
-        int i;
+        int16_t i;
         for ( i = 0; i < tkVal; i++ ) cursym->name[i] = tkStr[i];
         cursym->len = tkVal;
     }
 
+    ntok();
+
     // Get array declarations
     if ( tk == '[' )
     {
-        // Point sizes to end of current program break
+        // Pointer sizes to end of current program break
         curtype->sizes = sbrk(0);
 
         while ( tk == '[' )
         {
-            unsigned int * cas = sbrk( sizeof(unsigned int) );
+            unsigned int16_t * cas = sbrk( sizeof(unsigned int16_t) );
             if ( cas == SBRKFAIL ) mccfail("unable to allocate space for array size");
 
-            // TODO resolve constant expression and store into 'cas'
+            // TODO resolve constant expression and store value to 'cas'
 
             curtype->arrays++;
 
@@ -80,7 +89,7 @@ void declare( struct mccsym * cursym, struct mcctype * curtype )
         curnsp->symtail = &curnsp->symtbl;
         curnsp->nsptail = &curnsp->nsptbl;
 
-        curnsp->parent = NULL;
+        curnsp->parent = &glbnsp;
         curnsp->next = NULL;
 
         ntok();
@@ -92,18 +101,17 @@ void declare( struct mccsym * cursym, struct mcctype * curtype )
                 curnsp->type = CPL_VFUNC;
 
                 ntok();
-                if ( tk != ')' ) mccfail("expected closing parenthasis");
+                if ( tk != ')' ) mccfail("expected closing parenthasis 1");
                 break;
             }
 
             define( curnsp );
 
             if ( tk == ',' ) ntok();
-            else if ( tk != ')' ) mccfail("expected closing parenthasis");
+            else if ( tk != ')' ) mccfail("expected closing parenthasis 2");
         }
 
-        // Mark as defined (shouldn't really matter)
-        curnsp->type |= CPL_DEFN;
+        ntok();
     }
 }
 
@@ -112,11 +120,9 @@ void define( struct mccnsp * curnsp )
 {
     #define LNK_XTRN 1
     #define LNK_STAT 2
-    unsigned char ctype = 0, cnsp = 0, lnk = 0;
+    unsigned int8_t ctype = 0, cnsp = 0, lnk = 0;
 
-    ntok();
-
-    if ( (curnsp->type & CPL_NSPACE_MASK) == CPL_BLOC )
+    if ( (curnsp->type & CPL_NSPACE_MASK) == CPL_BLOCK )
     {
         // Determine linkage
         switch ( tk )
@@ -168,7 +174,7 @@ void define( struct mccnsp * curnsp )
         // Structures
         case Struct: cnsp  |= CPL_STRC; break;
         case Enum:   cnsp  |= CPL_ENUM; break;
-        case Union:  cnsp  |= CPL_UNIN; break;
+        case Union:  cnsp  |= CPL_UNION; break;
 
         default: mccfail("missing type in declaration");
     }
@@ -198,7 +204,7 @@ void define( struct mccnsp * curnsp )
                     newnsp->name = sbrk( tkVal );
                     if ( newnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
 
-                    int i;
+                    int16_t i;
                     for ( i = 0; i < tkVal; i++ ) newnsp->name[i] = tkStr[i];
                     newnsp->len = tkVal;
 
@@ -277,7 +283,7 @@ void define( struct mccnsp * curnsp )
         cursym->len = 0;
 
         cursym->ptype = ctype; // Record primative datatype
-        cursym->stype = curnsp; // Record if this is a struct or not
+        cursym->stype = newnsp; // Record if this is a struct or not
 
         cursym->addr = 0;
 
@@ -286,20 +292,44 @@ void define( struct mccnsp * curnsp )
         // Process type information
         declare( cursym, &cursym->type );
 
-        // TODO check if new declaration matches an existing one
+//	TODO compare to existing symbol
+//        compareSymbol( cursym,
 
         // Function declaration
         if ( cursym->type.ftype && tk == '{' )
         {
+            // Mark function as defined
             if ( cursym->type.ftype->type & CPL_DEFN ) mccfail("function already declared");
+            cursym->type.ftype->type |= CPL_DEFN;
+
+            // Create namespace to hold all bottom level function declarations
+            struct mccnsp * bbnsp = sbrk(sizeof(struct mccnsp));
+            if ( bbnsp == SBRKFAIL ) mccfail("unable to allocate room for function base block");
+
+            bbnsp->name = NULL;
+            bbnsp->len = 0;
+
+            bbnsp->type = CPL_BLOCK;
+            bbnsp->size = 0;
+
+            bbnsp->symtbl = NULL; bbnsp->symtail = &bbnsp->symtbl;
+            bbnsp->nsptbl = NULL; bbnsp->nsptail = &bbnsp->nsptbl;
+
+            bbnsp->parent = cursym->type.ftype;
+            bbnsp->next = NULL;
+
+            // Add to parent namespace
+            *cursym->type.ftype->nsptail = bbnsp;
+            cursym->type.ftype->nsptail = &bbnsp->next;
 
             ntok();
             while ( tk != '}' )
             {
-
+                statement(bbnsp);
             }
 
             ntok();
+            break;
         }
 
         // Only declare one variable per definition
@@ -308,4 +338,6 @@ void define( struct mccnsp * curnsp )
         else if ( tk == ',' ) ntok();
         else if ( tk != ';' ) mccfail("expected comma or semi-colon");
     }
+
+    if ( tk == ';' ) ntok();
 }

@@ -1,24 +1,24 @@
 #include "dgnasm.h"
 #include <errno.h>
 
-unsigned int flags; // Store misc booleans
-unsigned int curfno; // Current file number
-unsigned int entrypos; // Starting address offset within the text segment
-unsigned int stksize; // Additional stack size
-unsigned int copybuf[CBUF_LEN]; // Used to transfer data from one file to another
-unsigned char btarget = CPU_NOVA1; // Build target
+unsigned int16_t flags; // Store misc booleans
+unsigned int16_t curfno; // Current file number
+unsigned int16_t entrypos; // Starting address offset within the text segment
+unsigned int16_t stksize; // Additional stack size
+unsigned int16_t copybuf[CBUF_LEN]; // Used to transfer data from one file to another
+unsigned int8_t btarget = CPU_NOVA1; // Build target
 
 #include "symbols.c"
 
 // Output an octal number
-void octwrite( int nfd, unsigned int val )
+void octwrite( int16_t nfd, unsigned int16_t val )
 {
     write( nfd, "0", 1 );
 
     if ( !val ) return;
 
-    char tmpbuf[6];
-    int tmppos = 6;
+    int8_t tmpbuf[6];
+    int16_t tmppos = 6;
 
     while ( val )
     {
@@ -30,9 +30,9 @@ void octwrite( int nfd, unsigned int val )
 }
 
 // Output a symbol from the table
-void symwrite( int nfd, struct asmsym * cursym )
+void symwrite( int16_t nfd, struct asmsym * cursym )
 {
-    int k = 0;
+    int16_t k = 0;
     while ( cursym->name[k] ) k++;
     write( nfd, "NAME: ", 6 );
     write( nfd, cursym->name, k );
@@ -57,14 +57,14 @@ void symwrite( int nfd, struct asmsym * cursym )
 #include "tokenizer.c"
 #include "assembler.c"
 
-void asmfail( char * msg )
+void asmfail( int8_t * msg )
 {
-    int i = 0;
+    int16_t i = 0;
 
     if ( fp )
     {
-        unsigned int tmppos;
-        char tmpchr;
+        unsigned int16_t tmppos;
+        int8_t tmpchr;
 
         // Output current file
         while ( fp[i] ) i++;
@@ -109,13 +109,13 @@ void asmfail( char * msg )
     exit(1); // Quit program
 }
 
-int main( int argc, char ** argv )
+int16_t main( int16_t argc, int8_t ** argv )
 {
-    int i;
+    int16_t i;
     struct asmsym * cursym;
 
     // Drop first argument (program name)
-    char * progname = *argv;
+    int8_t * progname = *argv;
     argc--; argv++;
 
     // Set all flags
@@ -172,7 +172,7 @@ int main( int argc, char ** argv )
 //    write( 1, " *** Loading symbols ***\r\n", 26 );
 
 //    // *** Setup Assembler Defined Symbols ***
-//    unsigned int instize = sizeof(insts) / sizeof(struct instruct);
+//    unsigned int16_t instize = sizeof(insts) / sizeof(struct instruct);
 //    for ( i = 0; i < instsize - 1; i++ ) insts[i].next = insts + i + 1;
 
     symtail = &symtbl; // Initialize symbol table
@@ -285,22 +285,22 @@ int main( int argc, char ** argv )
     write( 1, "*** Generating output file ***\r\n", 32 );
 
     // Open a.out for writing
-    int ofd = creat( "a.out", 0755 );
+    int16_t ofd = creat( "a.out", 0755 );
     if ( ofd < 0 ) asmfail( "failed to open a.out" );
 
     if ( flags & FLG_SMH ) // SimH output
     {
         struct segment * seg = &zero;
-        unsigned int org = 0;
-        int header[3];
+        unsigned int16_t org = 0;
+        int16_t header[3];
 
         // Output Zero, Text, and Data segments
         while ( seg )
         {
-            unsigned int bs = 0;
-            int bl;
+            unsigned int16_t bs = 0;
+            int16_t bl;
             // Read input in 16 word increments
-            while ( bl = read( seg->data.fd, copybuf, 16 * sizeof(int) ) / sizeof(int) )
+            while ( bl = read( seg->data.fd, copybuf, 16 * sizeof(int16_t) ) / sizeof(int16_t) )
             {
                 if ( bl < 0 ) asmfail( "read fail" );
 
@@ -312,7 +312,7 @@ int main( int argc, char ** argv )
                 while ( i < bl ) header[2] -= copybuf[i++];
 
                 write( ofd, header, 6 ); // Output header
-                write( ofd, copybuf, bl * sizeof(int) ); // Output block
+                write( ofd, copybuf, bl * sizeof(int16_t) ); // Output block
 
                 bs += bl;
             }
@@ -375,7 +375,7 @@ int main( int argc, char ** argv )
     else if ( flags & FLG_TERM ) // Virtual console output
     {
         struct segment * seg = &zero;
-        unsigned int org = 0;
+        unsigned int16_t org = 0;
 
         write( ofd, "K", 1 ); // Make sure the current cell is closed
 
@@ -387,11 +387,11 @@ int main( int argc, char ** argv )
                 octwrite( ofd, org );
                 write( ofd, "/", 1 );
 
-                while ( i = read( seg->data.fd, copybuf, CBUF_LEN * sizeof(int) ) / sizeof(int) )
+                while ( i = read( seg->data.fd, copybuf, CBUF_LEN * sizeof(int16_t) ) / sizeof(int16_t) )
                 {
                     if ( i < 0 ) asmfail( "read error" );
 
-                    int k = 0;
+                    int16_t k = 0;
                     while ( k < i )
                     {
                         octwrite( ofd, copybuf[k] );
@@ -453,12 +453,12 @@ int main( int argc, char ** argv )
         write( ofd, &header, sizeof(struct exec) );
 
         // Output each segment's data
-        while ( i = read( zero.data.fd, copybuf, CBUF_LEN * sizeof(int) ) ) write( ofd, copybuf, i );
-        while ( i = read( text.data.fd, copybuf, CBUF_LEN * sizeof(int) ) ) write( ofd, copybuf, i );
-        while ( i = read( data.data.fd, copybuf, CBUF_LEN * sizeof(int) ) ) write( ofd, copybuf, i );
+        while ( i = read( zero.data.fd, copybuf, CBUF_LEN * sizeof(int16_t) ) ) write( ofd, copybuf, i );
+        while ( i = read( text.data.fd, copybuf, CBUF_LEN * sizeof(int16_t) ) ) write( ofd, copybuf, i );
+        while ( i = read( data.data.fd, copybuf, CBUF_LEN * sizeof(int16_t) ) ) write( ofd, copybuf, i );
 
         // Output symbol table
-        unsigned int nameoff = 0;
+        unsigned int16_t nameoff = 0;
         struct symbol outsym;
         cursym = symtbl;
         while ( cursym )
@@ -477,7 +477,7 @@ int main( int argc, char ** argv )
         }
 
         // Output string table
-        unsigned int k = 0;
+        unsigned int16_t k = 0;
         cursym = symtbl;
         while ( cursym )
         {
@@ -494,9 +494,9 @@ int main( int argc, char ** argv )
         }
 
         // Output each segment's data
-        while ( i = read( zero.rloc.fd, copybuf, CBUF_LEN * sizeof(int) ) ) write( ofd, copybuf, i );
-        while ( i = read( text.rloc.fd, copybuf, CBUF_LEN * sizeof(int) ) ) write( ofd, copybuf, i );
-        while ( i = read( data.rloc.fd, copybuf, CBUF_LEN * sizeof(int) ) ) write( ofd, copybuf, i );
+        while ( i = read( zero.rloc.fd, copybuf, CBUF_LEN * sizeof(int16_t) ) ) write( ofd, copybuf, i );
+        while ( i = read( text.rloc.fd, copybuf, CBUF_LEN * sizeof(int16_t) ) ) write( ofd, copybuf, i );
+        while ( i = read( data.rloc.fd, copybuf, CBUF_LEN * sizeof(int16_t) ) ) write( ofd, copybuf, i );
     }
 
     // Close work files

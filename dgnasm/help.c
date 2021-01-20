@@ -1,4 +1,4 @@
-char * helpdump = "about:\r\n"
+int8_t * helpdump = "about:\r\n"
 "    ` - Data General Nova Assembler (c) 2019 - 2020 Samuel Deutsch\r\n"
 "    full source code available here: https://github.com/Quantx/dgnsdk\r\n"
 "\r\n"
@@ -20,10 +20,10 @@ char * helpdump = "about:\r\n"
 "    -v			Enable virtual instruction emulation\r\n"
 ; // Terminate help string
 
-void showhelp( char * progname )
+void showhelp( int8_t * progname )
 {
-    char * hsp = helpdump;
-    int i = -1, pnl = 0;
+    int8_t * hsp = helpdump;
+    int16_t i = -1, pnl = 0;
 
     while ( progname[pnl] ) pnl++;
 

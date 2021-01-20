@@ -1,14 +1,14 @@
-char lp[MAX_LINE], * p, * pp, * fp = NULL, tk, ustr[MAX_STR + 1], * usp;
-unsigned int curline;
-int fd, tkVal;
+int8_t lp[MAX_LINE], * p, * pp, * fp = NULL, tk, ustr[MAX_STR + 1], * usp;
+unsigned int16_t curline;
+int16_t fd, tkVal;
 struct asmsym * tkSym;
 
-int readline()
+int16_t readline()
 {
     // Current line still has data
     if ( tk != TOK_EOL ) return -1;
 
-    int i = 0;
+    int16_t i = 0;
 
     // Read data in and scan for newline
     while ( i < MAX_LINE - 1 && read( fd, lp + i, 1 ) && lp[i++] != '\n' );
@@ -68,7 +68,7 @@ void ntok()
 
             // Label excedes max length
             if ( p - pp > 255 ) asmfail("named token exceeds max character length");
-            unsigned char toklen = p - pp;
+            unsigned int8_t toklen = p - pp;
 
             // Return current segment position
             if ( tk == '.' && toklen == 1 )
@@ -78,8 +78,8 @@ void ntok()
                 return;
             }
 
-            unsigned int fscp = -1;
-            int i, k;
+            unsigned int16_t fscp = -1;
+            int16_t i, k;
             struct instruct * tkInst;
             // Check all internal symbols
             for ( k = 0; k < sizeof(insts) / sizeof(struct instruct); k++ )
@@ -117,7 +117,7 @@ void ntok()
                 else if ( i == insts[k].len && toklen > insts[k].len ) // Partial match, get flags
                 {
                     // Number of unmatched chars (flags)
-                    int flagNum = toklen - i;
+                    int16_t flagNum = toklen - i;
 
                     // Check flags if I/O instruction
                     if ( flagNum == 1

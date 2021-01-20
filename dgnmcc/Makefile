@@ -1,4 +1,4 @@
-dgnmcc: dgnmcc.h dgnmcc.c tokenizer.c segments.c compiler.c statement.c expression.c
+dgnmcc: dgnmcc.h dgnmcc.c tokenizer.c segments.c compiler.c statement.c expression.c symbols.c debug.c
 	gcc -fno-builtin-exit -g -rdynamic -o dgnmcc dgnmcc.c
 
 clean:

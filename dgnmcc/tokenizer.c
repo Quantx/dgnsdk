@@ -1,24 +1,24 @@
 // File info
-int sfd;
-unsigned int ln; // Current line number
-char * fp; // Name of the file
+int16_t sfd;
+unsigned int16_t ln; // Current line number
+int8_t * fp; // Name of the file
 
 // Line into
-char * p, * pp;
-char lp[MAX_LINE]; // Stores current line
+int8_t lp[MAX_LINE]; // Stores current line
+int8_t * p = lp, * pp;
 
 // Token information
-unsigned char tk;
-int tkVal;
-long tkLong;
-char tkStr[256];
+unsigned int8_t tk;
+int16_t tkVal;
+int32_t tkLong;
+int8_t tkStr[256];
 
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
-char * res_words = "void int short char float long enum struct union auto static register const extern signed unsigned if else case default break continue return for while do goto sizeof";
+int8_t * res_words = "void int short char float long enum struct union auto static register const extern signed unsigned if else case default break continue return for while do goto sizeof";
 
-int readline()
+int16_t readline()
 {
-    int i = 0;
+    int16_t i = 0;
 
     // Read data in and scan for newline
     while ( i < MAX_LINE - 1 && read( sfd, lp + i, 1 ) && lp[i++] != '\n' );
@@ -35,7 +35,11 @@ int readline()
     return i;
 }
 
+#ifdef DEBUG_TOKEN
+void debug_ntok()
+#else
 void ntok()
+#endif
 {
     // Proccess line and token
     while ( *p || readline() )
@@ -53,7 +57,7 @@ void ntok()
             else if ( *p == '*' )
             {
                 // Multi-line comment, hunt end
-                while ( *p != '*' && p[1] != '/' )
+                while ( *p != '*' || p[1] != '/' )
                     if ( !*p++ && !readline() )
                         mccfail("expected block comment terminator, got end of file");
 
@@ -68,7 +72,7 @@ void ntok()
         // Named symbol
         else if ( tk >= 'A' && tk <= 'Z' || tk >= 'a' && tk <= 'z' || tk == '_' )
         {
-            int i;
+            int16_t i;
 
             // Get entire symbol
             while ( ( *p >= 'a' && *p <= 'z'
@@ -81,7 +85,7 @@ void ntok()
 
             // Check for reserved word
             tk = Void;
-            char * rpos = res_words;
+            int8_t * rpos = res_words;
             while ( *rpos )
             {
                 i = 0;
@@ -133,7 +137,7 @@ void ntok()
                 while ( *p >= '0' && *p <= '7' ) tkLong = (tkLong << 3) + *p++ - '0';
             }
 
-            tkVal = (int)tkLong;
+            tkVal = (int16_t)tkLong;
             if ( *p == 'l' || *p == 'L' ) { p++; tk = LongNumber; }
             else tk = Number;
             return;
@@ -146,7 +150,7 @@ void ntok()
 
             while ( *p || readline() )
             {
-                char out = *p;
+                int8_t out = *p;
 
                 // Closing quotation
                 if ( *p == tk ) { tk = Number; return; }
@@ -297,7 +301,7 @@ void ntok()
             else tk = Mul;
             return;
         }
-        else if ( tk == '[' ) { tk = Brak; return; }
+        else if ( tk == '[' ) { return; } //tk = Brak; return; }
         else if ( tk == '?' ) { tk = Tern; return; }
         else if ( tk == ':'
                || tk == ','
@@ -309,3 +313,16 @@ void ntok()
 
     tk = 0; // End of input feed
 }
+
+#ifdef DEBUG_TOKEN
+void ntok()
+{
+    debug_ntok();
+
+    write( 1, "TOKEN: ", 7 );
+    octwrite( 1, tk );
+    write( 1, ": ", 2 );
+    write( 1, pp, p - pp );
+    write( 1, "\r\n", 2 );
+}
+#endif

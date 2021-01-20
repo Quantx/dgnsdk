@@ -74,23 +74,23 @@ enum {
 
 struct instruct
 {
-    char * name;
-    unsigned char len;
+    int8_t * name;
+    unsigned int8_t len;
 
-    unsigned char type;
-    unsigned int val;
+    unsigned int8_t type;
+    unsigned int16_t val;
 
-    unsigned char target;
-    unsigned char trap;
+    unsigned int8_t target;
+    unsigned int8_t trap;
 };
 
 struct asmsym
 {
-    char * name;
-    unsigned char len; // Length of name in bytes
+    int8_t * name;
+    unsigned int8_t len; // Length of name in bytes
 
-    unsigned char type; // Type of symbol
-    unsigned int val;
+    unsigned int8_t type; // Type of symbol
+    unsigned int16_t val;
 
     struct asmsym * next;
 };
@@ -98,9 +98,9 @@ struct asmsym
 // Used to substitute instructions with hardware traps
 struct asmtrap
 {
-    unsigned char index; // Index of the instruction we're replacing
-    unsigned char type; // Type of trap & compile target
-    unsigned int trap; // Trap code we're replacing it with
+    unsigned int8_t index; // Index of the instruction we're replacing
+    unsigned int8_t type; // Type of trap & compile target
+    unsigned int16_t trap; // Trap code we're replacing it with
 };
 
 // Store a data segment
@@ -108,14 +108,14 @@ struct segment
 {
     struct
     {
-       int fd;
-       unsigned int pos;
-       unsigned int size;
+       int16_t fd;
+       unsigned int16_t pos;
+       unsigned int16_t size;
     } data, // Core image
       rloc; // Relocation info
 
-    unsigned char sym; // The symbol type
+    unsigned int8_t sym; // The symbol type
 };
 
 // Assembly fail function
-void asmfail(char * msg);
+void asmfail(int8_t * msg);

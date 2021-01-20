@@ -1,20 +1,20 @@
 #include "dgnmcc.h"
 
-unsigned int flags; // Store misc booleans
-unsigned int curfno; // Current file number
-unsigned int stksize; // Additional stack size
+unsigned int16_t flags; // Store misc booleans
+unsigned int16_t curfno; // Current file number
+unsigned int16_t stksize; // Additional stack size
 
-struct mccnsp glbnsp = { NULL, 0, 0, CPL_BLOC, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
+struct mccnsp glbnsp = { NULL, 0, 0, CPL_BLOCK, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
 
 // Output an octal number
-void octwrite( int nfd, unsigned int val )
+void octwrite( int16_t nfd, unsigned int16_t val )
 {
     write( nfd, "0", 1 );
 
     if ( !val ) return;
 
-    char tmpbuf[6];
-    int tmppos = 6;
+    int8_t tmpbuf[6];
+    int16_t tmppos = 6;
 
     while ( val )
     {
@@ -25,24 +25,35 @@ void octwrite( int nfd, unsigned int val )
     write( nfd, tmpbuf + tmppos, 6 - tmppos );
 }
 
-void mccfail( char * msg )
-{
-    int i = 0;
-    while ( msg[i] ) i++;
-
-    write( 2, msg, i );
-    exit(1);
-}
-
 #include "segments.c"
 #include "tokenizer.c"
 #include "symbols.c"
 #include "expression.c"
+#include "statement.c"
 #include "compiler.c"
+#ifdef DEBUG
+#include "debug.c"
+#endif
 
-int main( int argc, char ** argv )
+void mccfail( int8_t * msg )
 {
-    char * progname = *argv++; argc--;
+    int16_t i = 0;
+    while ( msg[i] ) i++;
+
+    if ( ln )
+    {
+        octwrite( 2, ln );
+        write( 2, ":", 1 );
+    }
+
+    write( 2, msg, i );
+    write( 2, "\r\n", 2 );
+    exit(1);
+}
+
+int16_t main( int16_t argc, int8_t ** argv )
+{
+    int8_t * progname = *argv++; argc--;
 
     // Process all argument options
     while ( argc && **argv == '-' )

@@ -1,6 +1,10 @@
 #include "../lib/novanix.h"
 #include "../lib/a.out.h"
 
+#define DEBUG 1
+#define DEBUG_TOKEN 1
+#define DEBUG_EXPR 1
+
 #define MAX_LINE      256  // Maximum number of tokens per file line
 #define MAX_STR       256  // Maximum length of user defined strings
 #define PAGESIZE      1024 // 2 KB (1 KW) of memory (1 mmu page)
@@ -44,7 +48,7 @@ enum
     Add, Sub, // Addition and Subtraction
     Mul, Div, Mod, // Multiplication, Division, Modulus
     LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Logical not, bitwise not, increment, decrement
-    Brak, Dot, Arrow, PostInc, PostDec // Open square bracket (array access), Dot (structure access), Arrow (structure access via pointer)
+    Dot, Arrow, PostInc, PostDec // Open square bracket (array access), Dot (structure access), Arrow (structure access via pointer)
 };
 
 /* Namespace attributes bitmask
@@ -55,11 +59,11 @@ enum
 
 */
 
-#define CPL_BLOC 0 // Block scope
-#define CPL_STRC 1 // Struct
-#define CPL_UNIN 2 // Union
-#define CPL_ENUM 3 // Enumeration
-#define CPL_FUNC 4 // Function arguments
+#define CPL_BLOCK 0 // Block scope
+#define CPL_STRC  1 // Struct
+#define CPL_UNION 2 // Union
+#define CPL_ENUM  3 // Enumeration
+#define CPL_FUNC  4 // Function arguments
 #define CPL_VFUNC 5 // Variadic Function arguments
 #define CPL_NSPACE_MASK 7
 
@@ -68,11 +72,12 @@ enum
 // NameSPace
 struct mccnsp
 {
-    char * name; // NULL if anonymous
-    unsigned char len; // Length of name
-    unsigned char type; // Type of namespace
+    int8_t * name; // NULL if anonymous
+    unsigned int8_t len; // Length of name
 
-    unsigned int size; // Number of bytes occupied by member symbols
+    unsigned int8_t type; // Type of namespace
+
+    unsigned int16_t size; // Number of bytes occupied by member symbols
 
     struct mccsym * symtbl, ** symtail; // Member symbols
     struct mccnsp * nsptbl, ** nsptail; // Child namespaces
@@ -82,30 +87,46 @@ struct mccnsp
     struct mccnsp * next; // Next namespace in this list
 };
 
-/* Type example (because I keep forgetting)
+/* Type examples (because I keep forgetting)
+
+*** Function pointer ***
 
 int (*test)();
 
-mccsym->name = test;
-mccsym->ptype = int;
+mccsym->name = "test";
+mccsym->ptype = CPL_INT;
 
 mccsym->type = mcctype1
 
 mcctype1->inder = 1
 mcctype1->type = mcctype2
 
-mcctype2->ftype = mccnsp
+mcctype2->ftype = mccnsp_args // Function argument namespace
 
+*** Function declaration ***
+
+struct myvar * test( ) { ...some code... }
+
+mccsym->name = "test"
+
+mccsym->stype = ptr_to_myvar_symbol
+
+mccsym->type = mcctype
+
+mcctype->inder = 1;
+mcctype->ftype = mccnsp_args // Function argument namespace
+
+mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 */
 
 // Type information
 struct mcctype
 {
     // Total number of indirections = inder + arrays;
-    unsigned char inder; // Number of inderections
-    unsigned char arrays; // Number of sizes
+    unsigned int8_t inder; // Number of inderections
+    unsigned int8_t arrays; // Number of sizes
 
-    unsigned int * sizes; // List of array sizes
+    unsigned int16_t * sizes; // List of array sizes
 
     struct mccnsp * ftype; // Function namespace (NULL if not a function)
     struct mcctype * type; // Sub type
@@ -144,13 +165,13 @@ struct mcctype
 // Symbol
 struct mccsym
 {
-    char * name;
-    unsigned char len;
+    int8_t * name;
+    unsigned int8_t len;
 
-    unsigned char ptype; // Primative datatype
+    unsigned int8_t ptype; // Primative datatype
     struct mccnsp * stype; // Struct type
 
-    unsigned int addr;
+    unsigned int16_t addr;
 
     struct mcctype type; // Complex type information
 
@@ -160,13 +181,13 @@ struct mccsym
 // Tree node
 struct mccnode
 {
-    unsigned char type; // What operation or datatype does this node represent
+    unsigned int8_t type; // What operation or datatype does this node represent
 
-    // Either a constant value, or a symbol
+    // Leafs are either a constant value, or a named symbol
+    int8_t * name;
     union {
-        unsigned int val;
-        unsigned long valLong;
-        struct mccsym * sym;
+        unsigned int16_t val;
+        unsigned int32_t valLong;
     };
 
     struct mccnode * left, * right;
@@ -175,12 +196,16 @@ struct mccnode
 // Store a data segment
 struct segment
 {
-    int fd;
-    unsigned int pos;
-    unsigned int size;
+    int16_t fd;
+    unsigned int16_t pos;
+    unsigned int16_t size;
 };
 
-// Assembly fail function
-void mccfail(char * msg);
+// Compiler fail function
+void mccfail(int8_t * msg);
 
 void define(struct mccnsp * curnsp);
+
+#ifdef DEBUG
+void dumpTree(struct mccnode * n);
+#endif

@@ -1,4 +1,4 @@
-void assemble( char * fpath )
+void assemble( int8_t * fpath )
 {
     // Reset current segment
     curseg = &text;
@@ -21,7 +21,7 @@ void assemble( char * fpath )
             ntok();
             if ( tk != TOK_NAME ) asmfail("expected label"); // The following token MUST be a label
 
-            unsigned int val = tkSym->val;
+            unsigned int16_t val = tkSym->val;
             // Set indirect bit if needed
             if ( tk == TOK_INDR ) val |= 0x8000;
             // This is a byte pointer
@@ -30,13 +30,13 @@ void assemble( char * fpath )
             if ( tk == TOK_BYLO ) val |= 1;
 
             // Compute relocation bits
-            unsigned int rloc = tkVal << 4 | tkSym->type & SYM_MASK | tk != TOK_INDR;
+            unsigned int16_t rloc = tkVal << 4 | tkSym->type & SYM_MASK | tk != TOK_INDR;
 
             // Add any following numbers
             ntok();
             if ( tk == TOK_MATH )
             {
-                char doNeg = tkVal;
+                int8_t doNeg = tkVal;
 
                 ntok();
                 if ( tk != TOK_NUM ) asmfail("expected numberical constant");
@@ -56,7 +56,7 @@ void assemble( char * fpath )
         else if ( tk == TOK_NAME )
         {
             // Store ref to symbol
-            int cursymno = tkVal;
+            int16_t cursymno = tkVal;
             struct asmsym * cursym = tkSym;
 
             ntok();
@@ -79,12 +79,12 @@ void assemble( char * fpath )
             // Some other token
             else
             {
-                unsigned int val = cursym->val;
+                unsigned int16_t val = cursym->val;
 
                 // Add any following numbers
                 if ( tk == TOK_MATH )
                 {
-                    char doNeg = tkVal;
+                    int8_t doNeg = tkVal;
 
                     ntok();
                     if ( tk != TOK_NUM ) asmfail("expected numerical constant");
@@ -104,7 +104,7 @@ void assemble( char * fpath )
         }
         else if ( tk == TOK_NUM || tk == TOK_MATH ) // Numerical constant
         {
-            int doNeg, val = tkVal;
+            int16_t doNeg, val = tkVal;
 
             // Numerical constant with prefix: -1234 or +1234
             if ( tk == TOK_MATH )
@@ -147,7 +147,7 @@ void assemble( char * fpath )
         }
         else if ( tk == TOK_STR ) // User defined string
         {
-            unsigned int val, i = 0;
+            unsigned int16_t val, i = 0;
 
             // Load string into segment
             while ( i < tkVal )
@@ -162,9 +162,9 @@ void assemble( char * fpath )
         }
         else if ( tk >= DGN_IONO && tk <= DGN_VIAA ) // DGNova instruction
         {
-            int optyp = tk; // Type of instruction
-            int opval = tkVal; // The 16 bit instruction
-            int oprlc = SYM_ABS; // Relocation bits for the instruction
+            int16_t optyp = tk; // Type of instruction
+            int16_t opval = tkVal; // The 16 bit instruction
+            int16_t oprlc = SYM_ABS; // Relocation bits for the instruction
 
             // I/O Instruction, need a device code and maybe an accumulator
             if ( optyp == DGN_IONO || optyp == DGN_IO || optyp == DGN_IOSK )
@@ -215,8 +215,8 @@ void assemble( char * fpath )
                 if ( tk == TOK_NUM || tk == TOK_MATH ) // Numerical displacement (programmer can pick mode)
                 {
                     // Store displacement
-                    int disp = tkVal;
-                    int mode = 0;
+                    int16_t disp = tkVal;
+                    int16_t mode = 0;
 
                     if ( tk == TOK_MATH )
                     {
@@ -255,14 +255,14 @@ void assemble( char * fpath )
                 else if ( tk == TOK_NAME ) // Label displacement (assembler picks mode)
                 {
                     // Store ref to symbol
-                    unsigned int cursymno = tkVal;
+                    unsigned int16_t cursymno = tkVal;
                     struct asmsym * cursym = tkSym;
 
-                    unsigned int val = 0;
+                    unsigned int16_t val = 0;
                     ntok();
                     if ( tk == TOK_MATH )
                     {
-                        char doNeg = tkVal;
+                        int8_t doNeg = tkVal;
 
                         ntok();
                         if ( tk != TOK_NUM ) asmfail("expected numerical constant");
@@ -299,7 +299,7 @@ void assemble( char * fpath )
                     // Program counter relative symbol
                     else if ( (cursym->type & SYM_MASK) == curseg->sym )
                     {
-                        int disp = cursym->val - curseg->data.pos + val;
+                        int16_t disp = cursym->val - curseg->data.pos + val;
 
                         // Out of bounds
                         if ( disp < -128 || disp > 127 ) asmfail("label outside displacement range");
@@ -511,7 +511,7 @@ void assemble( char * fpath )
             ntok();
             if ( tk != TOK_STR ) asmfail("expected a string");
 
-            unsigned int i = 0;
+            unsigned int16_t i = 0;
             while ( i < tkVal )
             {
                 segset( curseg, SYM_ABS, ustr[i++] & 0xFF );
