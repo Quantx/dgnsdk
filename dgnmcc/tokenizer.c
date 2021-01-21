@@ -14,7 +14,36 @@ int32_t tkLong;
 int8_t tkStr[256];
 
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
-int8_t * res_words = "void int short char float long enum struct union auto static register const extern signed unsigned if else case default break continue return for while do goto sizeof";
+int8_t * res_words[] = {
+    "void",
+    "int",
+    "short",
+    "char",
+    "float",
+    "long",
+    "enum",
+    "struct",
+    "union",
+    "auto",
+    "static",
+    "register",
+    "const",
+    "extern",
+    "signed",
+    "unsigned",
+    "if",
+    "else",
+    "case",
+    "default",
+    "break",
+    "continue",
+    "return",
+    "for",
+    "while",
+    "do",
+    "goto",
+    "sizeof"
+};
 
 int16_t readline()
 {
@@ -84,22 +113,16 @@ void ntok()
             tkVal = p - pp;
 
             // Check for reserved word
-            tk = Void;
-            int8_t * rpos = res_words;
-            while ( *rpos )
+            for ( tk = Void; tk <= SizeofRes; tk++ )
             {
-                i = 0;
-                while ( i < tkVal && rpos[i] && rpos[i] != ' ' && rpos[i] == pp[i] ) i++;
+                for ( i = 0; res_words[tk - Void][i] == pp[i]; i++ );
 
-                if ( rpos[i] == ' ' ) // Match
+                if ( !res_words[tk - Void][i] ) // Match
                 {
-                     if ( tk == Short ) tk = Int; // Shorts are always Ints
+                     if ( tk == Short  ) tk = Int; // Shorts are always Ints
+                     if ( tk == SizeofRes ) tk = Sizeof; // Sizeof is located in a weird spot
                      return;
                 }
-
-                while ( *rpos && *rpos++ != ' ' );
-
-                tk++;
             }
 
             // User defined Named
@@ -301,12 +324,9 @@ void ntok()
             else tk = Mul;
             return;
         }
-        else if ( tk == '[' ) { return; } //tk = Brak; return; }
-        else if ( tk == '?' ) { tk = Tern; return; }
-        else if ( tk == ':'
-               || tk == ','
-               || tk == ';'
-               || tk == ']'
+        else if ( tk == '?' || tk == ':'
+               || tk == ',' || tk == ';'
+               || tk == '[' || tk == ']'
                || tk == '{' || tk == '}'
                || tk == '(' || tk == ')' ) return;
     }
@@ -321,8 +341,13 @@ void ntok()
 
     write( 1, "TOKEN: ", 7 );
     octwrite( 1, tk );
-    write( 1, ": ", 2 );
-    write( 1, pp, p - pp );
+
+    if ( tk )
+    {
+        write( 1, ": ", 2 );
+        write( 1, pp, p - pp );
+    }
+
     write( 1, "\r\n", 2 );
 }
 #endif

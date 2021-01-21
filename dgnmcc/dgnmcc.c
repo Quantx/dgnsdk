@@ -30,7 +30,7 @@ void octwrite( int16_t nfd, unsigned int16_t val )
 #include "symbols.c"
 #include "expression.c"
 #include "statement.c"
-#include "compiler.c"
+#include "declaration.c"
 #ifdef DEBUG
 #include "debug.c"
 #endif
@@ -49,6 +49,22 @@ void mccfail( int8_t * msg )
     write( 2, msg, i );
     write( 2, "\r\n", 2 );
     exit(1);
+}
+
+void compile( int8_t * fname )
+{
+    // Prime tokenizer
+    sfd = open( fp = fname, 0 );
+    if ( sfd < 0 ) mccfail( "Unable to open file for compilation" );
+
+    ln = 1;
+    readline();
+
+    ntok();
+    while ( tk )
+    {
+        define(&glbnsp);
+    }
 }
 
 int16_t main( int16_t argc, int8_t ** argv )

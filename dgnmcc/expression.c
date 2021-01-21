@@ -1,6 +1,6 @@
 const unsigned int8_t prectbl[] = {
     Ass,    // 0 - Lowest
-    Tern,   // 1
+    Tern,   // 1 (Right associativity)
     LogOr,  // 2
     LogAnd, // 3
     Or,     // 4
@@ -11,7 +11,7 @@ const unsigned int8_t prectbl[] = {
     Shl,    // 9
     Add,    // 10
     Mul,    // 11
-    LogNot, // 12
+    Sizeof, // 12 (Right associativity)
     Dot     // 13 - Highest
 };
 
@@ -22,14 +22,76 @@ int8_t getPrec( unsigned int8_t op )
     return --i;
 }
 
+unsigned int8_t ostk[MAX_EXPR_OPER];
+unsigned int16_t otop;
+
+struct mccnode * nstk[MAX_EXPR_NODE];
+unsigned int16_t ntop;
+
+void expr_reduce()
+{
+    otop--;
+
+#ifdef DEBUG_EXPR
+    write( 2, "Pop:", 4 );
+    writeToken( 2, ostk[otop] );
+    write( 2, "\r\n", 2 );
+#endif
+
+    // This should never happen
+    if ( ostk[otop] == '(' || ostk[otop] == '[' || ostk[otop] == '?' )
+    mccfail("wrong matched parenthasis or bracket in expression");
+
+    struct mccnode * n = sbrk(sizeof(struct mccnode));
+    if ( n == SBRKFAIL ) mccfail("unable to allocate expression node");
+
+    n->type = ostk[otop];
+
+    // Prefix unary operators
+    if ( n->type == PreInc || n->type == PreDec
+    ||   n->type == Plus   || n->type == Minus
+    ||   n->type == Inder  || n->type == Deref
+    ||   n->type == LogNot || n->type == Not
+    ||   n->type == Sizeof )
+    {
+        if ( ntop < 1 ) mccfail("not enough nodes for pre-unary operator");
+        n->right = nstk[--ntop];
+        n->left  = NULL;
+    }
+    // Postfix unary operators
+    else if ( n->type == PostInc || n->type == PostDec )
+    {
+        if ( ntop < 1 ) mccfail("not enough nodes for post-unary operator");
+        n->right = NULL;
+        n->left  = nstk[--ntop];
+    }
+    // Ternary operator
+    else if ( n->type == Tern )
+    {
+        if ( ntop < 3 ) mccfail("not enough nodes for ternary operator");
+        struct mccnode * resn = sbrk(sizeof(struct mccnode));
+        if ( resn == SBRKFAIL ) mccfail("unable to allocate node for ternary operator");
+
+        resn->type = ':';
+        resn->right = nstk[--ntop];
+        resn->left  = nstk[--ntop];
+        n->left     = nstk[--ntop];
+        n->right = resn;
+    }
+    else
+    {
+        if ( ntop < 2 ) mccfail("not enough nodes for operator");
+        n->right = nstk[--ntop];
+        n->left  = nstk[--ntop];
+    }
+
+    nstk[ntop++] = n;
+}
+
 // Build and return an expression tree
 struct mccnode * expr(struct mccnsp * curnsp)
 {
-    unsigned int8_t ostk[MAX_EXPR_OPER];
-    unsigned int16_t otop = 0;
-
-    struct mccnode * nstk[MAX_EXPR_NODE];
-    unsigned int16_t ntop = 0;
+    otop = ntop = 0;
 
     /*
       mode 0 = Not unary
@@ -45,17 +107,11 @@ struct mccnode * expr(struct mccnsp * curnsp)
         unsigned int8_t prec;
 
         // We're done, goto mode 2 for cleanup
-        if ( tk < Number && tk != '(' && tk != ')' && tk != '[' && tk != ']' && tk != '"' ) mode = 2;
-/*
-	(
-               !stC.empty()
-            && stC.top() != '('
-            && (
-                   (s[i] != '^' && p[stC.top()] >= p[s[i]])
-                || (s[i] == '^' && p[stC.top()] >  p[s[i]])
-            )
-        )
-*/
+        if ( tk < Number && tk != '"' && tk != ','
+        &&   tk != '?'   && tk != ':'
+        &&   tk != '('   && tk != ')'
+        &&   tk != '['   && tk != ']' ) mode = 2;
+
         if ( tk == Number || tk == LongNumber || tk == '"' || tk == Named )
         {
             nstk[ntop] = sbrk(sizeof(struct mccnode));
@@ -87,55 +143,16 @@ struct mccnode * expr(struct mccnsp * curnsp)
             mode = 0;
             ntop++;
         }
-        else if ( tk == ']' || tk == ')' || mode == 2 )
+        else if ( tk == ']' || tk == ')' || tk == ':' || mode == 2 )
         {
-            if ( tk == ')' ) grp = '(';
-            else if ( tk == ']' ) grp = '[';// Brak;
-
-            while ( otop && ostk[otop - 1] != grp )
+            switch (tk)
             {
-                otop--;
-
-#ifdef DEBUG_EXPR
-                write( 2, "Pop1:", 5 );
-                octwrite( 2, ostk[otop] );
-                write( 2, "\r\n", 2 );
-#endif
-
-                // This should never happen
-                if ( ostk[otop] == '(' || ostk[otop] == '[' /*Brak*/ ) mccfail("wrong matched parenthasis or bracket in expression");
-
-                n = sbrk(sizeof(struct mccnode));
-                if ( n == SBRKFAIL ) mccfail("unable to allocate expression node");
-
-                n->type = ostk[otop];
-
-                // Prefix unary operators
-                if ( n->type == PreInc || n->type == PreDec
-                ||   n->type == Plus   || n->type == Minus
-                ||   n->type == Inder  || n->type == Deref
-                ||   n->type == LogNot || n->type == Not )
-                {
-                    if ( ntop < 1 ) mccfail("not enough nodes for pre-operator");
-                    n->right = nstk[--ntop];
-                    n->left  = NULL;
-                }
-                // Postfix unary operators
-                else if ( n->type == PostInc || n->type == PostDec )
-                {
-                    if ( ntop < 1 ) mccfail("not enough nodes for post-operator");
-                    n->right = NULL;
-                    n->left  = nstk[--ntop];
-                }
-                else
-                {
-                    if ( ntop < 2 ) mccfail("not enough nodes for operator");
-                    n->right = nstk[--ntop];
-                    n->left  = nstk[--ntop];
-                }
-
-                nstk[ntop++] = n;
+                case ')': grp = '('; break;
+                case ']': grp = '['; break;
+                case ':': grp = '?'; break;
             }
+
+            while ( otop && ostk[otop - 1] != grp ) expr_reduce();
 
             if ( mode != 2 )
             {
@@ -154,9 +171,20 @@ struct mccnode * expr(struct mccnsp * curnsp)
                     n->left  = nstk[--ntop];
 
                     nstk[ntop++] = n;
-                }
 
-                mode = 0;
+                    mode = 0;
+                }
+                else if ( ostk[otop] == '?' )
+                {
+                    n = nstk[--ntop];
+                    while ( otop && getPrec(ostk[otop - 1]) > 1 ) expr_reduce();
+                    nstk[ntop++] = n;
+
+                    ostk[otop++] = Tern;
+
+                    mode = 1;
+                }
+                else mode = 0;
 
                 ntok();
             }
@@ -179,61 +207,32 @@ struct mccnode * expr(struct mccnsp * curnsp)
 
             // Remember: '(' and '[' has a prec of -1
             prec = getPrec(tk);
-            while ( otop && getPrec(ostk[otop - 1]) >= prec )
-            {
-                otop--;
-
-#ifdef DEBUG_EXPR
-                write( 2, "Pop2:", 5 );
-                octwrite( 2, ostk[otop] );
-                write( 2, "\r\n", 2 );
-#endif
-
-                n = sbrk(sizeof(struct mccnode));
-                if ( n == SBRKFAIL ) mccfail("unable to allocate expression node");
-
-                n->type = ostk[otop];
-
-                // Prefix unary operators
-                if ( n->type == PreInc || n->type == PreDec
-                ||   n->type == Plus   || n->type == Minus
-                ||   n->type == Inder  || n->type == Deref
-                ||   n->type == LogNot || n->type == Not )
-                {
-                    if ( ntop < 1 ) mccfail("not enough nodes for pre-operator");
-                    n->right = nstk[--ntop];
-                    n->left  = NULL;
-                }
-                // Postfix unary operators
-                else if ( n->type == PostInc || n->type == PostDec )
-                {
-                    if ( ntop < 1 ) mccfail("not enough nodes for post-operator");
-                    n->right = NULL;
-                    n->left  = nstk[--ntop];
-                }
-                else
-                {
-                    if ( ntop < 2 ) mccfail("not enough nodes for operator");
-                    n->right = nstk[--ntop];
-                    n->left  = nstk[--ntop];
-                }
-
-                nstk[ntop++] = n;
-            }
+            // Left associative
+            if ( prec == 1 || prec == 12 ) while ( otop && getPrec(ostk[otop - 1]) > prec ) expr_reduce();
+            // Right associative
+            else while ( otop && getPrec(ostk[otop - 1]) >= prec ) expr_reduce();
 
 #ifdef DEBUG_EXPR
             write( 2, "Push:", 5 );
-            octwrite( 2, tk );
+            writeToken( 2, tk );
             write( 2, "\r\n", 2 );
 #endif
 
             ostk[otop++] = tk;
 
-            if ( tk != PostInc && tk != PostDec ) mode = 1;
+            mode = tk != PostInc && tk != PostDec;
+
             ntok();
+
+            // TODO Check if this is a cast
+            if ( ostk[otop - 1] == '(' )
+            {
+
+            }
         }
     }
 
-    if ( ntop != 1 ) mccfail("Unable to resolve expression");
+    if ( !ntop ) mccfail("Empty expression stack");
+    else if ( ntop > 1 ) mccfail("Not enough operators in expression");
     return *nstk;
 }

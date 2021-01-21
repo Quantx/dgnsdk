@@ -16,7 +16,7 @@ void statement( struct mccnsp * curnsp )
     {
         struct mccnode * t = expr( curnsp );
 
-        dumpTree(t);
+        dumpTree( t, "expr_tree.dot" );
 
         if ( tk != ';' ) mccfail( "Expected ; after expression" );
         ntok();
