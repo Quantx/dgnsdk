@@ -2,8 +2,11 @@
 #include "../lib/a.out.h"
 
 #define DEBUG 1
+
+#ifdef DEBUG
 #define DEBUG_TOKEN 1
 #define DEBUG_EXPR 1
+#endif
 
 #define MAX_LINE      256  // Maximum number of tokens per file line
 #define MAX_STR       256  // Maximum length of user defined strings
@@ -28,7 +31,7 @@ enum
     Break, Continue, Return, // Terminate
     For, While, Do, // Loops
     Goto, // Blasphemy
-    Sizeof, // Technically an operator
+    SizeofRes, // Used only for identifying the reserved word, not be confused with Sizeof
 // ******* Misc *******
     Variadic,
 // ******* Expression tokens *******
@@ -47,9 +50,41 @@ enum
     Shl, Shr, // Bitshift left and right
     Add, Sub, // Addition and Subtraction
     Mul, Div, Mod, // Multiplication, Division, Modulus
-    LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Logical not, bitwise not, increment, decrement
+    Sizeof, LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Logical not, bitwise not, increment, decrement
     Dot, Arrow, PostInc, PostDec // Open square bracket (array access), Dot (structure access), Arrow (structure access via pointer)
 };
+
+#ifdef DEBUG
+int8_t * tokenNames[] = {
+    "void", "int", "short", "char", "float", "long",
+    "enum", "struct", "union",
+    "auto", "static", "register", "const",
+    "extern", "signed", "unsigned",
+    "if", "else", "case", "default",
+    "break", "continue", "return",
+    "for", "while", "do",
+    "goto",
+    "sizeof (reserved word)",
+    "...",
+    "number", "long number",
+    "named",
+
+    "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=",
+    "?",
+    "||",
+    "&&",
+    "|",
+    "^",
+    "&",
+    "==", "!=",
+    "<", "<=", ">", ">=",
+    "<<", ">>",
+    "+", "-",
+    "*", "/", "%",
+    "sizeof (operator)", "!", "~", "(unary) +", "(unary) -", "(unary) &", "(unary) *", "(pre) ++", "(pre) --",
+    ".", "->", "(post) ++", "(post) --"
+};
+#endif
 
 /* Namespace attributes bitmask
 
@@ -184,11 +219,14 @@ struct mccnode
     unsigned int8_t type; // What operation or datatype does this node represent
 
     // Leafs are either a constant value, or a named symbol
-    int8_t * name;
     union {
-        unsigned int16_t val;
+        struct {
+            int8_t * name;
+            unsigned int16_t val;
+        };
         unsigned int32_t valLong;
     };
+
 
     struct mccnode * left, * right;
 };
@@ -207,5 +245,6 @@ void mccfail(int8_t * msg);
 void define(struct mccnsp * curnsp);
 
 #ifdef DEBUG
-void dumpTree(struct mccnode * n);
+void writeToken(int16_t fd, unsigned int8_t tokn);
+void dumpTree(struct mccnode * n, int8_t * fname);
 #endif
