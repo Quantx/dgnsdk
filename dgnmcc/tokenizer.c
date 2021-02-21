@@ -104,10 +104,10 @@ void ntok()
             int16_t i;
 
             // Get entire symbol
-            while ( ( *p >= 'a' && *p <= 'z'
-                   || *p >= 'A' && *p <= 'Z'
-                   || *p >= '0' && *p <= '9'
-                   || *p == '_' ) ) p++;
+            while ( *p >= 'a' && *p <= 'z'
+                 || *p >= 'A' && *p <= 'Z'
+                 || *p >= '0' && *p <= '9'
+                 || *p == '_' ) p++;
 
             if ( p - pp > 255 ) mccfail("named token exceedes max character length");
             tkVal = p - pp;
@@ -161,8 +161,11 @@ void ntok()
             }
 
             tkVal = (int16_t)tkLong;
-            if ( *p == 'l' || *p == 'L' ) { p++; tk = LongNumber; }
+
+            if ( *p == 'l' || *p == 'L' || tkLong >= 0xFFFF ) { p++; tk = LongNumber; }
+            else if ( *p == 'c' || *p == 'C' || (unsigned int16_t)tkVal <= 0xFF ) { p++; tk = SmolNumber; }
             else tk = Number;
+
             return;
         }
         else if ( tk == '\'' || tk == '"' ) // Character or String constant
@@ -230,7 +233,11 @@ void ntok()
                 }
                 else if ( *p != '\'' ) mccfail("Character constant too long");
                 // Record character constant
-                else tkVal = out;
+                else
+                {
+                    tk = SmolNumber;
+                    tkVal = out;
+                }
             }
 
             // End of input feed

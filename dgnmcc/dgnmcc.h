@@ -13,6 +13,7 @@
 #define PAGESIZE      1024 // 2 KB (1 KW) of memory (1 mmu page)
 #define MAX_EXPR_OPER 64   // Maximum size of the expression operator stack
 #define MAX_EXPR_NODE 256  // Maximum size of the expression node stack
+#define MAX_SUB_TYPE  8    // Maximum number of subtypes per type
 
 // +--------------+
 // | TOKEN VALUES |
@@ -35,8 +36,8 @@ enum
 // ******* Misc *******
     Variadic,
 // ******* Expression tokens *******
-    Number, LongNumber, // Numerical constant in source
-    Named, //Symbol, Nspace, // User defined symbols/types
+    Number, SmolNumber, LongNumber, // Numerical constant in source (Char, Int, Long)
+    Named, Variable, // Named (an identifier string), Variable (ref to user defiend variable)
 // ******* Operators *******
     Ass, AddAss, SubAss, MulAss, DivAss, ModAss, ShlAss, ShrAss, AndAss, XorAss, OrAss, // Assignment Operators
     Tern, // Ternary Conditional
@@ -50,8 +51,8 @@ enum
     Shl, Shr, // Bitshift left and right
     Add, Sub, // Addition and Subtraction
     Mul, Div, Mod, // Multiplication, Division, Modulus
-    Sizeof, LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Logical not, bitwise not, increment, decrement
-    Dot, Arrow, PostInc, PostDec // Open square bracket (array access), Dot (structure access), Arrow (structure access via pointer)
+    Sizeof, LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Sizeof, logical not, bitwise not, Pre-Increment, Pre-Decrement
+    PostInc, PostDec, Dot, Arrow // Post-Increment, Post-Decrement, Dot (structure access), Arrow (structure access via pointer)
 };
 
 #ifdef DEBUG
@@ -66,8 +67,8 @@ int8_t * tokenNames[] = {
     "goto",
     "sizeof (reserved word)",
     "...",
-    "number", "long number",
-    "named",
+    "number", "small number", "long number",
+    "named", "variable",
 
     "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=",
     "?",
@@ -82,7 +83,22 @@ int8_t * tokenNames[] = {
     "+", "-",
     "*", "/", "%",
     "sizeof (operator)", "!", "~", "(unary) +", "(unary) -", "(unary) &", "(unary) *", "(pre) ++", "(pre) --",
-    ".", "->", "(post) ++", "(post) --"
+    "(post) ++", "(post) --", ".", "->"
+};
+
+int8_t * typeNames[] = {
+    "void",
+    "char",
+    "uchar",
+    "int",
+    "uint",
+    "long",
+    "ulong",
+    "float",
+    "double",
+    "struct",
+    "union",
+    "enum"
 };
 #endif
 
@@ -126,7 +142,7 @@ struct mccnsp
 
 *** Function pointer ***
 
-int (*test)();
+long (*test)();
 
 mccsym->name = "test";
 mccsym->ptype = CPL_INT;
@@ -154,19 +170,6 @@ mcctype->ftype = mccnsp_args // Function argument namespace
 mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 */
 
-// Type information
-struct mcctype
-{
-    // Total number of indirections = inder + arrays;
-    unsigned int8_t inder; // Number of inderections
-    unsigned int8_t arrays; // Number of sizes
-
-    unsigned int16_t * sizes; // List of array sizes
-
-    struct mccnsp * ftype; // Function namespace (NULL if not a function)
-    struct mcctype * type; // Sub type
-};
-
 /* Data type bitmask
 
 |0|0|00|0000
@@ -176,16 +179,16 @@ struct mcctype
 
 */
 
-#define CPL_VOID 0  // ( 0 bits) Void
-#define CPL_CHR  1  // ( 8 bits) Signed Character
-#define CPL_UCHR 2  // ( 8 bits) Unsigned Character
-#define CPL_INT  3  // (16 bits) Signed Integer
-#define CPL_UINT 4  // (16 bits) Unsigned Integer
-#define CPL_LNG  5  // (32 bits) Signed Long
-#define CPL_ULNG 6  // (32 bits) Unsigned Long
-#define CPL_FPV  7  // (32 bits) DG Nova Float
-#define CPL_DBL  8  // (64 bits) DG Nova Double
-#define CPL_DTYPE_MASK 8 // Mask
+#define CPL_VOID 0 // ( 0 bits) Void
+#define CPL_CHR  1 // ( 8 bits) Signed Character
+#define CPL_UCHR 2 // ( 8 bits) Unsigned Character
+#define CPL_INT  3 // (16 bits) Signed Integer
+#define CPL_UINT 4 // (16 bits) Unsigned Integer
+#define CPL_LNG  5 // (32 bits) Signed Long
+#define CPL_ULNG 6 // (32 bits) Unsigned Long
+#define CPL_FPV  7 // (32 bits) DG Nova Float
+#define CPL_DBL  8 // (64 bits) DG Nova Double
+#define CPL_DTYPE_MASK 15 // Mask
 
 // C Storage types
 #define CPL_TEXT 0 << 4 // Text (write only) (functions and constants)
@@ -197,36 +200,57 @@ struct mcctype
 // C Storage qualifiers
 #define CPL_XTRN 1 << 6 // Extern flag
 
+// Type information
+struct mccsubtype
+{
+    // Total number of indirections = inder + arrays;
+    unsigned int8_t inder; // Number of inderections
+    unsigned int8_t arrays; // Number of sizes
+
+    unsigned int16_t * sizes; // List of array sizes
+
+    struct mccnsp * ftype; // Function namespace (NULL if not a function)
+    struct mccsubtype * sub; // Sub type
+};
+
+struct mcctype
+{
+    unsigned int8_t ptype; // Primative datatype
+    struct mccnsp * stype; // Struct type
+    struct mccsubtype * sub; // Complex type information (MUST NEVER BE NULL)
+};
+
 // Symbol
 struct mccsym
 {
     int8_t * name;
     unsigned int8_t len;
 
-    unsigned int8_t ptype; // Primative datatype
-    struct mccnsp * stype; // Struct type
-
-    unsigned int16_t addr;
-
-    struct mcctype type; // Complex type information
+    unsigned int16_t addr; // Offset from start of segment
+    struct mcctype type; // Type information
 
     struct mccsym * next; // Store the next symbol in the table
 };
 
+#define CPL_LVAL 1 << 0 // True if this node contains an l-value
+
 // Tree node
 struct mccnode
 {
-    unsigned int8_t type; // What operation or datatype does this node represent
+    unsigned int8_t oper; // What operation does this node represent
+    unsigned int8_t flag; // Flags for this node
+
+    struct mcctype * type; // Type information
 
     // Leafs are either a constant value, or a named symbol
     union {
         struct {
-            int8_t * name;
             unsigned int16_t val;
+            int8_t * name;
         };
+        struct mccsym * sym;
         unsigned int32_t valLong;
     };
-
 
     struct mccnode * left, * right;
 };

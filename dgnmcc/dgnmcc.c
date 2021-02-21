@@ -28,6 +28,7 @@ void octwrite( int16_t nfd, unsigned int16_t val )
 #include "segments.c"
 #include "tokenizer.c"
 #include "symbols.c"
+#include "types.c"
 #include "expression.c"
 #include "statement.c"
 #include "declaration.c"
@@ -70,6 +71,11 @@ void compile( int8_t * fname )
 int16_t main( int16_t argc, int8_t ** argv )
 {
     int8_t * progname = *argv++; argc--;
+
+#if DEBUG
+    // Sanity check to make sure we can store constants all in a char
+    if ( Arrow > 0xFF ) mccfail("too many constants!");
+#endif
 
     // Process all argument options
     while ( argc && **argv == '-' )
