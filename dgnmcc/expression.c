@@ -281,8 +281,10 @@ struct mccnode * expr(struct mccnsp * curnsp)
 
     root = n = *nstk;
 
+#if DEBUG
     dumpTree( root, "expr_tree.dot" );
     write( 2, "FINISHED\n", 9 );
+#endif
 
     // Preform post order traversal for type propogation and constant reduction
     ntop = 0;
@@ -358,6 +360,11 @@ struct, union: (In addition to pointers above)
 
 *** DON'T FORGET ABOUT CASTING
 */
+
+        write(2, "Tok: ", 5);
+        writeToken(2, n->oper);
+        write(2, "\n", 1);
+
         // TODO optimize typechecking/promotion
         if ( n->oper >= Ass && n->oper <= OrAss )
         {
@@ -499,18 +506,18 @@ struct, union: (In addition to pointers above)
         else if ( n->oper == Plus || n->oper == Minus )
         {
             if ( !isArith(n->right->type) ) mccfail("not an arithmetic type");
-            n->type = typePromote(n->left->type, n->right->type);
+            n->type = n->right->type;
             if ( (n->type->ptype & CPL_DTYPE_MASK) < CPL_INT ) n->type = &type_int;
         }
         else if ( n->oper == Inder )
         {
             if ( !isPointer(n->right->type) ) mccfail("not a pointer");
-            // TODO inderection
+            n->type = typeInder(n->right->type);
         }
         else if ( n->oper == Deref )
         {
             if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
-            // TODO dereference
+            n->type = typeDeref(n->right->type);
         }
         else if ( n->oper == PreInc || n->oper == PreDec )
         {
@@ -540,30 +547,21 @@ struct, union: (In addition to pointers above)
         {
             if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
             if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
-            // TODO dereference left type
+            n->type = typeDeref(n->left->type);
         }
+        else if ( n->oper == ',' ) n->type = n->right->type; // No rules for ,
 #ifdef DEBUG_EXPR
-        else
-        {
-            write( 2, "Tok: ", 5 );
-            writeToken( 2, n->oper );
-            write( 2, "\n", 1 );
-            mccfail("no typecheck rule for operator");
-        }
+        else mccfail("no typecheck rule for operator");
 
-        if (!n->type)
-        {
-            write( 2, "Tok: ", 5 );
-            writeToken( 2, n->oper );
-            write( 2, "\n", 1 );
-            mccfail("no promotion rule for operator");
-        }
+        if (!n->type) mccfail("no promotion rule for operator");
 #endif
 
         n = NULL;
     }
 
+#if DEBUG
     dumpTree( root, "type_tree.dot" );
+#endif
 
     return root;
 }

@@ -269,6 +269,7 @@ void mccfail(int8_t * msg);
 void define(struct mccnsp * curnsp);
 
 #ifdef DEBUG
+void writeType(int16_t fd, struct mcctype * t, int8_t * name, int16_t len);
 void writeToken(int16_t fd, unsigned int8_t tokn);
 void dumpTree(struct mccnode * n, int8_t * fname);
 #endif

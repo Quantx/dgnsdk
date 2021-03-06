@@ -65,8 +65,6 @@ void writeType( int16_t fd, struct mcctype * t, int8_t * name, int16_t len )
 
         if ( --stop ) write( fd, ")", 1 );
     }
-
-    write( fd, "\\n", 2 );
 }
 
 void writeToken( int16_t fd, unsigned int8_t tokn )
@@ -106,6 +104,7 @@ void dumpTree( struct mccnode * n, int8_t * fname )
 
         if ( n->oper == Variable ) writeType( fexp, n->type, n->sym->name, n->sym->len );
         else writeType( fexp, n->type, NULL, 0 );
+        write( fexp, "\\n", 2 );
 
         if ( n->oper == Named )
         {
