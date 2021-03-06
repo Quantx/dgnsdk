@@ -162,8 +162,12 @@ void ntok()
 
             tkVal = (int16_t)tkLong;
 
-            if ( *p == 'l' || *p == 'L' || tkLong >= 0xFFFF ) { p++; tk = LongNumber; }
-            else if ( *p == 'c' || *p == 'C' || (unsigned int16_t)tkVal <= 0xFF ) { p++; tk = SmolNumber; }
+            if ( *p == 'l' || *p == 'L' ) { p++; tk = LongNumber; }
+            else if ( tkLong >= 0xFFFF ) tk = LongNumber;
+
+            else if ( *p == 'c' || *p == 'C' ) { p++; tk = SmolNumber; }
+            else if ( (unsigned int16_t)tkVal <= 0xFF ) tk = SmolNumber;
+
             else tk = Number;
 
             return;

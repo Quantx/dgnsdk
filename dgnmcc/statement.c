@@ -14,9 +14,13 @@ void statement( struct mccnsp * curnsp )
     }
     else
     {
+        void * esp = sbrk(0);
+
         expr( curnsp );
 
         if ( tk != ';' ) mccfail( "Expected ; after expression" );
         ntok();
+
+        brk(esp); // Free memory allocated by the expression
     }
 }

@@ -71,6 +71,16 @@ int16_t typeSize( struct mcctype * t )
     return 8; // Double
 }
 
+// Prote arithmetic types
+struct mcctype * typePromote( struct mcctype * ta, struct mcctype * tb )
+{
+    unsigned int8_t pa = ta->ptype & CPL_DTYPE_MASK;
+    unsigned int8_t pb = tb->ptype & CPL_DTYPE_MASK;
+
+    if ( pa >= pb ) return ta;
+    else return tb;
+}
+
 /*
     CPL Type hierarchy:
 
@@ -137,7 +147,29 @@ int16_t isArray( struct mcctype * t )
     return s->arrays;
 }
 
-int16_t isCompatible( struct mcctype * a, struct mcctype * b )
+int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
 {
-    // TODO check type compatibility
+    // If either is a structure, make sure they're compatible
+    if ( ta->stype != tb->stype ) return 0;
+
+/* All primative types are compatible
+    // Ensure primative types match
+    if ( !ta->stype && (ta->ptype & CPL_DTYPE_MASK) != (tb->ptype & CPL_DTYPE_MASK) ) return 0;
+*/
+    // Get active subtype
+    struct mccsubtype * sa, * sb;
+    for ( sa = ta->sub; sa->sub; sa = sa->sub );
+    for ( sb = tb->sub; sb->sub; sb = sb->sub );
+
+    // Make sure array dimensions match
+    if ( sa->arrays != sb->arrays ) return 0;
+
+    if ( sa->ftype )
+    {
+        if ( !sb->ftype ) return 0;
+
+        // TODO check function compatibility
+    }
+
+    return 1;
 }

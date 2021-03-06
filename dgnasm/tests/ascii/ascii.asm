@@ -1,10 +1,8 @@
-		.LOC 100
-
 		INTDS		; Disable interrupt
 		LDA 0, asciibeg	; Load constants
 		LDA 1, asciiend
 
-mainloop:	SKPBZ 0, 11	; Wait untill TTO is free
+mainloop:	SKPBZ 11	; Wait untill TTO is free
 		JMP -1, 1
 
 		DOAS 0, 11	; Output to TTO

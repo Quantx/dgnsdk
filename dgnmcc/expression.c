@@ -149,7 +149,7 @@ struct mccnode * expr(struct mccnsp * curnsp)
                     ntok();
                     if ( tk == '(' ) // Function call
                     {
-                        // TODO
+                        // TODO function calls
                     }
                 }
                 else // Probably struct or union member
@@ -282,6 +282,7 @@ struct mccnode * expr(struct mccnsp * curnsp)
     root = n = *nstk;
 
     dumpTree( root, "expr_tree.dot" );
+    write( 2, "FINISHED\n", 9 );
 
     // Preform post order traversal for type propogation and constant reduction
     ntop = 0;
@@ -305,6 +306,7 @@ struct mccnode * expr(struct mccnsp * curnsp)
             continue;
         }
 
+        if ( !(n->left||n->right) ) { n = NULL; continue; } // Ignore leafs
 /*
 *** Supported operators for rvalue types ***
 char, uchar, int, uint, long, ulong:
@@ -356,14 +358,29 @@ struct, union: (In addition to pointers above)
 
 *** DON'T FORGET ABOUT CASTING
 */
-        // Typecheck TODO: optimize this
+        // TODO optimize typechecking/promotion
         if ( n->oper >= Ass && n->oper <= OrAss )
         {
             if ( n->oper == Ass ) // Any compatible type
             {
                 if ( !isCompatible( n->left->type, n->right->type ) ) mccfail("incompatible types");
             }
-            else if ( n->oper >= SubAss ) // Arithmetic Type
+            else if ( n->oper == AddAss )
+            {
+                if ( isPointer(n->left->type) && !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is not integer type");
+                if ( isPointer(n->right->type) && !isInteger(n->left->type) ) mccfail("rhs is pointer, lhs is not integer type");
+
+                if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
+                if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+            }
+            else if ( n->oper == SubAss )
+            {
+                if ( isPointer(n->left->type) && !isPointer(n->right->type) && !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is neither pointer nor integer");
+
+                if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
+                if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+            }
+            else if ( n->oper > SubAss ) // Arithmetic Type
             {
                 if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
                 if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
@@ -378,128 +395,175 @@ struct, union: (In addition to pointers above)
                 if ( !isScalar(n->left->type ) ) mccfail("lhs is not a scalar type");
                 if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
             }
+
+            n->type = n->left->type;
         }
         else if ( n->oper == Tern )
         {
             if ( !isScalar(n->left->type) ) mccfail("lhs is not a scalar type");
+            n->type = n->right->type;
         }
         else if ( n->oper == ':' )
         {
             if ( !isCompatible( n->left->type, n->right->type ) ) mccfail("incompatible types");
+            // Promote if needed
+            if ( isArith(n->left->type) ) n->type = typePromote( n->left->type, n->right->type );
+            else n->type = n->left->type;
         }
         else if ( n->oper == LogOr || n->oper == LogAnd )
         {
             if ( !isScalar(n->left->type ) ) mccfail("lhs is not a scalar type");
             if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
+            n->type = &type_int; // Always int
         }
         else if ( n->oper >= Or && n->oper <= And )
         {
             if ( !isInteger(n->left->type ) ) mccfail("lhs is not an integer type");
             if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+            n->type = typePromote(n->left->type, n->right->type);
         }
         else if ( n->oper >= Eq && n->oper <= GreatEq )
         {
             if ( !isScalar(n->left->type ) ) mccfail("lhs is not a scalar type");
             if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
+            n->type = &type_int;
         }
         else if ( n->oper == Shl || n->oper == Shr )
         {
             if ( !isInteger(n->left->type ) ) mccfail("lhs is not an integer type");
             if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+            n->type = typePromote(n->left->type, n->right->type);
+            if ( (n->type->ptype & CPL_DTYPE_MASK) < CPL_INT ) n->type = &type_int;
         }
-        else if ( n->oper == Add || n->oper == Sub )
+        else if ( n->oper == Add )
         {
-            if ( !isScalar(n->left->type ) ) mccfail("lhs is not a scalar type");
-            if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
+            if ( isPointer(n->left->type) )
+            {
+                if ( !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is not integer type");
+                n->type = n->left->type;
+            }
+            else if ( isPointer(n->right->type) )
+            {
+                if ( !isInteger(n->left->type) ) mccfail("rhs is pointer, lhs is not integer type");
+                n->type = n->right->type;
+            }
+            else
+            {
+                if ( !isArith(n->left->type ) ) mccfail("lhs is not a arithmetic type");
+                if ( !isArith(n->right->type) ) mccfail("rhs is not a arithmetic type");
+                n->type = typePromote(n->left->type, n->right->type);
+            }
+        }
+        else if ( n->oper == Sub )
+        {
+            if ( isPointer(n->left->type) )
+            {
+                if ( isPointer(n->right->type) ) n->type = &type_int;
+                else if ( isInteger(n->right->type) ) n->type = n->left->type;
+                else mccfail("lhs is pointer, rhs is neither pointer nor integer");
+            }
+            else
+            {
+                if ( !isArith(n->left->type ) ) mccfail("lhs is not a arithmetic type");
+                if ( !isArith(n->right->type) ) mccfail("rhs is not a arithmetic type");
+                n->type = typePromote(n->left->type, n->right->type);
+            }
         }
         else if ( n->oper == Mul || n->oper == Div )
         {
             if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
             if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+            n->type = typePromote(n->left->type, n->right->type);
         }
         else if ( n->oper == Mod )
         {
             if ( !isInteger(n->left->type ) ) mccfail("lhs is not an integer type");
             if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+            n->type = typePromote(n->left->type, n->right->type);
         }
         else if ( n->oper == Sizeof )
         {
             if ( isFunction(n->right->type) ) mccfail("cannot get sizeof function");
+            n->type = &type_int;
         }
         else if ( n->oper == LogNot )
         {
             if ( !isScalar(n->right->type) ) mccfail("not a scalar type");
+            n->type = &type_int;
         }
         else if ( n->oper == Not )
         {
             if ( !isInteger(n->right->type) ) mccfail("not an integer type");
+            n->type = n->right->type;
         }
         else if ( n->oper == Plus || n->oper == Minus )
         {
             if ( !isArith(n->right->type) ) mccfail("not an arithmetic type");
+            n->type = typePromote(n->left->type, n->right->type);
+            if ( (n->type->ptype & CPL_DTYPE_MASK) < CPL_INT ) n->type = &type_int;
         }
         else if ( n->oper == Inder )
         {
             if ( !isPointer(n->right->type) ) mccfail("not a pointer");
+            // TODO inderection
         }
         else if ( n->oper == Deref )
         {
             if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
+            // TODO dereference
         }
         else if ( n->oper == PreInc || n->oper == PreDec )
         {
             if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
             if ( !isScalar(n->right->type) ) mccfail("not a scalar type");
+            n->type = n->right->type;
         }
         else if ( n->oper == PostInc || n->oper == PostDec )
         {
             if ( ~n->left->flag & CPL_LVAL ) mccfail("not an l-value");
             if ( !isScalar(n->left->type) ) mccfail("not a scalar type");
+            n->type = n->left->type;
         }
         else if ( n->oper == Dot )
         {
             if ( isPointer(n->left->type) ) mccfail("lhs is a pointer");
             if ( !isStruct(n->left->type) ) mccfail("lhs is not a struct");
+            // TODO lookup type of rhs member
         }
         else if ( n->oper == Arrow )
         {
             if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
             if ( !isStruct(n->left->type ) ) mccfail("lhs is not a pointer to a struct");
+            // TODO lookup type of rhs member
         }
         else if ( n->oper == '[' )
         {
             if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
             if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+            // TODO dereference left type
         }
-
-
-        // Always integer
-        if ( n->oper == LogOr || n->oper == LogAnd || n->oper == LogNot )
+#ifdef DEBUG_EXPR
+        else
         {
-            if ( n->left->type->stype || n->right->type->stype ) mccfail("incompatible type, struct or union");
+            write( 2, "Tok: ", 5 );
+            writeToken( 2, n->oper );
+            write( 2, "\n", 1 );
+            mccfail("no typecheck rule for operator");
+        }
 
-            n->type = &type_int;
-        }
-        // Assignment (Always inherit the left type)
-        else if ( n->oper >= Ass && n->oper <= OrAss )
+        if (!n->type)
         {
-            n->type = n->left->type;
+            write( 2, "Tok: ", 5 );
+            writeToken( 2, n->oper );
+            write( 2, "\n", 1 );
+            mccfail("no promotion rule for operator");
         }
-        // Implicit arithmetic conversions
-        else if ( n->oper >= Or && n->oper <= Mod || n->oper == ':' )
-        {
-            // Requires a minimum rank of signed int
-            if ( n->oper == Shl || n->oper == Shr || n->oper >= Not && n->oper <= Minus )
-            {
-
-            }
-        }
-        #ifdef DEBUG_EXPR
-        else mccfail("no promotion rule for operator");
-        #endif
+#endif
 
         n = NULL;
     }
+
+    dumpTree( root, "type_tree.dot" );
 
     return root;
 }

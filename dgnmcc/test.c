@@ -1,5 +1,6 @@
-int a, b, * c, * g;
+int a, b, c, * g;
 unsigned int d;
+long l;
 
 struct test {
     int a;
@@ -15,12 +16,13 @@ float w;
 
 int main( int argc, char ** argv )
 {
-    z = y || tv.a || a.bsd ;
+//    z = y || tv.a || a.bsd ;
+//      x = l;
 //    printf( "%ld\n", sizeof(f) );
 
 //    a->b->c.d;
 
-//    a = (c + g)[ (a++ + -g[2]) * ++b ] + 4, 7 + b;
+    a = (c + g)[ (a++ + -g[2]) * ++b ] + 4, 7 + b;
 
 
 //      sizeof ( a + b + c );

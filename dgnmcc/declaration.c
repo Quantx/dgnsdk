@@ -294,7 +294,7 @@ void define( struct mccnsp * curnsp )
         // Process type information
         declare( cursym, &cursym->type.sub );
 
-//	TODO compare to existing symbol
+        // TODO compare to existing symbol
 //        compareSymbol( cursym,
 
         // Add symbol to current namespace (assuming it doesn't already exist)
