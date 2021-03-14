@@ -17,6 +17,8 @@ void declare( struct mccsym * cursym, struct mccsubtype ** partype )
     // Get any subtypes
     if ( tk == '(' )
     {
+        ntok();
+
         curtype->sub = sbrk( sizeof(struct mccsubtype) );
         if ( curtype->sub == SBRKFAIL ) mccfail("unable to allocate space for subtype");
 
@@ -101,6 +103,11 @@ void declare( struct mccsym * cursym, struct mccsubtype ** partype )
         ntok();
     }
 
+    // Pass up inderections if possible
+    if ( curtype->sub
+     && !curtype->arrays
+     && !curtype->ftype ) curtype->sub->inder += curtype->inder, curtype->inder = 0;
+
     // Fold child through empty subtypes
     if ((
             // This is the base subtype, it's allowed to be empty
@@ -109,10 +116,9 @@ void declare( struct mccsym * cursym, struct mccsubtype ** partype )
             || cursym->type.sub != *partype
         )
         // Check if empty
+        && !curtype->inder
         && !curtype->arrays
-        && !curtype->ftype )
-            // Pass up inderections and drop this subtype
-            curtype->sub->inder += curtype->inder, *partype = curtype->sub;
+        && !curtype->ftype ) *partype = curtype->sub;
 }
 
 // (extern|static) (const|register) (signed|unsigned) <void|char|int|...etc>

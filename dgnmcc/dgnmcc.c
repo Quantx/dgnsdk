@@ -91,4 +91,6 @@ int16_t main( int16_t argc, int8_t ** argv )
         compile( argv[curfno] );
         curfno++;
     }
+
+    return 0;
 }

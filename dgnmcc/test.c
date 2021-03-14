@@ -1,6 +1,6 @@
 void * v;
 
-int ** x, ** y;
+int ** x, *(* y);
 
 long a;
 int c;
