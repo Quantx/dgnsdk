@@ -112,7 +112,7 @@ void dumpTree( struct mccnode * n, int8_t * fname )
             write( fexp, n->name, n->val );
             write( fexp, "\\\"", 2 );
         }
-        else if ( n->oper == Number ) octwrite( fexp, n->val );
+        else if ( n->oper == Number || n->oper == SmolNumber ) octwrite( fexp, n->val );
         else writeToken( fexp, n->oper );
 
         write( fexp, "\"];\n", 4 );

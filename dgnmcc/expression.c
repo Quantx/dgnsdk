@@ -49,23 +49,17 @@ void reduce()
     n->flag = 0;
     n->type = NULL;
 
-    // Prefix unary operators
-    if ( n->oper == PreInc || n->oper == PreDec
-    ||   n->oper == Plus   || n->oper == Minus
-    ||   n->oper == Inder  || n->oper == Deref
-    ||   n->oper == LogNot || n->oper == Not
+    // Unary operators
+    if ( n->oper == PostInc || n->oper == PostDec
+    ||   n->oper == PreInc  || n->oper == PreDec
+    ||   n->oper == Plus    || n->oper == Minus
+    ||   n->oper == Inder   || n->oper == Deref
+    ||   n->oper == LogNot  || n->oper == Not
     ||   n->oper == Sizeof )
     {
-        if ( ntop < 1 ) mccfail("not enough nodes for pre-unary operator");
+        if ( ntop < 1 ) mccfail("not enough nodes for unary operator");
         n->right = nstk[--ntop];
         n->left  = NULL;
-    }
-    // Postfix unary operators
-    else if ( n->oper == PostInc || n->oper == PostDec )
-    {
-        if ( ntop < 1 ) mccfail("not enough nodes for post-unary operator");
-        n->right = NULL;
-        n->left  = nstk[--ntop];
     }
     // Ternary operator
     else if ( n->oper == Tern )
@@ -529,19 +523,11 @@ struct, union: (In addition to pointers above)
 
             n->flag |= CPL_LVAL;
         }
-        else if ( n->oper == PreInc || n->oper == PreDec )
+        else if ( n->oper == PreInc || n->oper == PreDec || n->oper == PostInc || n->oper == PostDec )
         {
             if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
             if ( !isScalar(n->right->type) ) mccfail("not a scalar type");
             n->type = n->right->type;
-
-            n->flag |= CPL_LVAL;
-        }
-        else if ( n->oper == PostInc || n->oper == PostDec )
-        {
-            if ( ~n->left->flag & CPL_LVAL ) mccfail("not an l-value");
-            if ( !isScalar(n->left->type) ) mccfail("not a scalar type");
-            n->type = n->left->type;
 
             n->flag |= CPL_LVAL;
         }
@@ -575,17 +561,78 @@ struct, union: (In addition to pointers above)
         if (!n->type) mccfail("no promotion rule for operator");
 #endif
 
-        if ( n->left && n->right
-          && (n->left->oper  == Number || n->left->oper  == SmolNumber)
-          && (n->right->oper == Number || n->right->oper == SmolNumber) )
+        if ( n->oper == Sizeof ) // Always results in a constant expr
         {
-            switch (n->oper)
+            n->oper = Number;
+            n->val = typeSize(n->right->type);
+            n->right->type = NULL;
+        }
+        else if ( n->oper == Tern )
+        {
+            // TODO constant expr ternary
+        }
+        else if ( n->right && (n->right->oper == Number || n->right->oper == SmolNumber) )
+        {
+            if ( n->left && (n->left->oper == Number || n->left->oper == SmolNumber) )
             {
-                
-            }
+                int16_t vl, vr;
+                vl = n->left->val;
+                vr = n->right->val;
 
-            if (n->left->oper == Number || n->right->oper == Number) n->oper = Number;
-            else n->oper = SmolNumber;
+                switch (n->oper)
+                {
+                    case LogOr:   vl = vl || vr; break;
+                    case LogAnd:  vl = vl && vr; break;
+                    case Or:      vl = vl |  vr; break;
+                    case Xor:     vl = vl ^  vr; break;
+                    case And:     vl = vl &  vr; break;
+                    case Eq:      vl = vl == vr; break;
+                    case Neq:     vl = vl != vr; break;
+                    case Less:    vl = vl <  vr; break;
+                    case LessEq:  vl = vl <= vr; break;
+                    case Great:   vl = vl >  vr; break;
+                    case GreatEq: vl = vl >= vr; break;
+                    case Shl:     vl = vl << vr; break;
+                    case Shr:     vl = vl >> vr; break;
+                    case Add:     vl = vl +  vr; break;
+                    case Sub:     vl = vl -  vr; break;
+                    case Mul:     vl = vl *  vr; break;
+                    case Div:     vl = vl /  vr; break;
+                    case Mod:     vl = vl %  vr; break;
+#ifdef DEBUG_EXPR
+                    default: mccfail("unknown constant expr operator");
+#endif
+                }
+
+                // Promote to integer if needed
+                if (n->left->oper == Number || n->right->oper == Number
+                     // Implicit promotion to integer
+                     || n->oper == Shl || n->oper == Shr ) n->oper = Number, n->val = vl;
+                else n->oper = SmolNumber, n->val = (int8_t)vl;
+
+                n->left = n->right = NULL;
+            }
+            else if ( !n->left ) // Unary operator
+            {
+                int16_t vd = 1, vl = n->left->val;
+
+                switch (n->oper)
+                {
+                    case Plus:   vl = +vl; break;
+                    case Minus:  vl = -vl; break;
+                    case Not:    vl = ~vl; break;
+                    case LogNot: vl = !vl; break;
+                    default: vd = 0; // Not all unary operators can be resolved like casts, example: a = *12;
+                }
+
+                if ( vd )
+                {
+                    // All valid unary operations result in integer promotion
+                    n->oper = Number;
+                    n->val = vl;
+                    n->right = NULL;
+                }
+            }
         }
 
 

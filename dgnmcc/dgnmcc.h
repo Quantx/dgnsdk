@@ -1,7 +1,7 @@
 #include "../lib/novanix.h"
 #include "../lib/a.out.h"
 
-//#define DEBUG 1
+#define DEBUG 1
 
 #ifdef DEBUG
 #define DEBUG_TOKEN 1
