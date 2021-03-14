@@ -16,7 +16,7 @@ void statement( struct mccnsp * curnsp )
     {
         void * esp = sbrk(0);
 
-        expr( curnsp );
+        expr( curnsp, 0 );
 
         if ( tk != ';' ) mccfail( "Expected ; after expression" );
         ntok();

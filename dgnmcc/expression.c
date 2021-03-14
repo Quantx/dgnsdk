@@ -87,7 +87,8 @@ void reduce()
 }
 
 // Build and return an expression tree
-struct mccnode * expr(struct mccnsp * curnsp)
+// stk = stop token
+struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 {
     struct mccnode * root, * n;
     unsigned int16_t unary = 1;
@@ -109,7 +110,7 @@ struct mccnode * expr(struct mccnsp * curnsp)
             // Collapse stack
             while ( otop ) reduce();
 
-            if ( tk == ';' ) break; // Done with this expression
+            if ( tk == ';' || stk == tk ) break; // Done with this expression
 
             ostk[otop++] = ',';
 
@@ -191,7 +192,11 @@ struct mccnode * expr(struct mccnsp * curnsp)
 
             while ( otop && ostk[otop - 1] != grp ) reduce();
 
-            if ( !otop ) mccfail("no matching open parenthasis or bracket in expression");
+            if ( !otop )
+            {
+                if ( stk == ']' ) break;
+                mccfail("no matching open parenthasis or bracket in expression");
+            }
 
             otop--;
 

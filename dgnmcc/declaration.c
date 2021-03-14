@@ -1,4 +1,4 @@
-void declare( struct mccsym * cursym, struct mccsubtype ** partype )
+void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype ** partype )
 {
     struct mccsubtype * curtype = *partype;
 
@@ -22,7 +22,7 @@ void declare( struct mccsym * cursym, struct mccsubtype ** partype )
         curtype->sub = sbrk( sizeof(struct mccsubtype) );
         if ( curtype->sub == SBRKFAIL ) mccfail("unable to allocate space for subtype");
 
-        declare( cursym, &curtype->sub );
+        declare( curnsp, cursym, &curtype->sub );
 
         if ( tk != ')' ) mccfail("expected closing parenthasis 0");
     }
@@ -50,36 +50,46 @@ void declare( struct mccsym * cursym, struct mccsubtype ** partype )
 
         while ( tk == '[' )
         {
+            ntok();
+
             unsigned int16_t * cas = sbrk( sizeof(unsigned int16_t) );
             if ( cas == SBRKFAIL ) mccfail("unable to allocate space for array size");
 
-            // TODO resolve constant expression and store value to 'cas'
+            void * erbp = sbrk(0);
+            struct mccnode * cexp = expr(curnsp, ']');
+
+            // TODO possible add code emition for non-file scope arrays
+            if ( cexp->oper != SmolNumber && cexp->oper != Number ) mccfail("need constant expression in array declaration");
+            *cas = cexp->val;
+
+            brk(erbp); // Free expression stack
 
             curtype->arrays++;
 
             if ( tk != ']' ) mccfail("expected closing bracket");
+            ntok();
         }
     }
     else if ( tk == '(' ) // Get function declarations
     {
-        struct mccnsp * curnsp = curtype->ftype = sbrk( sizeof(struct mccnsp) );
-        if ( curnsp == SBRKFAIL ) mccfail("unable to allocate space for new namespace");
+        struct mccnsp * fncnsp = curtype->ftype = sbrk( sizeof(struct mccnsp) );
+        if ( fncnsp == SBRKFAIL ) mccfail("unable to allocate space for new namespace");
 
-        curnsp->name = NULL;
-        curnsp->len = 0;
+        fncnsp->name = NULL;
+        fncnsp->len = 0;
 
-        curnsp->type = CPL_FUNC;
+        fncnsp->type = CPL_FUNC;
 
-        curnsp->size = 0;
+        fncnsp->size = 0;
 
-        curnsp->symtbl = NULL;
-        curnsp->nsptbl = NULL;
+        fncnsp->symtbl = NULL;
+        fncnsp->nsptbl = NULL;
 
-        curnsp->symtail = &curnsp->symtbl;
-        curnsp->nsptail = &curnsp->nsptbl;
+        fncnsp->symtail = &fncnsp->symtbl;
+        fncnsp->nsptail = &fncnsp->nsptbl;
 
-        curnsp->parent = &glbnsp;
-        curnsp->next = NULL;
+        fncnsp->parent = &glbnsp;
+        fncnsp->next = NULL;
 
         ntok();
         while ( tk != ')' )
@@ -87,14 +97,14 @@ void declare( struct mccsym * cursym, struct mccsubtype ** partype )
             // This is a variadic function
             if ( tk == Variadic )
             {
-                curnsp->type = CPL_VFUNC;
+                fncnsp->type = CPL_VFUNC;
 
                 ntok();
                 if ( tk != ')' ) mccfail("expected closing parenthasis 1");
                 break;
             }
 
-            define( curnsp );
+            define( fncnsp );
 
             if ( tk == ',' ) ntok();
             else if ( tk != ')' ) mccfail("expected closing parenthasis 2");
@@ -300,7 +310,7 @@ void define( struct mccnsp * curnsp )
         if ( cursym->type.sub == SBRKFAIL ) mccfail( "unable to allocate space for new symbol subtype" );
 
         // Process type information
-        declare( cursym, &cursym->type.sub );
+        declare( curnsp, cursym, &cursym->type.sub );
 
         if ( !( (ctype & CPL_DTYPE_MASK) || (cnsp & CPL_NSPACE_MASK) )
           && !(  cursym->type.sub->inder ||  cursym->type.sub->ftype ) ) mccfail("can't declare variable storing void");

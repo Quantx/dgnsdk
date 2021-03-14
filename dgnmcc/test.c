@@ -1,4 +1,4 @@
-int a, b, c, *g;
+int a, b, c, g[4];
 
 int main( int argc, char ** argv )
 {
