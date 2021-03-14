@@ -1,33 +1,15 @@
-int a, b, c, * g;
-unsigned int d;
-long l;
+void * v;
 
-struct test {
-    int a;
-} tv;
+int ** x, ** y;
 
-int *** z;
-
-char x, y;
-
-float w;
-
-//char f[];
+long a;
+int c;
+//int (*a)(int a, int b, ...);
+//char (*b)(int a, int b, ...);
+char d;
 
 int main( int argc, char ** argv )
 {
-//    z = y || tv.a || a.bsd ;
-//      x = l;
-//    printf( "%ld\n", sizeof(f) );
-
-//    a->b->c.d;
-
-    a = (c + g)[ (a++ + -g[2]) * ++b ] + 4, 7 + b;
-
-
-//      sizeof ( a + b + c );
-//    ++(*a);
-//    (c)++;
-//    mystruct->g[a] = b++ == 4 ? c > a ? (a + 4) * sizeof b : 5 << b : -b && (c % 4);
-//      a = b ? a : c ? a : b ? c : g;
+//    v = c ? v : va;
+    v = c ? x : y;
 }

@@ -61,6 +61,7 @@ void declare( struct mccsym * cursym, struct mccsubtype ** partype )
     else if ( tk == '(' ) // Get function declarations
     {
         struct mccnsp * curnsp = curtype->ftype = sbrk( sizeof(struct mccnsp) );
+        if ( curnsp == SBRKFAIL ) mccfail("unable to allocate space for new namespace");
 
         curnsp->name = NULL;
         curnsp->len = 0;
@@ -108,9 +109,10 @@ void declare( struct mccsym * cursym, struct mccsubtype ** partype )
             || cursym->type.sub != *partype
         )
         // Check if empty
-        && !curtype->inder
         && !curtype->arrays
-        && !curtype->ftype ) *partype = curtype->sub;
+        && !curtype->ftype )
+            // Pass up inderections and drop this subtype
+            curtype->sub->inder += curtype->inder, *partype = curtype->sub;
 }
 
 // (extern|static) (const|register) (signed|unsigned) <void|char|int|...etc>
@@ -294,6 +296,9 @@ void define( struct mccnsp * curnsp )
         // Process type information
         declare( cursym, &cursym->type.sub );
 
+        if ( !( (ctype & CPL_DTYPE_MASK) || (cnsp & CPL_NSPACE_MASK) )
+          && !(  cursym->type.sub->inder ||  cursym->type.sub->ftype ) ) mccfail("can't declare variable storing void");
+
         // TODO compare to existing symbol
 //        compareSymbol( cursym,
 
@@ -305,41 +310,46 @@ void define( struct mccnsp * curnsp )
         struct mccsubtype * sbt;
         for ( sbt = cursym->type.sub; sbt->sub; sbt = sbt->sub );
 
-        // Function call
-        if ( sbt->ftype && tk == '{' )
+        if ( sbt->ftype )
         {
-            // Mark function as defined
-            if ( sbt->ftype->type & CPL_DEFN ) mccfail("function already declared");
-            sbt->ftype->type |= CPL_DEFN;
+            if ( curnsp != &glbnsp ) mccfail("function declared outside file scope");
 
-            // Create namespace to hold all bottom level function declarations
-            struct mccnsp * bbnsp = sbrk(sizeof(struct mccnsp));
-            if ( bbnsp == SBRKFAIL ) mccfail("unable to allocate room for function base block");
-
-            bbnsp->name = NULL;
-            bbnsp->len = 0;
-
-            bbnsp->type = CPL_BLOCK;
-            bbnsp->size = 0;
-
-            bbnsp->symtbl = NULL; bbnsp->symtail = &bbnsp->symtbl;
-            bbnsp->nsptbl = NULL; bbnsp->nsptail = &bbnsp->nsptbl;
-
-            bbnsp->parent = sbt->ftype;
-            bbnsp->next = NULL;
-
-            // Add to parent namespace
-            *sbt->ftype->nsptail = bbnsp;
-            sbt->ftype->nsptail = &bbnsp->next;
-
-            ntok();
-            while ( tk != '}' )
+            // Function with codeblock
+            if ( tk == '{' )
             {
-                statement(bbnsp);
-            }
+                // Mark function as defined
+                if ( sbt->ftype->type & CPL_DEFN ) mccfail("function already declared");
+                sbt->ftype->type |= CPL_DEFN;
 
-            ntok();
-            break;
+                // Create namespace to hold all bottom level function declarations
+                struct mccnsp * bbnsp = sbrk(sizeof(struct mccnsp));
+                if ( bbnsp == SBRKFAIL ) mccfail("unable to allocate room for function base block");
+
+                bbnsp->name = NULL;
+                bbnsp->len = 0;
+
+                bbnsp->type = CPL_BLOCK;
+                bbnsp->size = 0;
+
+                bbnsp->symtbl = NULL; bbnsp->symtail = &bbnsp->symtbl;
+                bbnsp->nsptbl = NULL; bbnsp->nsptail = &bbnsp->nsptbl;
+
+                bbnsp->parent = sbt->ftype;
+                bbnsp->next = NULL;
+
+                // Add to parent namespace
+                *sbt->ftype->nsptail = bbnsp;
+                sbt->ftype->nsptail = &bbnsp->next;
+
+                ntok();
+                while ( tk != '}' )
+                {
+                    statement(bbnsp);
+                }
+
+                ntok();
+                break;
+            }
         }
 
         // Only declare one variable per definition

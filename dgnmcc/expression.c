@@ -281,7 +281,7 @@ struct mccnode * expr(struct mccnsp * curnsp)
 
     root = n = *nstk;
 
-#if DEBUG
+#if DEBUG_EXPR
     dumpTree( root, "expr_tree.dot" );
     write( 2, "FINISHED\n", 9 );
 #endif
@@ -361,15 +361,20 @@ struct, union: (In addition to pointers above)
 *** DON'T FORGET ABOUT CASTING
 */
 
+#if DEBUG_EXPR
         write(2, "Tok: ", 5);
         writeToken(2, n->oper);
         write(2, "\n", 1);
+#endif
 
         // TODO optimize typechecking/promotion
         if ( n->oper >= Ass && n->oper <= OrAss )
         {
+            if ( ~n->left->flag & CPL_LVAL ) mccfail("lhs of assignment is not an l-value");
+
             if ( n->oper == Ass ) // Any compatible type
             {
+                if ( isArray(n->left->type) ) mccfail("lhs of assignment is array");
                 if ( !isCompatible( n->left->type, n->right->type ) ) mccfail("incompatible types");
             }
             else if ( n->oper == AddAss )
@@ -403,14 +408,15 @@ struct, union: (In addition to pointers above)
                 if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
             }
 
-            n->type = n->left->type;
+            n->type = n->left->type; // Always produces a non l-value
         }
         else if ( n->oper == Tern )
         {
             if ( !isScalar(n->left->type) ) mccfail("lhs is not a scalar type");
             n->type = n->right->type;
+            n->flag = n->right->flag;
         }
-        else if ( n->oper == ':' )
+        else if ( n->oper == ':' ) // Always results in an r-value
         {
             if ( !isCompatible( n->left->type, n->right->type ) ) mccfail("incompatible types");
             // Promote if needed
@@ -448,11 +454,13 @@ struct, union: (In addition to pointers above)
             {
                 if ( !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is not integer type");
                 n->type = n->left->type;
+                n->flag |= CPL_LVAL;
             }
             else if ( isPointer(n->right->type) )
             {
                 if ( !isInteger(n->left->type) ) mccfail("rhs is pointer, lhs is not integer type");
                 n->type = n->right->type;
+                n->flag |= CPL_LVAL;
             }
             else
             {
@@ -466,7 +474,7 @@ struct, union: (In addition to pointers above)
             if ( isPointer(n->left->type) )
             {
                 if ( isPointer(n->right->type) ) n->type = &type_int;
-                else if ( isInteger(n->right->type) ) n->type = n->left->type;
+                else if ( isInteger(n->right->type) ) n->type = n->left->type, n->flag = CPL_LVAL;
                 else mccfail("lhs is pointer, rhs is neither pointer nor integer");
             }
             else
@@ -511,55 +519,80 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Inder )
         {
-            if ( !isPointer(n->right->type) ) mccfail("not a pointer");
+            if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
             n->type = typeInder(n->right->type);
         }
         else if ( n->oper == Deref )
         {
-            if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
+            if ( !isPointer(n->right->type) ) mccfail("not a pointer");
             n->type = typeDeref(n->right->type);
+
+            n->flag |= CPL_LVAL;
         }
         else if ( n->oper == PreInc || n->oper == PreDec )
         {
             if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
             if ( !isScalar(n->right->type) ) mccfail("not a scalar type");
             n->type = n->right->type;
+
+            n->flag |= CPL_LVAL;
         }
         else if ( n->oper == PostInc || n->oper == PostDec )
         {
             if ( ~n->left->flag & CPL_LVAL ) mccfail("not an l-value");
             if ( !isScalar(n->left->type) ) mccfail("not a scalar type");
             n->type = n->left->type;
+
+            n->flag |= CPL_LVAL;
         }
         else if ( n->oper == Dot )
         {
             if ( isPointer(n->left->type) ) mccfail("lhs is a pointer");
             if ( !isStruct(n->left->type) ) mccfail("lhs is not a struct");
             // TODO lookup type of rhs member
+
+            n->flag |= CPL_LVAL;
         }
         else if ( n->oper == Arrow )
         {
             if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
             if ( !isStruct(n->left->type ) ) mccfail("lhs is not a pointer to a struct");
             // TODO lookup type of rhs member
+
+            n->flag |= CPL_LVAL;
         }
         else if ( n->oper == '[' )
         {
             if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
             if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
             n->type = typeDeref(n->left->type);
+            n->flag |= CPL_LVAL;
         }
-        else if ( n->oper == ',' ) n->type = n->right->type; // No rules for ,
+        else if ( n->oper == ',' ) n->type = n->right->type, n->flag = n->right->flag; // No rules for ,
 #ifdef DEBUG_EXPR
         else mccfail("no typecheck rule for operator");
 
         if (!n->type) mccfail("no promotion rule for operator");
 #endif
 
+        if ( n->left && n->right
+          && (n->left->oper  == Number || n->left->oper  == SmolNumber)
+          && (n->right->oper == Number || n->right->oper == SmolNumber) )
+        {
+            switch (n->oper)
+            {
+                
+            }
+
+            if (n->left->oper == Number || n->right->oper == Number) n->oper = Number;
+            else n->oper = SmolNumber;
+        }
+
+
         n = NULL;
     }
 
-#if DEBUG
+#if DEBUG_EXPR
     dumpTree( root, "type_tree.dot" );
 #endif
 

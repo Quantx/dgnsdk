@@ -136,7 +136,13 @@ struct mcctype * typeDeref( struct mcctype * t )
     for ( s = out->sub; s->sub; s = s->sub ) ls = s;
 
     if ( s->ftype ) mccfail("tried to dereference a function");
-    else if ( s->arrays ) s->arrays--; // TODO do we drop the first or last size index here?
+    else if ( s->arrays )
+    {
+        s->arrays--;
+
+        int16_t i;
+        for ( i = 0; i < s->arrays; i++ ) s->sizes[i] = s->sizes[i+1];
+    }
     else if ( s->inder ) s->inder--;
     else mccfail("tried to dereference non-pointer");
 
@@ -152,8 +158,7 @@ struct mcctype * typePromote( struct mcctype * ta, struct mcctype * tb )
     unsigned int8_t pa = ta->ptype & CPL_DTYPE_MASK;
     unsigned int8_t pb = tb->ptype & CPL_DTYPE_MASK;
 
-    if ( pa >= pb ) return ta;
-    else return tb;
+    return pa >= pb ? ta : tb;
 }
 
 /*
@@ -224,27 +229,46 @@ int16_t isArray( struct mcctype * t )
 
 int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
 {
+    // These values may be invalid, confirm first
+    unsigned int8_t pa = ta->ptype & CPL_DTYPE_MASK;
+    unsigned int8_t pb = tb->ptype & CPL_DTYPE_MASK;
+
+    // Pointer, must be exact match (or void pointer)
+    if ( isPointer(ta) )
+    {
+        if ( !isPointer(tb) ) return 0; // Pointer missmatch
+
+        // Void pointers are compatible with everything
+        if ( !ta->stype && pa == CPL_VOID || !tb->stype && pb == CPL_VOID ) return 1;
+
+        // Struct types don't match or primative types don't match
+        if ( ta->stype != tb->stype || (!ta->stype && pa != pb) ) return 0;
+
+        struct mccsubtype * sa, * sb;
+        for ( sa = ta->sub, sb = tb->sub; sa && sb; sa = sa->sub, sb = sb->sub )
+        {
+            if ( sa->inder + !!sa->arrays != sb->inder + !!sb->arrays ) return 0; // Inderection missmatch
+
+            if ( sa->ftype )
+            {
+                if ( !sb->ftype ) return 0;
+
+                // TODO ensure function definitions match
+            }
+        }
+
+        // Subtype count missmatch
+        if ( sa || sb ) return 0;
+
+        return 1;
+    }
+    else if ( isPointer(tb) ) return 0; // Pointer missmatch
+
     // If either is a structure, make sure they're compatible
     if ( ta->stype != tb->stype ) return 0;
 
-/* All primative types are compatible
-    // Ensure primative types match
-    if ( !ta->stype && (ta->ptype & CPL_DTYPE_MASK) != (tb->ptype & CPL_DTYPE_MASK) ) return 0;
-*/
-    // Get active subtype
-    struct mccsubtype * sa, * sb;
-    for ( sa = ta->sub; sa->sub; sa = sa->sub );
-    for ( sb = tb->sub; sb->sub; sb = sb->sub );
-
-    // Make sure array dimensions match
-    if ( sa->arrays != sb->arrays ) return 0;
-
-    if ( sa->ftype )
-    {
-        if ( !sb->ftype ) return 0;
-
-        // TODO check function compatibility
-    }
+    // Ensure primative types are compatible (void is only compatible with self)
+    if ( !ta->stype && (pa == CPL_VOID) != (pb == CPL_VOID) ) return 0;
 
     return 1;
 }
