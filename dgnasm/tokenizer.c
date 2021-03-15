@@ -342,9 +342,9 @@ void ntok()
     write( 1, "INP: '", 6 );
     write( 1, pp, p - pp );
     write( 1, "', TOKEN: ", 10 );
-    octwrite( 1, tk );
+    decwrite( 1, tk );
     write( 1, ", VAL: ", 7 );
-    octwrite( 1, tkVal );
+    decwrite( 1, tkVal );
     write( 1, "\r\n", 2 );
 }
 #endif

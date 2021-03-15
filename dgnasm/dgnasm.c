@@ -29,6 +29,20 @@ void octwrite( int16_t nfd, unsigned int16_t val )
     write( nfd, tmpbuf + tmppos, 6 - tmppos );
 }
 
+void decwrite( int16_t nfd, unsigned int16_t val )
+{
+    int8_t tmpbuf[6];
+    int16_t tmppos = 6;
+
+    while ( val )
+    {
+        tmpbuf[--tmppos] = val % 10 + '0';
+        val /= 10;
+    }
+
+    write( nfd, tmpbuf + tmppos, 6 - tmppos );
+}
+
 // Output a symbol from the table
 void symwrite( int16_t nfd, struct asmsym * cursym )
 {
@@ -38,17 +52,17 @@ void symwrite( int16_t nfd, struct asmsym * cursym )
     write( nfd, cursym->name, k );
 
     write( nfd, " | ", 3 );
-    octwrite( nfd, cursym->len );
+    decwrite( nfd, cursym->len );
 
     write( nfd, "\r\n", 2 );
 
 
     write( nfd, "TYPE: ", 6);
-    octwrite( nfd, cursym->type );
+    decwrite( nfd, cursym->type );
     write( nfd, "\r\n", 2 );
 
     write( nfd, "VAL: ", 5 );
-    octwrite( nfd, cursym->val );
+    decwrite( nfd, cursym->val );
     write( nfd, "\r\n", 2 );
 }
 
@@ -73,12 +87,12 @@ void asmfail( int8_t * msg )
 
         if ( p )
         {
-            // Output current line in octal
-            octwrite( 2, curline );
+            // Output current line
+            decwrite( 2, curline );
             write( 2, ":", 1 );
 
-            // Output current position in octal
-            octwrite( 2, pp - lp );
+            // Output current position
+            decwrite( 2, pp - lp );
             write( 2, ":", 1 );
         }
 
@@ -224,19 +238,13 @@ int16_t main( int16_t argc, int8_t ** argv )
     if ( zero.data.pos > 0xFF ) asmfail("zero page overflow");
 
     // Create temp files
-    text.data.fd = creat( "/tmp/text-data", 0666 );
-    if ( text.data.fd < 0 ) asmfail("failed to create /tmp/text-data");
-    data.data.fd = creat( "/tmp/data-data", 0666 );
-    if ( data.data.fd < 0 ) asmfail("failed to create /tmp/data-data");
-    zero.data.fd = creat( "/tmp/zero-data", 0666 );
-    if ( zero.data.fd < 0 ) asmfail("failed to create /tmp/zero-data");
+    if ( (text.data.fd = creat( "/tmp/text-data", 0666 )) < 0 ) asmfail("failed to create /tmp/text-data");
+    if ( (data.data.fd = creat( "/tmp/data-data", 0666 )) < 0 ) asmfail("failed to create /tmp/data-data");
+    if ( (zero.data.fd = creat( "/tmp/zero-data", 0666 )) < 0 ) asmfail("failed to create /tmp/zero-data");
 
-    text.rloc.fd = creat( "/tmp/text-rloc", 0666 );
-    if ( text.rloc.fd < 0 ) asmfail("failed to create /tmp/text-rloc");
-    data.rloc.fd = creat( "/tmp/data-rloc", 0666 );
-    if ( data.rloc.fd < 0 ) asmfail("failed to create /tmp/data-rloc");
-    zero.rloc.fd = creat( "/tmp/zero-rloc", 0666 );
-    if ( zero.rloc.fd < 0 ) asmfail("failed to create /tmp/zero-rloc");
+    if ( (text.rloc.fd = creat( "/tmp/text-rloc", 0666 )) < 0 ) asmfail("failed to create /tmp/text-rloc");
+    if ( (data.rloc.fd = creat( "/tmp/data-rloc", 0666 )) < 0 ) asmfail("failed to create /tmp/data-rloc");
+    if ( (zero.rloc.fd = creat( "/tmp/zero-rloc", 0666 )) < 0 ) asmfail("failed to create /tmp/zero-rloc");
 
     // *** Reset for next pass ***
     text.data.size = text.data.pos; text.data.pos = 0;
