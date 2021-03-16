@@ -14,13 +14,13 @@ void statement( struct mccnsp * curnsp )
     }
     else
     {
-        void * esp = sbrk(0);
+        void * erbp = sbrk(0); // Expression RollBack Point
 
-        expr( curnsp, 0 );
+        expr( curnsp, 0 ); // No stop token
 
         if ( tk != ';' ) mccfail( "Expected ; after expression" );
         ntok();
 
-        brk(esp); // Free memory allocated by the expression
+        brk(erbp); // Free memory allocated by the expression
     }
 }

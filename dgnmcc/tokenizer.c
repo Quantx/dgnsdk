@@ -175,7 +175,7 @@ void ntok()
         else if ( tk == '\'' || tk == '"' ) // Character or String constant
         {
             // Record initial value
-            if ( tk == '"' ) tkVal = cnst.pos;
+            if ( tk == '"' ) tkVal = 0; //cnst.pos; TODO fix this
             else tkVal = *p;
 
             while ( *p || readline() )
@@ -351,7 +351,7 @@ void ntok()
     debug_ntok();
 
     write( 1, "TOKEN: ", 7 );
-    octwrite( 1, tk );
+    decwrite( 1, tk );
 
     if ( tk )
     {

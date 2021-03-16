@@ -3,6 +3,7 @@
 unsigned int16_t flags; // Store misc booleans
 unsigned int16_t curfno; // Current file number
 unsigned int16_t stksize; // Additional stack size
+int16_t segs[5]; // Text, Constant, Zero, Data, Bss
 
 struct mccnsp glbnsp = { NULL, 0, 0, CPL_BLOCK, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
 
@@ -25,7 +26,20 @@ void octwrite( int16_t nfd, unsigned int16_t val )
     write( nfd, tmpbuf + tmppos, 6 - tmppos );
 }
 
-#include "segments.c"
+void decwrite( int16_t nfd, unsigned int16_t val )
+{
+    int8_t tmpbuf[6];
+    int16_t tmppos = 6;
+
+    while ( val )
+    {
+        tmpbuf[--tmppos] = val % 10 + '0';
+        val /= 10;
+    }
+
+    write( nfd, tmpbuf + tmppos, 6 - tmppos );
+}
+
 #include "tokenizer.c"
 #include "symbols.c"
 #include "types.c"
@@ -43,7 +57,7 @@ void mccfail( int8_t * msg )
 
     if ( ln )
     {
-        octwrite( 2, ln );
+        decwrite( 2, ln );
         write( 2, ":", 1 );
     }
 
@@ -73,9 +87,16 @@ int16_t main( int16_t argc, int8_t ** argv )
     int8_t * progname = *argv++; argc--;
 
 #if DEBUG
-    // Sanity check to make sure we can store constants all in a char
+    // Sanity check to make sure we can store all constants in a char
     if ( Arrow > 0xFF ) mccfail("too many constants!");
 #endif
+
+    // Open output files
+    if ( (segs[SEG_ZERO] = creat( "zero.seg", 0666 )) < 0 ) mccfail("failed to create zero segment");
+    if ( (segs[SEG_TEXT] = creat( "text.seg", 0666 )) < 0 ) mccfail("failed to create text segment");
+    if ( (segs[SEG_CNST] = creat( "cnst.seg", 0666 )) < 0 ) mccfail("failed to create cnst segment");
+    if ( (segs[SEG_DATA] = creat( "data.seg", 0666 )) < 0 ) mccfail("failed to create data segment");
+    if ( (segs[SEG_BSS ] = creat( "bss.seg",  0666 )) < 0 ) mccfail("failed to create bss  segment");
 
     // Process all argument options
     while ( argc && **argv == '-' )

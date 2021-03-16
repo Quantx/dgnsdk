@@ -194,7 +194,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 
             if ( !otop )
             {
-                if ( stk == ']' ) break;
+                if ( stk == tk ) break;
                 mccfail("no matching open parenthasis or bracket in expression");
             }
 
@@ -538,16 +538,20 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Dot )
         {
-            if ( isPointer(n->left->type) ) mccfail("lhs is a pointer");
             if ( !isStruct(n->left->type) ) mccfail("lhs is not a struct");
+            if ( isPointer(n->left->type) ) mccfail("lhs is a pointer");
             // TODO lookup type of rhs member
 
             n->flag |= CPL_LVAL;
         }
         else if ( n->oper == Arrow )
         {
-            if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
-            if ( !isStruct(n->left->type ) ) mccfail("lhs is not a pointer to a struct");
+//            if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
+            if ( !isStruct(n->left->type ) ) mccfail("lhs is not a struct type");
+
+            struct mccsubtype * s = n->left->type->sub;
+            if ( s->sub || s->inder + s->arrays - 1 ) mccfail("lhs not a pointer to struct");
+
             // TODO lookup type of rhs member
 
             n->flag |= CPL_LVAL;
@@ -623,6 +627,7 @@ struct, union: (In addition to pointers above)
 
                 switch (n->oper)
                 {
+//                    case Inder:  vl = n->left->sym->addr; break; // TODO inderection
                     case Plus:   vl = +vl; break;
                     case Minus:  vl = -vl; break;
                     case Not:    vl = ~vl; break;

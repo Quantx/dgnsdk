@@ -116,9 +116,9 @@ int8_t * typeNames[] = {
 #define CPL_ENUM  3 // Enumeration
 #define CPL_FUNC  4 // Function arguments
 #define CPL_VFUNC 5 // Variadic Function arguments
-#define CPL_NSPACE_MASK 7
+#define CPL_NSPACE_MASK 0b111
 
-#define CPL_DEFN 8 // Defined flag
+#define CPL_DEFN (1 << 3) // Defined flag
 
 // NameSPace
 struct mccnsp
@@ -170,7 +170,7 @@ mcctype->ftype = mccnsp_args // Function argument namespace
 mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 */
 
-/* Data type bitmask
+/* Data type bitmask (stored in: type->ptype)
 
 |0|0|00|0000
 | | |  |Primative datatype
@@ -188,17 +188,27 @@ mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 #define CPL_ULNG 6 // (32 bits) Unsigned Long
 #define CPL_FPV  7 // (32 bits) DG Nova Float
 #define CPL_DBL  8 // (64 bits) DG Nova Double
-#define CPL_DTYPE_MASK 15 // Mask
+#define CPL_DTYPE_MASK 0b00001111 // Mask
+
+// Segments
+#define SEG_ZERO 0
+#define SEG_TEXT 1
+#define SEG_CNST 2
+#define SEG_DATA 3
+#define SEG_BSS  4
+#define SEG_STAK 5
 
 // C Storage types
-#define CPL_TEXT 0 << 4 // Text (write only) (functions and constants)
-#define CPL_ZERO 1 << 4 // Zero page (register)
-#define CPL_DATA 2 << 4 // Data (static)
-#define CPL_STAK 3 << 4 // Stack (dynamic)
-#define CPL_STORE_MASK 3 << 4 // Mask
+#define CPL_ZERO (SEG_ZERO << 4) // Zero page (register)
+#define CPL_TEXT (SEG_TEXT << 4) // Text (function code)
+#define CPL_CNST (SEG_CNST << 4) // Constants (read only data)
+#define CPL_DATA (SEG_DATA << 4) // Data (static)
+#define CPL_BSS  (SEG_BSS  << 4) // Bss  (initialized to zero)
+#define CPL_STAK (SEG_STAK << 4) // Stack (dynamic)
+#define CPL_STORE_MASK (0b01110000) // Mask
 
 // C Storage qualifiers
-#define CPL_XTRN 1 << 6 // Extern flag
+#define CPL_XTRN 0b10000000 // Extern flag
 
 // Type information
 struct mccsubtype
@@ -226,13 +236,12 @@ struct mccsym
     int8_t * name;
     unsigned int8_t len;
 
-    unsigned int16_t addr; // Offset from start of segment
     struct mcctype type; // Type information
 
     struct mccsym * next; // Store the next symbol in the table
 };
 
-#define CPL_LVAL 1 << 0 // True if this node contains an l-value
+#define CPL_LVAL 1 // True if this node contains an l-value
 
 // Tree node
 struct mccnode
@@ -255,18 +264,8 @@ struct mccnode
     struct mccnode * left, * right;
 };
 
-// Store a data segment
-struct segment
-{
-    int16_t fd;
-    unsigned int16_t pos;
-    unsigned int16_t size;
-};
-
 // Compiler fail function
 void mccfail(int8_t * msg);
-
-void define(struct mccnsp * curnsp);
 
 #ifdef DEBUG
 void writeType(int16_t fd, struct mcctype * t, int8_t * name, int16_t len);

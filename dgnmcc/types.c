@@ -30,6 +30,8 @@ struct mcctype type_string = {
     &subtype_ptr
 };
 
+struct mcctype * typeDeref( struct mcctype * t );
+
 // Size required to store type in bytes
 int16_t typeSize( struct mcctype * t )
 {
@@ -46,7 +48,16 @@ int16_t typeSize( struct mcctype * t )
         if ( !s->sizes[i] ) mccfail("cannot get sizeof unknown dimension in array");
         j *= s->sizes[i];
     }
-    if ( i ) return j;
+    if ( i )
+    {
+        void * drbp = sbrk(0);
+
+        j *= typeSize(typeDeref(t));
+
+        brk(drbp);
+
+        return j;
+    }
 
     // Check if this is a pointer
     if ( s->inder ) return 2;
@@ -247,7 +258,7 @@ int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
         struct mccsubtype * sa, * sb;
         for ( sa = ta->sub, sb = tb->sub; sa && sb; sa = sa->sub, sb = sb->sub )
         {
-            if ( sa->inder + !!sa->arrays != sb->inder + !!sb->arrays ) return 0; // Inderection missmatch
+            if ( sa->inder + sa->arrays != sb->inder + sb->arrays ) return 0; // Inderection missmatch
 
             if ( sa->ftype )
             {

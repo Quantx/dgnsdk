@@ -1,3 +1,5 @@
+void define(struct mccnsp * curnsp); // Fix circular dependancy
+
 void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype ** partype )
 {
     struct mccsubtype * curtype = *partype;
@@ -42,12 +44,13 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
 
     ntok();
 
+    // Pointer sizes to end of current program break
+    // Do this here in case we pass arrays up
+    curtype->sizes = sbrk(0);
+
     // Get array declarations
     if ( tk == '[' )
     {
-        // Pointer sizes to end of current program break
-        curtype->sizes = sbrk(0);
-
         while ( tk == '[' )
         {
             ntok();
@@ -56,10 +59,11 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
             if ( cas == SBRKFAIL ) mccfail("unable to allocate space for array size");
 
             void * erbp = sbrk(0);
+
             struct mccnode * cexp = expr(curnsp, ']');
 
-            // TODO possible add code emition for non-file scope arrays
-            if ( cexp->oper != SmolNumber && cexp->oper != Number ) mccfail("need constant expression in array declaration");
+            // MAYBE add code emition for non-file scope arrays
+            if ( cexp->oper < Number || cexp->oper > LongNumber ) mccfail("need constant expression in array declaration");
             *cas = cexp->val;
 
             brk(erbp); // Free expression stack
@@ -113,10 +117,14 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
         ntok();
     }
 
-    // Pass up inderections if possible
-    if ( curtype->sub
-     && !curtype->arrays
-     && !curtype->ftype ) curtype->sub->inder += curtype->inder, curtype->inder = 0;
+    if ( curtype->sub )
+    {
+        // Pass up arrays if possible
+        if ( !(curtype->sub->inder || curtype->sub->ftype) ) curtype->sub->arrays += curtype->arrays, curtype->arrays = 0;
+
+        // Pass up inderections if possible
+        if ( !(curtype->arrays || curtype->ftype) ) curtype->sub->inder += curtype->inder, curtype->inder = 0;
+    }
 
     // Fold child through empty subtypes
     if ((
@@ -129,6 +137,89 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
         && !curtype->inder
         && !curtype->arrays
         && !curtype->ftype ) *partype = curtype->sub;
+}
+
+void instantiate( struct mccnsp * curnsp, int16_t sfd, struct mcctype * curtype )
+{
+    struct mccsubtype * s;
+    for ( s = curtype->sub; s->sub; s = s->sub );
+
+    if ( s->ftype ) mccfail("cannot instantiate a function");
+
+    if ( s->arrays )
+    {
+        if ( tk != '{' ) mccfail("expected opening curly-brace");
+        ntok();
+
+        void * arbp = sbrk(0);
+
+        struct mcctype * dt = typeDeref(curtype);
+
+        unsigned int16_t i;
+        for ( i = 0; i < s->arrays; i++ )
+        {
+            instantiate(curnsp, sfd, dt);
+
+            if ( tk == '}' ) break;
+            if ( tk == ',' ) ntok();
+            else mccfail("expected closing curly-brace or comma");
+        }
+
+        if ( tk != '}' ) mccfail("expected closing curly-brace");
+
+        // Fill rest of array with zeros
+        write( sfd, ".zero ", 6 );
+        decwrite( sfd, (s->arrays - i) * typeSize(dt) );
+
+        brk(arbp);
+
+        return;
+    }
+
+    if ( curtype->stype ) // TODO struct initialization
+    {
+        return;
+    }
+
+    void * erbp = sbrk(0);
+
+    struct mccnode * cexp = expr(curnsp, ',');
+
+    if ( !isCompatible( curtype, cexp->type ) ) mccfail("incompatible initialization type");
+
+    switch ( typeSize(curtype) )
+    {
+        case 1: write( sfd, ".byte ", 6 ); break;
+        case 2: write( sfd, ".word ", 6 ); break;
+        case 4: write( sfd, ".long ", 6 ); break;
+        case 8: write( sfd, ".quad ", 6 ); break;
+#if DEBUG
+        default: mccfail("invalid primative/pointer size");
+#endif
+    }
+
+    // TODO finish primative/pointer initialization
+    // https://en.cppreference.com/w/c/language/constant_expression
+
+    if ( cexp->oper >= Number && cexp->oper <= LongNumber ) // Integer expression
+    {
+        if ( cexp->oper == LongNumber ) octwrite( LongNumber );
+        else decwrite( sfd, cexp->val );
+    }
+    // Address-of (Inderection) operations
+    else if ( cexp->oper == Inder )
+    {
+
+    }
+    else if ( cexp->oper == Add || cexp->oper == Sub )
+    {
+
+    }
+    else mccfail("non-constant initializer");
+
+    write( sfd, "\n", 1 );
+
+    brk(erbp);
 }
 
 // (extern|static) (const|register) (signed|unsigned) <void|char|int|...etc>
@@ -150,10 +241,10 @@ void define( struct mccnsp * curnsp )
         // Check storage type
         switch ( tk ) // Check for storage type
         {
-            case Const:    ctype |= CPL_TEXT; ntok(); break;
+            case Const:    ctype |= CPL_CNST; ntok(); break;
             case Register: ctype |= CPL_ZERO; ntok(); break;
             case Auto:
-            default: ctype |= curnsp == &glbnsp ? CPL_DATA : CPL_STAK;
+            default: ctype |= curnsp == &glbnsp ? CPL_BSS : CPL_STAK;
         }
     }
 
@@ -302,7 +393,7 @@ void define( struct mccnsp * curnsp )
         cursym->type.ptype = ctype; // Record primative datatype
         cursym->type.stype = newnsp; // Record if this is a struct or not
 
-        cursym->addr = 0;
+//        cursym->addr = 0;
 
         cursym->next = NULL;
 
@@ -337,6 +428,9 @@ void define( struct mccnsp * curnsp )
                 if ( sbt->ftype->type & CPL_DEFN ) mccfail("function already declared");
                 sbt->ftype->type |= CPL_DEFN;
 
+                cursym->type.ptype &= ~CPL_STORE_MASK;
+                cursym->type.ptype |= CPL_TEXT;
+
                 // Create namespace to hold all bottom level function declarations
                 struct mccnsp * bbnsp = sbrk(sizeof(struct mccnsp));
                 if ( bbnsp == SBRKFAIL ) mccfail("unable to allocate room for function base block");
@@ -357,6 +451,9 @@ void define( struct mccnsp * curnsp )
                 *sbt->ftype->nsptail = bbnsp;
                 sbt->ftype->nsptail = &bbnsp->next;
 
+                write( segs[SEG_TEXT], cursym->name, cursym->len );
+                write( segs[SEG_TEXT], ":\n", 2 );
+
                 ntok();
                 while ( tk != '}' )
                 {
@@ -365,6 +462,26 @@ void define( struct mccnsp * curnsp )
 
                 ntok();
                 break;
+            }
+        }
+        else // Not a function
+        {
+            // No longer initialized to zero so convert BSS to DATA
+            if ( tk == '=' && (cursym->type.ptype & CPL_STORE_MASK) == CPL_BSS )
+            {
+                cursym->type.ptype &= ~CPL_STORE_MASK;
+                cursym->type.ptype |= CPL_DATA;
+            }
+
+            int16_t sfd = segs[(cursym->type.ptype & CPL_STORE_MASK) >> 4];
+
+            write( sfd, cursym->name, cursym->len );
+            write( sfd, ": ", 2 );
+
+            if ( tk == '=' )
+            {
+                ntok();
+                instantiate(curnsp, sfd, &cursym->type);
             }
         }
 
