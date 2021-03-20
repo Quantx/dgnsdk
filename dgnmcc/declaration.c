@@ -493,36 +493,10 @@ void define( struct mccnsp * curnsp )
                 cursym->type.ptype &= ~CPL_STORE_MASK;
                 cursym->type.ptype |= CPL_TEXT;
 
-                // Create namespace to hold all bottom level function declarations
-                struct mccnsp * bbnsp = sbrk(sizeof(struct mccnsp));
-                if ( bbnsp == SBRKFAIL ) mccfail("unable to allocate room for function base block");
-
-                bbnsp->name = NULL;
-                bbnsp->len = 0;
-
-                bbnsp->type = CPL_BLOCK;
-                bbnsp->size = 0;
-
-                bbnsp->symtbl = NULL; bbnsp->symtail = &bbnsp->symtbl;
-                bbnsp->nsptbl = NULL; bbnsp->nsptail = &bbnsp->nsptbl;
-
-                bbnsp->parent = sbt->ftype;
-                bbnsp->next = NULL;
-
-                // Add to parent namespace
-                *sbt->ftype->nsptail = bbnsp;
-                sbt->ftype->nsptail = &bbnsp->next;
-
                 write( segs[SEG_TEXT], cursym->name, cursym->len );
                 write( segs[SEG_TEXT], ":\n", 2 );
 
-                ntok();
-                while ( tk != '}' )
-                {
-                    statement(bbnsp);
-                }
-
-                ntok();
+                statement(sbt->ftype);
                 break;
             }
         }

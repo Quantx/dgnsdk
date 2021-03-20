@@ -9,3 +9,4 @@ dgnmcc_old/
 *.seg
 dgnova
 a.out
+*.dot

@@ -386,7 +386,7 @@ struct, union: (In addition to pointers above)
         write(2, "\n", 1);
 #endif
 
-        // TODO optimize typechecking/promotion
+        // MAYBE optimize typechecking/promotion
         if ( n->oper >= Ass && n->oper <= OrAss )
         {
             if ( ~n->left->flag & CPL_LVAL ) mccfail("lhs of assignment is not an l-value");
