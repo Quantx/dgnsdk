@@ -1,5 +1,3 @@
-void define(struct mccnsp * curnsp); // Fix circular dependancy
-
 void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype ** partype )
 {
     struct mccsubtype * curtype = *partype;
@@ -63,7 +61,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
             struct mccnode * cexp = expr(curnsp, ']');
 
             // MAYBE add code emition for non-file scope arrays
-            if ( cexp->oper < Number || cexp->oper > LongNumber ) mccfail("need constant expression in array declaration");
+            if ( cexp->oper < Number || cexp->oper > LongNumber ) mccfail("need constant integer expression in array declaration");
             *cas = cexp->val;
 
             brk(erbp); // Free expression stack
@@ -139,7 +137,22 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
         && !curtype->ftype ) *partype = curtype->sub;
 }
 
-void instantiate( struct mccnsp * curnsp, int16_t sfd, struct mcctype * curtype )
+void outputVarAddr( int16_t segfd, struct mccnode * n )
+{
+    struct mccsym * isym = n->sym;
+
+    if ( n->oper == Dot ) isym = n->left->sym;
+    else if ( n->oper != Variable ) mccfail("cannot output address of non-variable");
+
+    write( segfd, isym->name, isym->len );
+    if ( n->oper == Dot )
+    {
+        write( segfd, " + ", 3 );
+        // TODO output struct offset
+    }
+}
+
+void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtype )
 {
     struct mccsubtype * s;
     for ( s = curtype->sub; s->sub; s = s->sub );
@@ -155,21 +168,28 @@ void instantiate( struct mccnsp * curnsp, int16_t sfd, struct mcctype * curtype 
 
         struct mcctype * dt = typeDeref(curtype);
 
-        unsigned int16_t i;
-        for ( i = 0; i < s->arrays; i++ )
+        unsigned int16_t i = 0;
+        while ( i < *s->sizes )
         {
-            instantiate(curnsp, sfd, dt);
+            instantiate(curnsp, segfd, dt);
 
+            i++;
             if ( tk == '}' ) break;
             if ( tk == ',' ) ntok();
             else mccfail("expected closing curly-brace or comma");
         }
 
         if ( tk != '}' ) mccfail("expected closing curly-brace");
+        ntok();
 
-        // Fill rest of array with zeros
-        write( sfd, ".zero ", 6 );
-        decwrite( sfd, (s->arrays - i) * typeSize(dt) );
+        // Output filler if needed
+        if ( i = *s->sizes - i )
+        {
+            // Fill rest of array with zeros
+            write( segfd, "\t.zero ", 7 );
+            decwrite( segfd, i * typeSize(dt) );
+            write( segfd, "\n", 1 );
+        }
 
         brk(arbp);
 
@@ -185,57 +205,98 @@ void instantiate( struct mccnsp * curnsp, int16_t sfd, struct mcctype * curtype 
 
     struct mccnode * cexp = expr(curnsp, ',');
 
-    if ( !isCompatible( curtype, cexp->type ) ) mccfail("incompatible initialization type");
+    int16_t comp = isCompatible( curtype, cexp->type );
 
-    switch ( typeSize(curtype) )
+    if ( !comp ) mccfail("incompatible initialization type");
+    else if ( comp < 0 ) mccfail("constant to large for type");
+
+    if ( cexp->oper >= Number && cexp->oper <= DblNumber ) // Integer expression
     {
-        case 1: write( sfd, ".byte ", 6 ); break;
-        case 2: write( sfd, ".word ", 6 ); break;
-        case 4: write( sfd, ".long ", 6 ); break;
-        case 8: write( sfd, ".quad ", 6 ); break;
-#if DEBUG
-        default: mccfail("invalid primative/pointer size");
-#endif
+        switch ( typeSize(curtype) )
+        {
+            case 1: write( segfd, "\t.byte ", 7 ); break;
+            case 2: write( segfd, "\t.word ", 7 ); break;
+            case 4: write( segfd, "\t.long ", 7 ); break;
+            case 8: write( segfd, "\t.quad ", 7 ); break;
+        }
+
+        // TODO output floats
+        if ( cexp->oper == LongNumber ) octwrite( segfd, cexp->valLong );
+        else decwrite( segfd, cexp->val );
     }
-
-    // TODO finish primative/pointer initialization
-    // https://en.cppreference.com/w/c/language/constant_expression
-
-    if ( cexp->oper >= Number && cexp->oper <= LongNumber ) // Integer expression
+    // String constant
+    else if ( cexp->oper == '"' )
     {
-        if ( cexp->oper == LongNumber ) octwrite( LongNumber );
-        else decwrite( sfd, cexp->val );
+        write( segfd, "\t~SC", 4 );
+        decwrite( segfd, cexp->val );
+        write( segfd, "\n", 1 );
     }
     // Address-of (Inderection) operations
     else if ( cexp->oper == Inder )
     {
-
+        write( segfd, "\t", 1 );
+        outputVarAddr( segfd, cexp->right );
+        write( segfd, "\n", 1 );
     }
-    else if ( cexp->oper == Add || cexp->oper == Sub )
+    else if ( cexp->oper == Sub )
     {
+        if ( cexp->left->oper != Inder ) mccfail("lhs of const subtraction is not address of");
+        if ( cexp->right->oper < SmolNumber || cexp->right->oper > LongNumber ) mccfail("rhs of const subtraction is not number");
 
+        write( segfd, "\t", 1 );
+        outputVarAddr( segfd, cexp->left );
+        write( segfd, " - ", 3 );
+        decwrite( segfd, cexp->right->val );
+        write( segfd, "\n", 1 );
+    }
+    else if ( cexp->oper == Add )
+    {
+        struct mccnode * aofn;
+        int16_t av;
+
+        if ( cexp->left->oper == Inder )
+        {
+            if ( cexp->right->oper < SmolNumber || cexp->right->oper > LongNumber ) mccfail("rhs of address-of addtion is not number");
+            aofn = cexp->left;
+            av = cexp->right->val;
+        }
+        else if ( cexp->right->oper == Inder )
+        {
+            if ( cexp->left->oper < SmolNumber || cexp->left->oper > LongNumber ) mccfail("lhs of address-of addtion is not number");
+            aofn = cexp->right;
+            av = cexp->left->val;
+        }
+        else mccfail("not a constant expression");
+
+        write( segfd, "\t", 1 );
+        outputVarAddr( segfd, aofn );
+        write( segfd, " + ", 3 );
+        decwrite( segfd, av );
+        write( segfd, "\n", 1 );
     }
     else mccfail("non-constant initializer");
 
-    write( sfd, "\n", 1 );
+    write( segfd, "\n", 1 );
 
     brk(erbp);
 }
 
-// (extern|static) (const|register) (signed|unsigned) <void|char|int|...etc>
+// (extern|static) (const|register) (signed|unsigned) <void|char|int|...|struct|union|...|etc>
 void define( struct mccnsp * curnsp )
 {
-    #define LNK_XTRN 1
-    #define LNK_STAT 2
+    #define LNK_EXTERN 1
+    #define LNK_STATIC 2
     unsigned int8_t ctype = 0, cnsp = 0, lnk = 0;
 
-    if ( (curnsp->type & CPL_NSPACE_MASK) == CPL_BLOCK )
+    unsigned int8_t nsptype = curnsp->type & CPL_NSPACE_MASK;
+
+    if ( nsptype == CPL_BLOCK )
     {
         // Determine linkage
         switch ( tk )
         {
-            case Extern: lnk = LNK_XTRN; ntok(); break;
-            case Static: lnk = LNK_STAT; ntok(); break;
+            case Extern: lnk = LNK_EXTERN; ntok(); break;
+            case Static: lnk = LNK_STATIC; ntok(); break;
         }
 
         // Check storage type
@@ -393,7 +454,7 @@ void define( struct mccnsp * curnsp )
         cursym->type.ptype = ctype; // Record primative datatype
         cursym->type.stype = newnsp; // Record if this is a struct or not
 
-//        cursym->addr = 0;
+        cursym->addr = 0;
 
         cursym->next = NULL;
 
@@ -403,7 +464,8 @@ void define( struct mccnsp * curnsp )
         // Process type information
         declare( curnsp, cursym, &cursym->type.sub );
 
-        if ( !( (ctype & CPL_DTYPE_MASK) || (cnsp & CPL_NSPACE_MASK) )
+        if ( nsptype != CPL_CAST // You can cast to VOID
+          && !( (ctype & CPL_DTYPE_MASK) || (cnsp & CPL_NSPACE_MASK) )
           && !(  cursym->type.sub->inder ||  cursym->type.sub->ftype ) ) mccfail("can't declare variable storing void");
 
         // TODO compare to existing symbol
@@ -464,30 +526,50 @@ void define( struct mccnsp * curnsp )
                 break;
             }
         }
-        else // Not a function
+        else if ( (cursym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) // This variable was declared on the stack
+        {
+            // Compute address
+            unsigned int16_t tsz = typeSize(&cursym->type);
+            if ( curnsp->size & 1 && tsz > 1 ) curnsp->size++; // Align to word if needed
+            cursym->addr = curnsp->size;
+            curnsp->size += tsz;
+
+            // TODO stack declarations
+        }
+        else  // Not a function
         {
             // No longer initialized to zero so convert BSS to DATA
-            if ( tk == '=' && (cursym->type.ptype & CPL_STORE_MASK) == CPL_BSS )
+            if ( tk == Ass && (cursym->type.ptype & CPL_STORE_MASK) == CPL_BSS )
             {
                 cursym->type.ptype &= ~CPL_STORE_MASK;
                 cursym->type.ptype |= CPL_DATA;
             }
 
-            int16_t sfd = segs[(cursym->type.ptype & CPL_STORE_MASK) >> 4];
+            int16_t segfd = segs[(cursym->type.ptype & CPL_STORE_MASK) >> 4];
 
-            write( sfd, cursym->name, cursym->len );
-            write( sfd, ": ", 2 );
+            write( segfd, cursym->name, cursym->len );
+            write( segfd, ":\n", 2 );
 
-            if ( tk == '=' )
+            if ( tk == Ass )
             {
                 ntok();
-                instantiate(curnsp, sfd, &cursym->type);
+                instantiate(curnsp, segfd, &cursym->type);
+            }
+            else
+            {
+                write( segfd, "\t.zero ", 7 );
+                decwrite( segfd, typeSize(&cursym->type) );
+                write( segfd, "\n", 1 );
             }
         }
 
+        decwrite(1, nsptype);
+        write(1,"\n",1);
+
         // Only declare one variable per definition
-        if ( (curnsp->type & CPL_NSPACE_MASK) == CPL_FUNC
-          || (curnsp->type & CPL_NSPACE_MASK) == CPL_VFUNC ) break;
+        if ( nsptype == CPL_CAST
+          || nsptype == CPL_FUNC
+          || nsptype == CPL_VFUNC ) break;
         else if ( tk == ',' ) ntok();
         else if ( tk != ';' ) mccfail("expected comma or semi-colon");
     }

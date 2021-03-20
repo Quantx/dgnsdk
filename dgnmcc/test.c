@@ -1,7 +1,13 @@
-int a[2][4] = {
+/*
+int a[3][4] = {
     {1},
     {2}
 };
+
+long b = 0xFFFFFFFF;
+*/
+
+//char * t = "test\a\n";
 
 //int ****((*(*a)(int a))[4])[2];
 
@@ -15,8 +21,11 @@ struct myst {
 int *z = &mysta.a;
 */
 
+//int a[256];
+
+int a, c, g[4], b;
+
 int main( int argc, char ** argv )
 {
-    a;
-//    a = (c + g)[ (a++ + -g[2]) * ++b ] + 4, 7 + 3 + b;
+    a = (c + g)[ (a++ + -g[2]) * ++b ] + 4, 7 + (char _)b;
 }

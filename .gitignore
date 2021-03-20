@@ -6,4 +6,6 @@ dgnasm/build_symbols
 dgnmcc/dgnmcc
 dgnmcc_old/
 
+*.seg
 dgnova
+a.out

@@ -1,3 +1,5 @@
+struct mccnsp castnsp = { NULL, 0, CPL_CAST, 0, NULL, &castnsp.symtbl, NULL, &castnsp.nsptbl };
+
 const unsigned int8_t prectbl[] = {
     Ass,     // 0 - Lowest
     Tern,    // 1 (Right associativity)
@@ -22,11 +24,14 @@ int8_t getPrec( unsigned int8_t op )
     return --i;
 }
 
+// Must be declared before stacks to prevent overflow nonsense
+unsigned int16_t otop, ntop, ctop;
+
 unsigned int8_t ostk[MAX_EXPR_OPER];
-unsigned int16_t otop;
 
 struct mccnode * nstk[MAX_EXPR_NODE];
-unsigned int16_t ntop;
+
+struct mcctype * cstk[MAX_EXPR_CAST];
 
 void reduce()
 {
@@ -40,7 +45,7 @@ void reduce()
 
     // This should never happen
     if ( ostk[otop] == '(' || ostk[otop] == '[' || ostk[otop] == '?' )
-    mccfail("wrong matched parenthasis or bracket in expression");
+        mccfail("wrong matched parenthasis or bracket in expression");
 
     struct mccnode * n = sbrk(sizeof(struct mccnode));
     if ( n == SBRKFAIL ) mccfail("unable to allocate expression node");
@@ -55,11 +60,17 @@ void reduce()
     ||   n->oper == Plus    || n->oper == Minus
     ||   n->oper == Inder   || n->oper == Deref
     ||   n->oper == LogNot  || n->oper == Not
-    ||   n->oper == Sizeof )
+    ||   n->oper == Sizeof  || n->oper == Cast )
     {
         if ( ntop < 1 ) mccfail("not enough nodes for unary operator");
         n->right = nstk[--ntop];
         n->left  = NULL;
+
+        if ( n->oper == Cast )
+        {
+            if (!ctop) mccfail("no type for cast");
+            n->type = cstk[--ctop];
+        }
     }
     // Ternary operator
     else if ( n->oper == Tern )
@@ -93,14 +104,14 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
     struct mccnode * root, * n;
     unsigned int16_t unary = 1;
 
-    otop = ntop = 0;
+    otop = ntop = ctop = 0;
 
     // Build expression tree
-    while ( tk >= Number || tk == '"'
-    ||      tk == ','    || tk == ';'
-    ||      tk == '?'    || tk == ':'
-    ||      tk == '('    || tk == ')'
-    ||      tk == '['    || tk == ']' )
+    while ( tk >= Named || tk == '"'
+    ||      tk == ','   || tk == ';'
+    ||      tk == '?'   || tk == ':'
+    ||      tk == '('   || tk == ')'
+    ||      tk == '['   || tk == ']' )
     {
         int8_t grp = 0;
         unsigned int8_t prec;
@@ -118,7 +129,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 
             ntok();
         }
-        else if ( tk == Named || tk == Number || tk == '"' || tk == SmolNumber || tk == LongNumber )
+        else if ( tk == Named || (tk >= Number && tk <= DblNumber) || tk == '"' )
         {
             nstk[ntop] = sbrk(sizeof(struct mccnode));
             if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new node");
@@ -173,6 +184,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
                 else if ( tk == '"' )
                 {
                     nstk[ntop]->flag |= CPL_LVAL; // String constants are l-values
+                    nstk[ntop]->type = &type_string;
                 }
 
                 ntok();
@@ -263,27 +275,36 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 
             ntok();
 
-            // TODO Check if this is a cast
-            if ( ostk[otop - 1] == '(' )
+            if ( ostk[otop - 1] == '(' && tk >= Void && tk <= Unsigned ) // Check if cast
             {
+                ostk[otop - 1] = Cast;
 
+                castnsp.parent = curnsp;
+                define(&castnsp);
+
+                if ( tk != ')' ) mccfail("expected closing parenthasis in cast");
+                ntok();
+
+                cstk[ctop++] = &castnsp.symtbl->type;
+
+                // Reset casting namespace
+                castnsp.symtbl = NULL;
+                castnsp.symtail = &castnsp.symtbl;
+
+                castnsp.size = 0;
             }
         }
 
         // Check for overflows
         if ( otop > MAX_EXPR_OPER ) mccfail( "operator stack full" );
         if ( ntop > MAX_EXPR_NODE ) mccfail( "node stack full" );
+        if ( ctop > MAX_EXPR_CAST ) mccfail( "cast stack full" );
     }
 
     if ( !ntop ) mccfail("Empty expression stack");
     else if ( ntop > 1 ) mccfail("Not enough operators in expression");
 
     root = n = *nstk;
-
-#if DEBUG_EXPR
-    dumpTree( root, "expr_tree.dot" );
-    write( 2, "FINISHED\n", 9 );
-#endif
 
     // Preform post order traversal for type propogation and constant reduction
     ntop = 0;
@@ -301,8 +322,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 
         if ( n->right && nstk[ntop - 1] == n->right )
         {
-            ntop--;
-            nstk[ntop++] = n;
+            nstk[ntop - 1] = n;
             n = n->right;
             continue;
         }
@@ -346,7 +366,7 @@ struct, union:
     Ass,
     Sizeof, Inder, Dot
 
-*** Supoorted operators for lvalue pointers ***
+*** Supported operators for lvalue pointers ***
 void, char, uchar, int, uint, long, ulong, float, double:
     Ass, AddAss, SubAss,
     LogOr,
@@ -509,6 +529,7 @@ struct, union: (In addition to pointers above)
         {
             if ( !isInteger(n->right->type) ) mccfail("not an integer type");
             n->type = n->right->type;
+            if ( (n->type->ptype & CPL_DTYPE_MASK) < CPL_INT ) n->type = &type_int;
         }
         else if ( n->oper == Plus || n->oper == Minus )
         {
@@ -562,6 +583,14 @@ struct, union: (In addition to pointers above)
             if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
             n->type = typeDeref(n->left->type);
             n->flag |= CPL_LVAL;
+        }
+        else if ( n->oper == Cast )
+        {
+            if ( !isScalar(n->right->type) ) mccfail("rhs of cast is not a scalar");
+
+            // Type of cast is pre-defined
+
+            // Never results in an l-value
         }
         else if ( n->oper == ',' ) n->type = n->right->type, n->flag = n->right->flag; // No rules for ,
 #ifdef DEBUG_EXPR
@@ -627,7 +656,6 @@ struct, union: (In addition to pointers above)
 
                 switch (n->oper)
                 {
-//                    case Inder:  vl = n->left->sym->addr; break; // TODO inderection
                     case Plus:   vl = +vl; break;
                     case Minus:  vl = -vl; break;
                     case Not:    vl = ~vl; break;
@@ -645,7 +673,6 @@ struct, union: (In addition to pointers above)
             }
         }
 
-
         n = NULL;
     }
 
@@ -654,4 +681,35 @@ struct, union: (In addition to pointers above)
 #endif
 
     return root;
+}
+
+void emit(struct mccnsp * curnsp, struct mccnode * root)
+{
+    struct mccnode * n = root;
+
+    // Preform post order traversal for code emission
+    ntop = 0;
+    while ( n || ntop )
+    {
+        while (n)
+        {
+            if ( n->right ) nstk[ntop++] = n->right;
+            nstk[ntop++] = n;
+
+            n = n->left;
+        }
+
+        n = nstk[--ntop];
+
+        if ( n->right && nstk[ntop - 1] == n->right )
+        {
+            nstk[ntop - 1] = n;
+            n = n->right;
+            continue;
+        }
+
+        
+
+        n = NULL;
+    }
 }
