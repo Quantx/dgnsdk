@@ -605,9 +605,16 @@ struct, union: (In addition to pointers above)
             n->val = typeSize(n->right->type);
             n->right->type = NULL;
         }
-        else if ( n->oper == Tern )
+        else if ( n->oper == Tern && (n->left->oper == Number || n->left->oper == SmolNumber) )
         {
-            // TODO constant expr ternary
+            struct mccnode * trn = n->left->val ? n->right->left : n->right->right;
+
+            if ( trn->oper == Number || trn->oper == SmolNumber )
+            {
+                n->oper = trn->oper;
+                n->val = trn->val;
+                n->left = n->right = NULL;
+            }
         }
         else if ( n->right && (n->right->oper == Number || n->right->oper == SmolNumber) )
         {

@@ -537,9 +537,6 @@ void define( struct mccnsp * curnsp )
             }
         }
 
-        decwrite(1, nsptype);
-        write(1,"\n",1);
-
         // Only declare one variable per definition
         if ( nsptype == CPL_CAST
           || nsptype == CPL_FUNC

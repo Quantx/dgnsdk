@@ -23,7 +23,7 @@ int *z = &mysta.a;
 
 //int a[256];
 
-int a, c, g[4], b;
+int a, c, g[4], b = 0 ? c : 4;
 
 int main( int argc, char ** argv )
 {
