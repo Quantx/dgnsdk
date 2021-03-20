@@ -77,7 +77,8 @@ void writeToken( int16_t fd, unsigned int8_t tokn )
 
         write( fd, opn, opl );
     }
-    else write( fd, &tokn, 1 );
+    else if ( tokn >= 32 ) write( fd, &tokn, 1 );
+    else decwrite( fd, tokn );
 }
 
 void dumpTree( struct mccnode * n, int8_t * fname )
@@ -99,7 +100,7 @@ void dumpTree( struct mccnode * n, int8_t * fname )
         }
 
         write( fexp, "\"", 1 );
-        decwrite( fexp, (int16_t)n );
+        decwrite( fexp, (int16_t)(long)n );
         write( fexp, "\" [label=\"", 10 );
 
         if ( n->oper == Variable ) writeType( fexp, n->type, n->sym->name, n->sym->len );
@@ -113,6 +114,7 @@ void dumpTree( struct mccnode * n, int8_t * fname )
             write( fexp, "\\\"", 2 );
         }
         else if ( n->oper == Number || n->oper == SmolNumber ) decwrite( fexp, n->val );
+        else if ( n->oper == LongNumber ) octwrite( fexp, n->valLong );
         else writeToken( fexp, n->oper );
 
         write( fexp, "\"];\n", 4 );
@@ -121,18 +123,18 @@ void dumpTree( struct mccnode * n, int8_t * fname )
         if ( n->left )
         {
             write( fexp, "\"", 1 );
-            decwrite( fexp, (int16_t)n );
+            decwrite( fexp, (int16_t)(long)n );
             write( fexp, "\" -- \"", 6 );
-            decwrite( fexp, (int16_t)n->left );
+            decwrite( fexp, (int16_t)(long)n->left );
             write( fexp, "\";\n", 3 );
         }
 
         if ( n->right )
         {
             write( fexp, "\"", 1 );
-            decwrite( fexp, (int16_t)n );
+            decwrite( fexp, (int16_t)(long)n );
             write( fexp, "\" -- \"", 6 );
-            decwrite( fexp, (int16_t)n->right );
+            decwrite( fexp, (int16_t)(long)n->right );
             write( fexp, "\";\n", 3 );
         }
 

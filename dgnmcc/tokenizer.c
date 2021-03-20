@@ -13,34 +13,19 @@ int16_t tkVal;
 int32_t tkLong;
 int8_t tkStr[256];
 
+// Current string constant
+unsigned int16_t csc;
+
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
 int8_t * res_words[] = {
-    "void",
-    "int",
-    "short",
-    "char",
-    "float",
-    "long",
-    "enum",
-    "struct",
-    "union",
-    "auto",
-    "static",
-    "register",
-    "const",
+    "void", "int", "short", "char", "float", "long", "double",
+    "signed", "unsigned",
     "extern",
-    "signed",
-    "unsigned",
-    "if",
-    "else",
-    "case",
-    "default",
-    "break",
-    "continue",
-    "return",
-    "for",
-    "while",
-    "do",
+    "enum", "struct", "union",
+    "auto", "static", "register", "const",
+    "if", "else", "case", "default",
+    "break", "continue", "return",
+    "for", "while", "do",
     "goto",
     "sizeof"
 };
@@ -163,7 +148,7 @@ void ntok()
             tkVal = (int16_t)tkLong;
 
             if ( *p == 'l' || *p == 'L' ) { p++; tk = LongNumber; }
-            else if ( tkLong >= 0xFFFF ) tk = LongNumber;
+            else if ( (unsigned int32_t)tkLong > 0xFFFF ) tk = LongNumber;
 
             else if ( *p == 'c' || *p == 'C' ) { p++; tk = SmolNumber; }
             else if ( (unsigned int16_t)tkVal <= 0xFF ) tk = SmolNumber;
@@ -172,80 +157,85 @@ void ntok()
 
             return;
         }
-        else if ( tk == '\'' || tk == '"' ) // Character or String constant
+        else if ( tk == '\'' ) // Character constant
         {
-            // Record initial value
-            if ( tk == '"' ) tkVal = 0; //cnst.pos; TODO fix this
-            else tkVal = *p;
+            int8_t out = *p;
 
-            while ( *p || readline() )
+            // Escape character
+            if ( *p == '\\' )
             {
-                int8_t out = *p;
+                p++;
 
-                // Closing quotation
-                if ( *p == tk ) { tk = Number; return; }
-
-                // Escape character
-                if ( *p == '\\' )
+                if      ( *p == 'a'  ) { out = '\a'; p++; }
+                else if ( *p == 'b'  ) { out = '\b'; p++; }
+                else if ( *p == 'e'  ) { out = '\e'; p++; }
+                else if ( *p == 'f'  ) { out = '\f'; p++; }
+                else if ( *p == 'n'  ) { out = '\n'; p++; }
+                else if ( *p == 'r'  ) { out = '\r'; p++; }
+                else if ( *p == 't'  ) { out = '\t'; p++; }
+                else if ( *p == 'v'  ) { out = '\v'; p++; }
+                else if ( *p == '\\' ) { out = '\\'; p++; }
+                else if ( *p == '\'' ) { out = '\''; p++; }
+                else if ( *p == '"'  ) { out = '"';  p++; }
+                else if ( *p == 'x' )
                 {
-                    p++;
+                    if ( *++p >= '0' && *p <= '9'
+                        || *p >= 'a' && *p <= 'f'
+                        || *p >= 'A' && *p <= 'F' )
+                        // Convert first digit
+                        out = (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
+                    else mccfail("expected two hex digits following a \\x escape");
 
-                    if      ( *p == 'a'  ) { out = '\a'; p++; }
-                    else if ( *p == 'b'  ) { out = '\b'; p++; }
-                    else if ( *p == 'e'  ) { out = '\e'; p++; }
-                    else if ( *p == 'f'  ) { out = '\f'; p++; }
-                    else if ( *p == 'n'  ) { out = '\n'; p++; }
-                    else if ( *p == 'r'  ) { out = '\r'; p++; }
-                    else if ( *p == 't'  ) { out = '\t'; p++; }
-                    else if ( *p == 'v'  ) { out = '\v'; p++; }
-                    else if ( *p == '\\' ) { out = '\\'; p++; }
-                    else if ( *p == '\'' ) { out = '\''; p++; }
-                    else if ( *p == '"'  ) { out = '"';  p++; }
-                    else if ( *p == 'x' )
-                    {
-                        if ( *++p >= '0' && *p <= '9'
-                            || *p >= 'a' && *p <= 'f'
-                            || *p >= 'A' && *p <= 'F' )
-                            // Convert first digit
-                            out = (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
-                        else mccfail("expected two hex digits following a \\x escape");
-
-                        // Convert possible second digit
-                        if ( *p >= '0' && *p <= '9'
-                          || *p >= 'a' && *p <= 'f'
-                          || *p >= 'A' && *p <= 'F' )
-                            out = (out << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
-                    }
-                    else if ( *p >= '0' && *p <= '7' )
-                    {
-                        out = *p++ - '0'; // First digit
-
-                        if ( *p >= '0' && *p <= '7' ) // Second digit
-                            out = (out << 3) + *p++ - '0';
-
-                        if ( *p >= '0' && *p <= '7' ) // Last digit
-                            out = (out << 3) + *p++ - '0';
-                    }
-                    else mccfail("unknown escape sequence");
+                    // Convert possible second digit
+                    if ( *p >= '0' && *p <= '9'
+                      || *p >= 'a' && *p <= 'f'
+                      || *p >= 'A' && *p <= 'F' )
+                        out = (out << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
                 }
-                else p++;
-
-                // Write string to cnst segment
-                if ( tk == '"' )
+                else if ( *p >= '0' && *p <= '7' )
                 {
-                    // TODO write string to const segment
+                    out = *p++ - '0'; // First digit
+
+                    if ( *p >= '0' && *p <= '7' ) // Second digit
+                        out = (out << 3) + *p++ - '0';
+
+                    if ( *p >= '0' && *p <= '7' ) // Last digit
+                        out = (out << 3) + *p++ - '0';
                 }
-                else if ( *p != '\'' ) mccfail("Character constant too long");
-                // Record character constant
-                else
+                else mccfail("unknown escape sequence");
+            }
+            else p++;
+
+            if ( *p != '\'' ) mccfail("missing end quote on character constant");
+
+            // Record character constant
+            tk = SmolNumber;
+            tkVal = out;
+            return;
+        }
+        else if ( tk == '"' ) // String constant
+        {
+            write( segs[SEG_CNST], "~SC", 3 );
+            decwrite( segs[SEG_CNST], csc );
+            write( segs[SEG_CNST], ": \"", 3 );
+
+            while ( *p || readline() ) // Continuous read
+            {
+                write( segs[SEG_CNST], p, 1 );
+
+                if ( *p == '"' && tk != '\\' )
                 {
-                    tk = SmolNumber;
-                    tkVal = out;
+                    write( segs[SEG_CNST], "\n", 1 );
+
+                    tk = *p++;
+                    tkVal = csc++;
+                    return;
                 }
+
+                tk = *p++;
             }
 
-            // End of input feed
-            mccfail("failed to find closing quotation on string");
+            mccfail("missing closing quote on string constant");
         }
         else if ( tk == '.' )
         {
@@ -350,12 +340,13 @@ void ntok()
 {
     debug_ntok();
 
-    write( 1, "TOKEN: ", 7 );
-    decwrite( 1, tk );
+    write( 1, "Token '", 7 );
+    writeToken( 1, tk );
+    write( 1, "'", 1 );
 
     if ( tk )
     {
-        write( 1, ": ", 2 );
+        write( 1, ": ", 3 );
         write( 1, pp, p - pp );
     }
 

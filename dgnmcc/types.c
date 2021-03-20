@@ -30,58 +30,6 @@ struct mcctype type_string = {
     &subtype_ptr
 };
 
-struct mcctype * typeDeref( struct mcctype * t );
-
-// Size required to store type in bytes
-int16_t typeSize( struct mcctype * t )
-{
-    // Get active subtype
-    struct mccsubtype * s;
-    for ( s = t->sub; s->sub; s = s->sub );
-
-    if ( s->ftype ) mccfail("cannot get sizeof function");
-
-    // Check if this is an array
-    int16_t i, j;
-    for ( i = 0, j = 0; i < s->arrays; i++ )
-    {
-        if ( !s->sizes[i] ) mccfail("cannot get sizeof unknown dimension in array");
-        j *= s->sizes[i];
-    }
-    if ( i )
-    {
-        void * drbp = sbrk(0);
-
-        j *= typeSize(typeDeref(t));
-
-        brk(drbp);
-
-        return j;
-    }
-
-    // Check if this is a pointer
-    if ( s->inder ) return 2;
-
-    // Check if this is a struct
-    if ( t->stype )
-    {
-        if ( ~t->stype->type & CPL_DEFN ) mccfail("tried to get sizeof incomplete type");
-        return t->stype->size;
-    }
-
-    // Must be a primative type
-    int8_t ptype = t->ptype & CPL_DTYPE_MASK;
-
-    // Can't get size of void
-    if ( ptype == CPL_VOID ) mccfail("tried to get sizeof void");
-
-    if ( ptype <= CPL_UCHR ) return 1;
-    if ( ptype <= CPL_UINT ) return 2;
-    if ( ptype <= CPL_FPV  ) return 4;
-
-    return 8; // Double
-}
-
 struct mcctype * typeClone( struct mcctype * t )
 {
     struct mcctype * out = sbrk(sizeof(struct mcctype));
@@ -162,6 +110,61 @@ struct mcctype * typeDeref( struct mcctype * t )
 
     return out;
 }
+
+// Size required to store type in bytes
+int16_t typeSize( struct mcctype * t )
+{
+    // Get active subtype
+    struct mccsubtype * s;
+    for ( s = t->sub; s->sub; s = s->sub );
+
+    if ( s->ftype ) mccfail("cannot get sizeof function");
+
+    // Check if this is an array
+    int16_t i, j;
+    for ( i = 0, j = 1; i < s->arrays; i++ )
+    {
+        if ( !s->sizes[i] ) mccfail("cannot get sizeof unknown dimension in array");
+        j *= s->sizes[i];
+    }
+    if ( i )
+    {
+        void * drbp = sbrk(0);
+
+        s->arrays = 0; // Temporarily drop all arrays
+
+        j *= typeSize(typeClone(t));
+
+        s->arrays = i;
+
+        brk(drbp);
+
+        return j;
+    }
+
+    // Check if this is a pointer
+    if ( s->inder ) return 2;
+
+    // Check if this is a struct
+    if ( t->stype )
+    {
+        if ( ~t->stype->type & CPL_DEFN ) mccfail("tried to get sizeof incomplete type");
+        return t->stype->size;
+    }
+
+    // Must be a primative type
+    int8_t ptype = t->ptype & CPL_DTYPE_MASK;
+
+    // Can't get size of void
+    if ( ptype == CPL_VOID ) mccfail("tried to get sizeof void");
+
+    if ( ptype <= CPL_UCHR ) return 1;
+    if ( ptype <= CPL_UINT ) return 2;
+    if ( ptype <= CPL_FPV  ) return 4;
+
+    return 8; // Double
+}
+
 
 // Prote arithmetic types
 struct mcctype * typePromote( struct mcctype * ta, struct mcctype * tb )
@@ -255,6 +258,9 @@ int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
         // Struct types don't match or primative types don't match
         if ( ta->stype != tb->stype || (!ta->stype && pa != pb) ) return 0;
 
+        // Struct must be complete
+        if ( ta->stype && (~ta->stype->type & CPL_DEFN) ) mccfail("incomplete type is incompatible");
+
         struct mccsubtype * sa, * sb;
         for ( sa = ta->sub, sb = tb->sub; sa && sb; sa = sa->sub, sb = sb->sub )
         {
@@ -264,7 +270,7 @@ int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
             {
                 if ( !sb->ftype ) return 0;
 
-                // TODO ensure function definitions match
+                // TODO ensure function definitions match and that functions are complete
             }
         }
 
@@ -278,8 +284,17 @@ int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
     // If either is a structure, make sure they're compatible
     if ( ta->stype != tb->stype ) return 0;
 
+    // Both types are structs and match
+    if ( ta->stype )
+    {
+        if ( ~ta->stype->type & CPL_DEFN ) mccfail("incomplete type is incompatible");
+        return 1;
+    }
+
     // Ensure primative types are compatible (void is only compatible with self)
-    if ( !ta->stype && (pa == CPL_VOID) != (pb == CPL_VOID) ) return 0;
+    if ( (pa == CPL_VOID) != (pb == CPL_VOID) ) return 0;
+
+    if ( pa < pb ) return -1; // PB won't fit into PA
 
     return 1;
 }

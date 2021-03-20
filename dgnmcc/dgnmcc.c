@@ -5,17 +5,17 @@ unsigned int16_t curfno; // Current file number
 unsigned int16_t stksize; // Additional stack size
 int16_t segs[5]; // Text, Constant, Zero, Data, Bss
 
-struct mccnsp glbnsp = { NULL, 0, 0, CPL_BLOCK, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
+struct mccnsp glbnsp = { NULL, 0, CPL_BLOCK, 0, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
 
 // Output an octal number
-void octwrite( int16_t nfd, unsigned int16_t val )
+void octwrite( int16_t nfd, unsigned int32_t val )
 {
     write( nfd, "0", 1 );
 
     if ( !val ) return;
 
-    int8_t tmpbuf[6];
-    int16_t tmppos = 6;
+    int8_t tmpbuf[11];
+    int16_t tmppos = 11;
 
     while ( val )
     {
@@ -23,11 +23,13 @@ void octwrite( int16_t nfd, unsigned int16_t val )
         val >>= 3;
     }
 
-    write( nfd, tmpbuf + tmppos, 6 - tmppos );
+    write( nfd, tmpbuf + tmppos, 11 - tmppos );
 }
 
 void decwrite( int16_t nfd, unsigned int16_t val )
 {
+    if ( !val ) return (void)write( nfd, "0", 1 );
+
     int8_t tmpbuf[6];
     int16_t tmppos = 6;
 
@@ -89,6 +91,8 @@ int16_t main( int16_t argc, int8_t ** argv )
 #if DEBUG
     // Sanity check to make sure we can store all constants in a char
     if ( Arrow > 0xFF ) mccfail("too many constants!");
+
+    if ( (sizeof(tokenNames)/sizeof(*tokenNames)) != (Arrow - Void) + 1) mccfail("debug token count missmatch");
 #endif
 
     // Open output files

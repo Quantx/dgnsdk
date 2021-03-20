@@ -11,81 +11,14 @@
 #define MAX_LINE      256  // Maximum number of tokens per file line
 #define MAX_STR       256  // Maximum length of user defined strings
 #define PAGESIZE      1024 // 2 KB (1 KW) of memory (1 mmu page)
+
 #define MAX_EXPR_OPER 64   // Maximum size of the expression operator stack
 #define MAX_EXPR_NODE 256  // Maximum size of the expression node stack
-#define MAX_SUB_TYPE  8    // Maximum number of subtypes per type
+#define MAX_EXPR_CAST 16    // Maximum number of casts in an expression
 
-// +--------------+
-// | TOKEN VALUES |
-// +--------------+
-// Start at 128 so that we don't overlap ASCII tokens
-enum
-{
-// ******* Reserved words *******
-    // *** Specifiers and qualifiers ***
-    Void = 128, Int, Short, Char, Float, Long, // Storage types
-    Enum, Struct, Union, // Data structures
-    Auto, Static, Register, Const, // Storage classes
-    Extern, Signed, Unsigned, // Storage Qualifiers
-    // *** Program structure ***
-    If, Else, Case, Default, // Branch
-    Break, Continue, Return, // Terminate
-    For, While, Do, // Loops
-    Goto, // Blasphemy
-    SizeofRes, // Used only for identifying the reserved word, not be confused with Sizeof
-// ******* Misc *******
-    Variadic,
-// ******* Expression tokens *******
-    Number, SmolNumber, LongNumber, // Numerical constant in source (Char, Int, Long)
-    Named, Variable, // Named (an identifier string), Variable (ref to user defiend variable)
-// ******* Operators *******
-    Ass, AddAss, SubAss, MulAss, DivAss, ModAss, ShlAss, ShrAss, AndAss, XorAss, OrAss, // Assignment Operators
-    Tern, // Ternary Conditional
-    LogOr, // Logical Or
-    LogAnd, // Logical And
-    Or, // Bitwise Or
-    Xor, // Bitwise Xor
-    And, // Bitwise And
-    Eq, Neq, // Relational equal and not-equal
-    Less, LessEq, Great, GreatEq, // Relational equivalencies
-    Shl, Shr, // Bitshift left and right
-    Add, Sub, // Addition and Subtraction
-    Mul, Div, Mod, // Multiplication, Division, Modulus
-    Sizeof, LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Sizeof, logical not, bitwise not, Pre-Increment, Pre-Decrement
-    PostInc, PostDec, Dot, Arrow // Post-Increment, Post-Decrement, Dot (structure access), Arrow (structure access via pointer)
-};
+#include "tokens.h"
 
 #ifdef DEBUG
-int8_t * tokenNames[] = {
-    "void", "int", "short", "char", "float", "long",
-    "enum", "struct", "union",
-    "auto", "static", "register", "const",
-    "extern", "signed", "unsigned",
-    "if", "else", "case", "default",
-    "break", "continue", "return",
-    "for", "while", "do",
-    "goto",
-    "sizeof (reserved word)",
-    "...",
-    "number", "small number", "long number",
-    "named", "variable",
-
-    "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=",
-    "?",
-    "||",
-    "&&",
-    "|",
-    "^",
-    "&",
-    "==", "!=",
-    "<", "<=", ">", ">=",
-    "<<", ">>",
-    "+", "-",
-    "*", "/", "%",
-    "sizeof (operator)", "!", "~", "(unary) +", "(unary) -", "(unary) &", "(unary) *", "(pre) ++", "(pre) --",
-    "(post) ++", "(post) --", ".", "->"
-};
-
 int8_t * typeNames[] = {
     "void",
     "char",
@@ -116,6 +49,7 @@ int8_t * typeNames[] = {
 #define CPL_ENUM  3 // Enumeration
 #define CPL_FUNC  4 // Function arguments
 #define CPL_VFUNC 5 // Variadic Function arguments
+#define CPL_CAST  6 // Special namespace used for casting
 #define CPL_NSPACE_MASK 0b111
 
 #define CPL_DEFN (1 << 3) // Defined flag
@@ -236,6 +170,8 @@ struct mccsym
     int8_t * name;
     unsigned int8_t len;
 
+    unsigned int16_t addr;
+
     struct mcctype type; // Type information
 
     struct mccsym * next; // Store the next symbol in the table
@@ -263,6 +199,9 @@ struct mccnode
 
     struct mccnode * left, * right;
 };
+
+// Fix circular dependancy
+void define(struct mccnsp * curnsp);
 
 // Compiler fail function
 void mccfail(int8_t * msg);
