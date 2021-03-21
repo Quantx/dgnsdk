@@ -634,6 +634,8 @@ struct, union: (In addition to pointers above)
 
             if ( !s->ftype ) mccfail("lhs is not a function");
 
+            if ( s->ftype->symtbl ) mccfail("function expects arguments");
+
             s->ftype = NULL;
 
             // Functions never return l-values
