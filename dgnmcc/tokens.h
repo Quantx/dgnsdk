@@ -12,7 +12,7 @@ enum
     Extern,
     Auto, Static, Register, Const, // Storage classes
     // *** Program structure ***
-    If, Else, Case, Default, // Branch
+    If, Else, Switch, Case, Default, // Branch
     Break, Continue, Return, // Terminate
     For, While, Do, // Loops
     Goto, // Blasphemy
@@ -23,6 +23,7 @@ enum
     Named, Variable, // Named (an identifier string), Variable (ref to user defiend variable)
     Number, SmolNumber, LongNumber, FpvNumber, DblNumber, // Numerical constant in source (Char, Int, Long, Float, Double)
 // ******* Operators *******
+    Comma,
     Ass, AddAss, SubAss, MulAss, DivAss, ModAss, ShlAss, ShrAss, AndAss, XorAss, OrAss, // Assignment Operators
     Tern, // Ternary Conditional
     LogOr, // Logical Or
@@ -36,7 +37,7 @@ enum
     Add, Sub, // Addition and Subtraction
     Mul, Div, Mod, // Multiplication, Division, Modulus
     Sizeof, Cast, LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Sizeof, logical not, bitwise not, Pre-Increment, Pre-Decrement
-    PostInc, PostDec, Dot, Arrow // Post-Increment, Post-Decrement, Dot (structure access), Arrow (structure access via pointer)
+    PostInc, PostDec, Dot, Arrow, FnCall // Post-Increment, Post-Decrement, Dot (structure access), Arrow (structure access via pointer)
 };
 
 #ifdef DEBUG
@@ -46,7 +47,7 @@ int8_t * tokenNames[] = {
     "signed", "unsigned",
     "extern",
     "auto", "static", "register", "const",
-    "if", "else", "case", "default",
+    "if", "else", "switch", "case", "default",
     "break", "continue", "return",
     "for", "while", "do",
     "goto",
@@ -55,6 +56,7 @@ int8_t * tokenNames[] = {
     "named", "variable",
     "number", "small number", "long number", "float number", "double number",
 
+    ",",
     "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=",
     "?",
     "||",
@@ -68,6 +70,6 @@ int8_t * tokenNames[] = {
     "+", "-",
     "*", "/", "%",
     "sizeof (operator)", "cast", "!", "~", "(unary) +", "(unary) -", "(unary) &", "(unary) *", "(pre) ++", "(pre) --",
-    "(post) ++", "(post) --", ".", "->"
+    "(post) ++", "(post) --", ".", "->", "call"
 };
 #endif

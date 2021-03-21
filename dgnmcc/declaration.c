@@ -108,7 +108,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
 
             define( fncnsp );
 
-            if ( tk == ',' ) ntok();
+            if ( tk == Comma ) ntok();
             else if ( tk != ')' ) mccfail("expected closing parenthasis 2");
         }
 
@@ -137,19 +137,18 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
         && !curtype->ftype ) *partype = curtype->sub;
 }
 
-void outputVarAddr( int16_t segfd, struct mccnode * n )
+void outputVarAddr( int16_t segfd, struct mccnode * root )
 {
-    struct mccsym * isym = n->sym;
-
-    if ( n->oper == Dot ) isym = n->left->sym;
-    else if ( n->oper != Variable ) mccfail("cannot output address of non-variable");
-
-    write( segfd, isym->name, isym->len );
-    if ( n->oper == Dot )
+    struct mccnode * n;
+    for ( n = root; n && n->oper == Dot; n = n->left )
     {
+        decwrite( segfd, n->right->val );
         write( segfd, " + ", 3 );
-        // TODO output struct offset
     }
+
+    if ( !( n && n->oper == Variable ) ) mccfail("cannot output address of non-immediate-lvalue");
+
+    write( segfd, n->sym->name, n->sym->len );
 }
 
 void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtype )
@@ -175,7 +174,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
 
             i++;
             if ( tk == '}' ) break;
-            if ( tk == ',' ) ntok();
+            if ( tk == Comma ) ntok();
             else mccfail("expected closing curly-brace or comma");
         }
 
@@ -203,7 +202,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
 
     void * erbp = sbrk(0);
 
-    struct mccnode * cexp = expr(curnsp, ',');
+    struct mccnode * cexp = expr(curnsp, Comma);
 
     int16_t comp = isCompatible( curtype, cexp->type );
 
@@ -349,61 +348,60 @@ void define( struct mccnsp * curnsp )
 
     ntok();
 
-    struct mccnsp * newnsp = NULL;
+    struct mccnsp * decnsp = NULL;
 
     // Get struct name or anonymous definition
     if ( cnsp & CPL_NSPACE_MASK )
     {
         if ( tk == Named || tk == '{' )
         {
+            // TODO struct overriding and anonymous child struct offset
             if ( tk == Named )
             {
-                newnsp = getNamespace( curnsp, tkStr, tkVal );
+                decnsp = findNamespace( curnsp, tkStr, tkVal );
             }
 
-            if ( !newnsp ) // Generate new struct
+            if ( !decnsp || tk == '{' ) // Generate new struct
             {
-                newnsp = sbrk( sizeof(struct mccnsp) );
-                if ( newnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
+                decnsp = sbrk( sizeof(struct mccnsp) );
+                if ( decnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
 
                 if ( tk == Named )
                 {
                     // Copy name
-                    newnsp->name = sbrk( tkVal );
-                    if ( newnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
+                    decnsp->name = sbrk( tkVal );
+                    if ( decnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
 
                     int16_t i;
-                    for ( i = 0; i < tkVal; i++ ) newnsp->name[i] = tkStr[i];
-                    newnsp->len = tkVal;
-
-                    ntok();
+                    for ( i = 0; i < tkVal; i++ ) decnsp->name[i] = tkStr[i];
+                    decnsp->len = tkVal;
                 }
                 else // Anonymous struct
                 {
-                    newnsp->name = NULL;
-                    newnsp->len = 0;
+                    decnsp->name = NULL;
+                    decnsp->len = 0;
                 }
 
                 // Record namespace type
-                newnsp->type = cnsp;
+                decnsp->type = cnsp;
 
                 // Init tables
-                newnsp->size = 0;
-                newnsp->symtbl = NULL;
-                newnsp->nsptbl = NULL;
+                decnsp->size = 0;
+                decnsp->symtbl = NULL;
+                decnsp->nsptbl = NULL;
 
-                newnsp->symtail = &newnsp->symtbl;
-                newnsp->nsptail = &newnsp->nsptbl;
+                decnsp->symtail = &decnsp->symtbl;
+                decnsp->nsptail = &decnsp->nsptbl;
 
                 // Add to parent namespace
-                newnsp->parent = curnsp;
-                newnsp->next = NULL;
+                decnsp->parent = curnsp;
+                decnsp->next = NULL;
 
-                *curnsp->nsptail = newnsp;
-                curnsp->nsptail = &newnsp->next;
+                *curnsp->nsptail = decnsp;
+                curnsp->nsptail = &decnsp->next;
             }
             // Type check existing struct
-            else if ( (newnsp->type & CPL_NSPACE_MASK) != (cnsp & CPL_NSPACE_MASK) ) mccfail("struct type missmatch");
+            else if ( (decnsp->type & CPL_NSPACE_MASK) != (cnsp & CPL_NSPACE_MASK) ) mccfail("struct type missmatch");
         }
         else mccfail("expected struct name or anonymous struct definition");
 
@@ -411,8 +409,8 @@ void define( struct mccnsp * curnsp )
         if ( tk == '{' )
         {
             // Don't redfine things
-            if ( newnsp->type & CPL_DEFN ) mccfail("struct redefinition");
-            newnsp->type |= CPL_DEFN;
+            if ( decnsp->type & CPL_DEFN ) mccfail("struct redefinition");
+            decnsp->type |= CPL_DEFN;
 
             if ( cnsp == CPL_ENUM )
             {
@@ -427,7 +425,7 @@ void define( struct mccnsp * curnsp )
                 ntok(); // Drop opening {
                 while ( tk != '}' )
                 {
-                    define(newnsp);
+                    define(decnsp);
                 }
             }
 
@@ -442,7 +440,6 @@ void define( struct mccnsp * curnsp )
 
         Used for type checking with an existing symbol
         It will be deallocated later if it already exists
-        Count number of inderections
         */
 
         struct mccsym * cursym = sbrk( sizeof(struct mccsym) );
@@ -452,7 +449,9 @@ void define( struct mccnsp * curnsp )
         cursym->len = 0;
 
         cursym->type.ptype = ctype; // Record primative datatype
-        cursym->type.stype = newnsp; // Record if this is a struct or not
+        cursym->type.stype = decnsp; // Record if this is a struct or not
+
+        if ( decnsp ) decnsp->type |= CPL_INST; // Mark this struct as instantiated
 
         cursym->addr = 0;
 
@@ -467,6 +466,14 @@ void define( struct mccnsp * curnsp )
         if ( nsptype != CPL_CAST // You can cast to VOID
           && !( (ctype & CPL_DTYPE_MASK) || (cnsp & CPL_NSPACE_MASK) )
           && !(  cursym->type.sub->inder ||  cursym->type.sub->ftype ) ) mccfail("can't declare variable storing void");
+
+        // You can declare either a pointer to a function returning the struct, or a pointer to the struct itself
+        if ( decnsp == curnsp
+          && !( cursym->type.sub->inder || cursym->type.sub->ftype ) ) mccfail("recursive struct declaration");
+
+        // You can only declare pointers to incomplete types
+        if ( decnsp && (~decnsp->type & CPL_DEFN)
+          && !( cursym->type.sub->inder || cursym->type.sub->ftype ) ) mccfail("cannot declare incomplete type");
 
         // TODO compare to existing symbol
 //        compareSymbol( cursym,
@@ -541,7 +548,7 @@ void define( struct mccnsp * curnsp )
         if ( nsptype == CPL_CAST
           || nsptype == CPL_FUNC
           || nsptype == CPL_VFUNC ) break;
-        else if ( tk == ',' ) ntok();
+        else if ( tk == Comma ) ntok();
         else if ( tk != ';' ) mccfail("expected comma or semi-colon");
     }
 

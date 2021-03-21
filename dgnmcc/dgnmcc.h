@@ -1,7 +1,4 @@
-#include "../lib/novanix.h"
-#include "../lib/a.out.h"
-
-#define DEBUG 1
+#include "../lib/unistd.h"
 
 #ifdef DEBUG
 #define DEBUG_TOKEN 1
@@ -28,18 +25,26 @@ int8_t * typeNames[] = {
     "long",
     "ulong",
     "float",
-    "double",
+    "double"
+};
+
+int8_t * namespaceNames[] = {
+    "code_block",
     "struct",
     "union",
-    "enum"
+    "enum",
+    "func",
+    "variadic_function",
+    "casting_namespace"
 };
 #endif
 
 /* Namespace attributes bitmask
 
-|0000|0|000
-|    | |Namespace type
-|    |Defined flag
+|000|0|0|000
+|   | | |Namespace type
+|   | |Defined flag
+|   |Instantiated flag (at lease one variable was declared using this namespace as it's type)
 
 */
 
@@ -53,6 +58,7 @@ int8_t * typeNames[] = {
 #define CPL_NSPACE_MASK 0b111
 
 #define CPL_DEFN (1 << 3) // Defined flag
+#define CPL_INST (1 << 4) // This flag is set when a struct is instantiated
 
 // NameSPace
 struct mccnsp
@@ -106,10 +112,10 @@ mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 
 /* Data type bitmask (stored in: type->ptype)
 
-|0|0|00|0000
-| | |  |Primative datatype
-| | |Storage type
-| |Extern flag
+|0|000|0000
+| |   |Primative datatype
+| |Storage type
+|Extern flag
 
 */
 
@@ -207,7 +213,9 @@ void define(struct mccnsp * curnsp);
 void mccfail(int8_t * msg);
 
 #ifdef DEBUG
+void dumpNamespace( int16_t fd, struct mccnsp * dmpnsp );
 void writeType(int16_t fd, struct mcctype * t, int8_t * name, int16_t len);
 void writeToken(int16_t fd, unsigned int8_t tokn);
 void dumpTree(struct mccnode * n, int8_t * fname);
+void dumpGlbnsp( int8_t * fname );
 #endif

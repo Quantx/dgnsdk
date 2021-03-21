@@ -1,20 +1,21 @@
 struct mccnsp castnsp = { NULL, 0, CPL_CAST, 0, NULL, &castnsp.symtbl, NULL, &castnsp.nsptbl };
 
 const unsigned int8_t prectbl[] = {
-    Ass,     // 0 - Lowest
-    Tern,    // 1 (Right associativity)
-    LogOr,   // 2
-    LogAnd,  // 3
-    Or,      // 4
-    Xor,     // 5
-    And,     // 6
-    Eq,      // 7
-    Less,    // 8
-    Shl,     // 9
-    Add,     // 10
-    Mul,     // 11
-    Sizeof,  // 12 (Right associativity)
-    PostInc, // 13 - Highest
+    Comma,   // 0 - Lowest
+    Ass,     // 1
+    Tern,    // 2 (Right associativity)
+    LogOr,   // 3
+    LogAnd,  // 4
+    Or,      // 5
+    Xor,     // 6
+    And,     // 7
+    Eq,      // 8
+    Less,    // 9
+    Shl,     // 10
+    Add,     // 11
+    Mul,     // 12
+    Sizeof,  // 13 (Right associativity)
+    PostInc, // 14 - Highest
 };
 
 int8_t getPrec( unsigned int8_t op )
@@ -107,8 +108,8 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
     otop = ntop = ctop = 0;
 
     // Build expression tree
-    while ( tk >= Named || tk == '"'
-    ||      tk == ','   || tk == ';'
+    while ( tk >= Named
+    ||      tk == '"'
     ||      tk == '?'   || tk == ':'
     ||      tk == '('   || tk == ')'
     ||      tk == '['   || tk == ']' )
@@ -116,20 +117,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
         int8_t grp = 0;
         unsigned int8_t prec;
 
-        if ( tk == ',' || tk == ';' )
-        {
-            // Collapse stack
-            while ( otop ) reduce();
-
-            if ( tk == ';' || stk == tk ) break; // Done with this expression
-
-            ostk[otop++] = ',';
-
-            unary = 1;
-
-            ntok();
-        }
-        else if ( tk == Named || (tk >= Number && tk <= DblNumber) || tk == '"' )
+        if ( tk == Named || (tk >= Number && tk <= DblNumber) || tk == '"' )
         {
             nstk[ntop] = sbrk(sizeof(struct mccnode));
             if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new node");
@@ -151,12 +139,14 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
                     nstk[ntop]->oper = Variable;
                     nstk[ntop]->type = &nsym->type;
                     nstk[ntop]->sym  = nsym;
-
+/*
                     ntok();
                     if ( tk == '(' ) // Function call
                     {
-                        // TODO function calls
+                        ostk[otop++] = FnCall;
+                        ostk[otop++] = '(';
                     }
+*/
                 }
                 else // Probably struct or union member
                 {
@@ -166,9 +156,9 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 
                     int16_t i;
                     for ( i = 0; i < tkVal; i++ ) nstk[ntop]->name[i] = tkStr[i];
-
-                    ntok();
                 }
+
+                ntok();
             }
             else
             {
@@ -240,6 +230,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 
             ntok();
         }
+        else if ( tk == stk ) break; // Stop token reached
         else
         {
             // Convert to unary operators as needed
@@ -255,6 +246,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
                     case And: tk = Inder; break;
                 }
             }
+            else if (tk == '(') tk = FnCall;
 
             // Remember: '(' and '[' has a prec of -1
             prec = getPrec(tk);
@@ -270,6 +262,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 #endif
 
             ostk[otop++] = tk;
+            if ( tk == FnCall ) ostk[otop++] = '(';
 
             unary = tk != PostInc && tk != PostDec;
 
@@ -300,6 +293,8 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
         if ( ntop > MAX_EXPR_NODE ) mccfail( "node stack full" );
         if ( ctop > MAX_EXPR_CAST ) mccfail( "cast stack full" );
     }
+
+    while ( otop ) reduce(); // Final reduction
 
     if ( !ntop ) mccfail("Empty expression stack");
     else if ( ntop > 1 ) mccfail("Not enough operators in expression");
@@ -561,9 +556,23 @@ struct, union: (In addition to pointers above)
         {
             if ( !isStruct(n->left->type) ) mccfail("lhs is not a struct");
             if ( isPointer(n->left->type) ) mccfail("lhs is a pointer");
-            // TODO lookup type of rhs member
 
+            int8_t * name = n->right->name;
+            int16_t len = n->right->val;
+
+            if ( n->right->oper == Variable ) name = n->right->sym->name, len = n->right->sym->len;
+            else if ( n->right->oper != Named ) mccfail("rhs is not named symbol");
+
+            struct mccsym * ms = getSymbol( n->left->type->stype, name, len );
+
+            if ( !ms ) mccfail("rhs is not a member of lhs");
+
+            n->type = &ms->type;
             n->flag |= CPL_LVAL;
+
+            n->right->oper = Number;
+            n->right->type = &type_int;
+            n->right->val = ms->addr;
         }
         else if ( n->oper == Arrow )
         {
@@ -573,9 +582,22 @@ struct, union: (In addition to pointers above)
             struct mccsubtype * s = n->left->type->sub;
             if ( s->sub || s->inder + s->arrays - 1 ) mccfail("lhs not a pointer to struct");
 
-            // TODO lookup type of rhs member
+            int8_t * name = n->right->name;
+            int16_t len = n->right->val;
 
+            if ( n->right->oper == Variable ) name = n->right->sym->name, len = n->right->sym->len;
+            else if ( n->right->oper != Named ) mccfail("rhs is not named symbol");
+
+            struct mccsym * ms = getSymbol( n->left->type->stype, name, len );
+
+            if ( !ms ) mccfail("rhs is not a member of lhs");
+
+            n->type = &ms->type;
             n->flag |= CPL_LVAL;
+
+            n->right->oper = Number;
+            n->right->type = &type_int;
+            n->right->val = ms->addr;
         }
         else if ( n->oper == '[' )
         {
@@ -592,7 +614,21 @@ struct, union: (In addition to pointers above)
 
             // Never results in an l-value
         }
-        else if ( n->oper == ',' ) n->type = n->right->type, n->flag = n->right->flag; // No rules for ,
+        else if ( n->oper == FnCall )
+        {
+            if ( !isFunction(n->left->type) ) mccfail("lhs is not a function");
+
+            // TODO function argument typechecking
+
+            // Just drop the function namespace to get the return type
+            n->type = typeClone(n->left->type);
+            struct mccsubtype * s;
+            for ( s = n->type->sub; s->sub; s = s->sub );
+            s->ftype = NULL;
+
+            // Functions do not return l-values
+        }
+        else if ( n->oper == Comma ) n->type = n->right->type, n->flag = n->right->flag; // No rules for ,
 #ifdef DEBUG_EXPR
         else mccfail("no typecheck rule for operator");
 
@@ -607,14 +643,9 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Tern && (n->left->oper == Number || n->left->oper == SmolNumber) )
         {
-            struct mccnode * trn = n->left->val ? n->right->left : n->right->right;
+            *n = *(n->left->val ? n->right->left : n->right->right);
 
-            if ( trn->oper == Number || trn->oper == SmolNumber )
-            {
-                n->oper = trn->oper;
-                n->val = trn->val;
-                n->left = n->right = NULL;
-            }
+            n->flag &= ~CPL_LVAL; // Unset l-value flag since ternary always results in an r-value
         }
         else if ( n->right && (n->right->oper == Number || n->right->oper == SmolNumber) )
         {
@@ -715,8 +746,9 @@ void emit(struct mccnsp * curnsp, struct mccnode * root)
             continue;
         }
 
-        
+        // TODO final output
 
         n = NULL;
     }
 }
+

@@ -148,7 +148,7 @@ int16_t typeSize( struct mcctype * t )
     // Check if this is a struct
     if ( t->stype )
     {
-        if ( ~t->stype->type & CPL_DEFN ) mccfail("tried to get sizeof incomplete type");
+        if ( ~t->stype->type & CPL_DEFN ) mccfail("cannot get sizeof incomplete type");
         return t->stype->size;
     }
 
@@ -187,6 +187,8 @@ struct mcctype * typePromote( struct mcctype * ta, struct mcctype * tb )
 
 int16_t isInteger( struct mcctype * t )
 {
+    if ( !t ) return 0;
+
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
@@ -197,6 +199,8 @@ int16_t isInteger( struct mcctype * t )
 
 int16_t isArith( struct mcctype * t )
 {
+    if ( !t ) return 0;
+
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
@@ -205,6 +209,8 @@ int16_t isArith( struct mcctype * t )
 
 int16_t isPointer( struct mcctype * t )
 {
+    if ( !t ) return 0;
+
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
@@ -213,6 +219,8 @@ int16_t isPointer( struct mcctype * t )
 
 int16_t isScalar( struct mcctype * t )
 {
+    if ( !t ) return 0;
+
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
@@ -221,20 +229,24 @@ int16_t isScalar( struct mcctype * t )
 
 int16_t isFunction( struct mcctype * t )
 {
+    if ( !t ) return 0;
+
     // Get active subtype
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
-    return s->ftype == NULL;
+    return !!s->ftype;
 }
 
 int16_t isStruct( struct mcctype * t )
 {
-    return t->stype && !isFunction(t);
+    return t && t->stype && !isFunction(t);
 }
 
 int16_t isArray( struct mcctype * t )
 {
+    if ( !t ) return 0;
+
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
@@ -243,6 +255,8 @@ int16_t isArray( struct mcctype * t )
 
 int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
 {
+    if ( !(ta && tb) ) return 0;
+
     // These values may be invalid, confirm first
     unsigned int8_t pa = ta->ptype & CPL_DTYPE_MASK;
     unsigned int8_t pb = tb->ptype & CPL_DTYPE_MASK;

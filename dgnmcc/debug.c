@@ -5,9 +5,8 @@ void writeType( int16_t fd, struct mcctype * t, int8_t * name, int16_t len )
     if ( t->stype ) // Struct, union, enum
     {
         int8_t st = t->stype->type & CPL_NSPACE_MASK;
-        st += 8; // Offset
 
-        int8_t * stn = typeNames[st];
+        int8_t * stn = namespaceNames[st];
         int16_t stl = 0;
         while ( stn[stl] ) stl++;
 
@@ -52,8 +51,19 @@ void writeType( int16_t fd, struct mcctype * t, int8_t * name, int16_t len )
 
         if ( s->ftype )
         {
-            write( fd, "(func)", 6 );
-            //TODO print out args
+            write( fd, "( ", 2);
+
+            struct mccsym * cursym;
+            for ( cursym = s->ftype->symtbl; cursym; cursym = cursym->next )
+            {
+                writeType( fd, &cursym->type, cursym->name, cursym->len );
+
+                write( fd, " @ ", 3 );
+                decwrite( fd, cursym->addr );
+                if ( cursym->next ) write( fd, ", ", 2 );
+            }
+
+            write( fd, ")\n", 2 );
         }
 
         for ( i = 0; i < s->arrays; i++ )
@@ -86,8 +96,8 @@ void dumpTree( struct mccnode * n, int8_t * fname )
     struct mccnode * ns[MAX_EXPR_NODE];
     int16_t nspos = 0;
 
-    int16_t fexp = creat( fname, 0666 );
-    if ( fexp < 0 ) mccfail( "unable to tree dump file" );
+    int16_t fexp;
+    if ( (fexp = creat(fname, 0666)) < 0 ) mccfail( "unable to create tree dump file" );
 
     write( fexp, "graph expression_tree {\n", 24 );
 
@@ -144,4 +154,57 @@ void dumpTree( struct mccnode * n, int8_t * fname )
 
     write( fexp, "}", 1 );
     close( fexp );
+}
+
+void dumpNamespace( int16_t fd, struct mccnsp * dmpnsp )
+{
+    int8_t st = dmpnsp->type & CPL_NSPACE_MASK;
+
+    int8_t * stn = namespaceNames[st];
+    int16_t stl = 0;
+    while ( stn[stl] ) stl++;
+
+    write( fd, stn, stl );
+
+    if ( dmpnsp->len )
+    {
+        write( fd, " ", 1 );
+        write( fd, dmpnsp->name, dmpnsp->len );
+    }
+
+    if ( dmpnsp->type & CPL_DEFN )
+    {
+        if ( st == CPL_FUNC || st == CPL_VFUNC ) write( fd, "( ", 2 );
+        else write( fd, " {\n", 3 );
+
+        struct mccsym * cursym;
+        for ( cursym = dmpnsp->symtbl; cursym; cursym = cursym->next )
+        {
+            writeType( fd, &cursym->type, cursym->name, cursym->len );
+
+            write( fd, " @ ", 3 );
+            decwrite( fd, cursym->addr );
+
+            if ( (st == CPL_FUNC || st == CPL_VFUNC) && cursym->next ) write( fd, ", ", 2 );
+            else write( fd, ";\n", 2 );
+        }
+
+        if ( st == CPL_FUNC || st == CPL_VFUNC ) write( fd, ");", 2 );
+        else write( fd, "};\n", 3 );
+    }
+    else write( fd, ";\n", 2 );
+
+    struct mccnsp * curnsp;
+    for ( curnsp = dmpnsp->nsptbl; curnsp; curnsp = curnsp->next ) dumpNamespace( fd, curnsp );
+}
+
+// Dump the global namespace to a file
+void dumpGlbnsp( int8_t * fname )
+{
+    int16_t fnsp;
+    if ( (fnsp = creat(fname, 0666)) < 0 ) mccfail( "unable to create namespace dump file" );
+
+    dumpNamespace( fnsp, &glbnsp );
+
+    close(fnsp);
 }

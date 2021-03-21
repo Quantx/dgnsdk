@@ -1,5 +1,6 @@
 void statement( struct mccnsp * curnsp )
 {
+
     if ( tk == ';' ) ntok();
     else if ( tk == '{' )
     {
@@ -47,6 +48,15 @@ void statement( struct mccnsp * curnsp )
         // Unallocate child block
         brk(cbnsp);
     }
+    // TODO control statements
+    else if ( tk == If ) {}
+    else if ( tk == Switch ) {}
+    else if ( tk == Break ) {}
+    else if ( tk == Continue ) {}
+    else if ( tk == Return ) {}
+    else if ( tk == For ) {}
+    else if ( tk == While ) {}
+    else if ( tk == Do ) {}
     else
     {
         void * erbp = sbrk(0); // Expression RollBack Point

@@ -23,7 +23,7 @@ int8_t * res_words[] = {
     "extern",
     "enum", "struct", "union",
     "auto", "static", "register", "const",
-    "if", "else", "case", "default",
+    "if", "else", "switch", "case", "default",
     "break", "continue", "return",
     "for", "while", "do",
     "goto",
@@ -325,8 +325,13 @@ void ntok()
             else tk = Mul;
             return;
         }
-        else if ( tk == '?' || tk == ':'
-               || tk == ',' || tk == ';'
+        else if ( tk == ',' )
+        {
+            tk = Comma;
+            return;
+        }
+        else if ( tk == ';'
+               || tk == '?' || tk == ':'
                || tk == '[' || tk == ']'
                || tk == '{' || tk == '}'
                || tk == '(' || tk == ')' ) return;

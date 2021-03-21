@@ -1,4 +1,4 @@
-// Search for symbol in immediate namespace
+// Search for symbol in immediate and child anonymous namespaces
 struct mccsym * getSymbol( struct mccnsp * sernsp, int8_t * name, int16_t len )
 {
     struct mccsym * cursym;
@@ -12,10 +12,24 @@ struct mccsym * getSymbol( struct mccnsp * sernsp, int8_t * name, int16_t len )
         if ( i == len ) return cursym;
     }
 
+    struct mccnsp * curnsp;
+
+    for ( curnsp = sernsp->nsptbl; curnsp; curnsp = curnsp->next )
+    {
+        unsigned int8_t nsptype = curnsp->type & CPL_NSPACE_MASK;
+
+        // Search child anonymous namespaces
+        if ( (nsptype == CPL_STRC || nsptype == CPL_UNION) && !curnsp->name && curnsp->type & CPL_DEFN && curnsp->type & CPL_INST )
+        {
+            cursym = getSymbol( curnsp, name, len );
+            if ( cursym ) return cursym;
+        }
+    }
+
     return NULL;
 }
 
-// Search for symbol in all scoped namespaces
+// Search for symbol in each parent namespace
 struct mccsym * findSymbol( struct mccnsp * sernsp, int8_t * name, int16_t len )
 {
     struct mccsym * cursym;
@@ -24,8 +38,6 @@ struct mccsym * findSymbol( struct mccnsp * sernsp, int8_t * name, int16_t len )
     {
         // Found symbol
         if ( cursym = getSymbol( sernsp, name, len ) ) return cursym;
-
-        // TODO search for symbol in anonymous structs, unions, etc...
 
         // Check parent namespace
         sernsp = sernsp->parent;
@@ -50,7 +62,19 @@ struct mccnsp * getNamespace( struct mccnsp * sernsp, int8_t * name, int16_t len
     return NULL;
 }
 
-int16_t compareSymbol( struct mccsym * sa, struct mccsym * sb )
+// Search for symbol in each parent namespace
+struct mccnsp * findNamespace( struct mccnsp * sernsp, int8_t * name, int16_t len )
 {
-    return 1;
+    struct mccnsp * curnsp;
+
+    while ( sernsp )
+    {
+        // Found symbol
+        if ( curnsp = getNamespace( sernsp, name, len ) ) return curnsp;
+
+        // Check parent namespace
+        sernsp = sernsp->parent;
+    }
+
+    return NULL;
 }
