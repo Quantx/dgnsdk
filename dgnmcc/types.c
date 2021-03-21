@@ -235,12 +235,18 @@ int16_t isFunction( struct mcctype * t )
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
-    return !!s->ftype;
+    return s->ftype != NULL;
 }
 
 int16_t isStruct( struct mcctype * t )
 {
-    return t && t->stype && !isFunction(t);
+    if ( !t ) return 0;
+
+    // Get active subtype
+    struct mccsubtype * s;
+    for ( s = t->sub; s->sub; s = s->sub );
+
+    return t && t->stype && !s->ftype;
 }
 
 int16_t isArray( struct mcctype * t )

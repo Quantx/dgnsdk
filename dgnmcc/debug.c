@@ -60,10 +60,11 @@ void writeType( int16_t fd, struct mcctype * t, int8_t * name, int16_t len )
 
                 write( fd, " @ ", 3 );
                 decwrite( fd, cursym->addr );
-                if ( cursym->next ) write( fd, ", ", 2 );
+                if ( cursym->next || (s->ftype->type & CPL_NSPACE_MASK) == CPL_VFUNC ) write( fd, ", ", 2 );
             }
 
-            write( fd, ")\n", 2 );
+            if ( (s->ftype->type & CPL_NSPACE_MASK) == CPL_VFUNC ) write( fd, "... )\n", 6 );
+            else write( fd, " )\n", 2 );
         }
 
         for ( i = 0; i < s->arrays; i++ )
@@ -185,11 +186,12 @@ void dumpNamespace( int16_t fd, struct mccnsp * dmpnsp )
             write( fd, " @ ", 3 );
             decwrite( fd, cursym->addr );
 
-            if ( (st == CPL_FUNC || st == CPL_VFUNC) && cursym->next ) write( fd, ", ", 2 );
+            if ( (st == CPL_FUNC && cursym->next) || st == CPL_VFUNC ) write( fd, ", ", 2 );
             else write( fd, ";\n", 2 );
         }
 
-        if ( st == CPL_FUNC || st == CPL_VFUNC ) write( fd, ");", 2 );
+        if ( st == CPL_VFUNC ) write( fd, " ...);", 6 );
+        else if ( st == CPL_FUNC ) write( fd, " );", 3 );
         else write( fd, "};\n", 3 );
     }
     else write( fd, ";\n", 2 );

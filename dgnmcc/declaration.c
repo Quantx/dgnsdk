@@ -307,6 +307,7 @@ void define( struct mccnsp * curnsp )
             default: ctype |= curnsp == &glbnsp ? CPL_BSS : CPL_STAK;
         }
     }
+    else ctype |= CPL_STAK;
 
     if ( tk == Unsigned )
     {

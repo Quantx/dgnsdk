@@ -61,7 +61,8 @@ void reduce()
     ||   n->oper == Plus    || n->oper == Minus
     ||   n->oper == Inder   || n->oper == Deref
     ||   n->oper == LogNot  || n->oper == Not
-    ||   n->oper == Sizeof  || n->oper == Cast )
+    ||   n->oper == Sizeof  || n->oper == Cast
+    ||   n->oper == FnCall )
     {
         if ( ntop < 1 ) mccfail("not enough nodes for unary operator");
         n->right = nstk[--ntop];
@@ -246,7 +247,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
                     case And: tk = Inder; break;
                 }
             }
-            else if (tk == '(') tk = FnCall;
+            else if (tk == '(') tk = FnCallArgs;
 
             // Remember: '(' and '[' has a prec of -1
             prec = getPrec(tk);
@@ -262,11 +263,22 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 #endif
 
             ostk[otop++] = tk;
-            if ( tk == FnCall ) ostk[otop++] = '(';
 
-            unary = tk != PostInc && tk != PostDec;
+            if ( tk == FnCallArgs )
+            {
+                ntok();
 
-            ntok();
+                if ( tk == ')' ) ostk[otop - 1] = FnCall, ntok();
+                else ostk[otop++] = '(';
+
+                unary = 1;
+            }
+            else
+            {
+                unary = tk != PostInc && tk != PostDec;
+
+                ntok();
+            }
 
             if ( ostk[otop - 1] == '(' && tk >= Void && tk <= Unsigned ) // Check if cast
             {
@@ -512,7 +524,7 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Sizeof )
         {
-            if ( isFunction(n->right->type) ) mccfail("cannot get sizeof function");
+            if ( !isFunction(n->right->type) ) mccfail("cannot get sizeof function");
             n->type = &type_int;
         }
         else if ( n->oper == LogNot )
@@ -616,14 +628,38 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == FnCall )
         {
-            if ( !isFunction(n->left->type) ) mccfail("lhs is not a function");
+            n->type = typeClone(n->right->type);
+            struct mccsubtype * s;
+            for ( s = n->type->sub; s->sub; s = s->sub );
 
-            // TODO function argument typechecking
+            if ( !s->ftype ) mccfail("lhs is not a function");
 
-            // Just drop the function namespace to get the return type
+            s->ftype = NULL;
+
+            // Functions never return l-values
+        }
+        else if ( n->oper == FnCallArgs )
+        {
             n->type = typeClone(n->left->type);
             struct mccsubtype * s;
             for ( s = n->type->sub; s->sub; s = s->sub );
+
+            if ( !s->ftype ) mccfail("lhs is not a function");
+
+            struct mccnode * fan;
+            struct mccsym * cursym;
+            for ( cursym = s->ftype->symtbl, fan = n->right;
+                  cursym;
+                  cursym = cursym->next, fan = fan->left )
+            {
+                if ( !isCompatible( &cursym->type, fan->oper == Comma ? fan->right->type : fan->type ) ) mccfail("incompatible argument");
+                if ( fan->oper != Comma ) { fan = NULL; cursym = cursym->next; break; }
+            }
+
+            if ( cursym ) mccfail("not enough arguments");
+            if ( fan && (s->ftype->type & CPL_NSPACE_MASK) != CPL_VFUNC ) mccfail("too many arguments");
+
+            // Just drop the function namespace to get the return type
             s->ftype = NULL;
 
             // Functions do not return l-values
@@ -657,7 +693,7 @@ struct, union: (In addition to pointers above)
 
                 switch (n->oper)
                 {
-                    case LogOr:   vl = vl || vr; break;
+                    case LogOr:   vl = vl || vr; break; // MAYBE add short circuit behavior
                     case LogAnd:  vl = vl && vr; break;
                     case Or:      vl = vl |  vr; break;
                     case Xor:     vl = vl ^  vr; break;

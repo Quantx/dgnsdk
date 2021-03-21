@@ -92,6 +92,7 @@ int16_t main( int16_t argc, int8_t ** argv )
     // Sanity check to make sure we can store all constants in a char
     if ( Arrow > 0xFF ) mccfail("too many constants!");
 
+/*
     int16_t tnc = (sizeof(tokenNames)/sizeof(*tokenNames));
     int16_t tkc = (Arrow - Void) + 2;
     if ( tnc != tkc )
@@ -102,6 +103,7 @@ int16_t main( int16_t argc, int8_t ** argv )
         write(2, "\n", 1);
         mccfail("debug token count missmatch");
     }
+*/
 #endif
 
     // Open output files

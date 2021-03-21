@@ -37,7 +37,7 @@ enum
     Add, Sub, // Addition and Subtraction
     Mul, Div, Mod, // Multiplication, Division, Modulus
     Sizeof, Cast, LogNot, Not, Plus, Minus, Inder, Deref, PreInc, PreDec, // Sizeof, logical not, bitwise not, Pre-Increment, Pre-Decrement
-    PostInc, PostDec, Dot, Arrow, FnCall // Post-Increment, Post-Decrement, Dot (structure access), Arrow (structure access via pointer)
+    PostInc, PostDec, Dot, Arrow, FnCallArgs, FnCall // Post-Increment, Post-Decrement, Dot (structure access), Arrow (structure access via pointer)
 };
 
 #ifdef DEBUG
@@ -70,6 +70,6 @@ int8_t * tokenNames[] = {
     "+", "-",
     "*", "/", "%",
     "sizeof (operator)", "cast", "!", "~", "(unary) +", "(unary) -", "(unary) &", "(unary) *", "(pre) ++", "(pre) --",
-    "(post) ++", "(post) --", ".", "->", "call"
+    "(post) ++", "(post) --", ".", "->", "call (w. args)", "call"
 };
 #endif
