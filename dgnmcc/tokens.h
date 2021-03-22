@@ -73,3 +73,35 @@ int8_t * tokenNames[] = {
     "(post) ++", "(post) --", ".", "->", "call (w. args)", "call"
 };
 #endif
+
+// Primative types
+#define IR_VOID CPL_VOID
+#define IR_CHR  CPL_CHR
+#define IR_UCHR CPL_UCHR
+#define IR_INT  CPL_INT
+#define IR_UINT CPL_UINT
+#define IR_LNG  CPL_LNG
+#define IR_ULNG CPL_ULNG
+#define IR_FPV  CPL_FPV
+#define IR_DBL  CPL_DBL
+// Complex types
+#define IR_STRUC 9
+#define IR_UNION 10
+// Derived types
+#define IR_PTR   11
+#define IR_FUNC  12
+
+#define IR_TYPE_MASK 0b00001111
+
+
+
+struct mccirn
+{
+    unsigned int8_t oper;
+    unsigned int8_t flag;
+    union {
+        unsigned int16_t size;
+	int16_t val;
+	int32_t valLong;
+    };
+};

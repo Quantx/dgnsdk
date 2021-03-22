@@ -290,7 +290,15 @@ int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
             {
                 if ( !sb->ftype ) return 0;
 
-                // TODO ensure function definitions match and that functions are complete
+                if ( (sa->ftype->type & CPL_NSPACE_MASK) != (sb->ftype->type & CPL_NSPACE_MASK) ) mccfail("variadic function incompatible with non-variadic function");
+
+                struct mccsym * asym, * bsym;
+                for ( asym = sa->ftype->symtbl, bsym = sb->ftype->symtbl; asym && bsym; asym = asym->next, bsym = bsym->next )
+                {
+                    if ( !isCompatible( &asym->type, &bsym->type ) ) mccfail("incompatible argument types");
+                }
+
+                if ( asym || bsym ) mccfail("incompatile number of arguments");
             }
         }
 

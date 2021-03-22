@@ -115,7 +115,7 @@ mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 |0|000|0000
 | |   |Primative datatype
 | |Storage type
-|Extern flag
+|Local flag
 
 */
 
@@ -128,6 +128,7 @@ mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 #define CPL_ULNG 6 // (32 bits) Unsigned Long
 #define CPL_FPV  7 // (32 bits) DG Nova Float
 #define CPL_DBL  8 // (64 bits) DG Nova Double
+
 #define CPL_DTYPE_MASK 0b00001111 // Mask
 
 // Segments
@@ -148,7 +149,7 @@ mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 #define CPL_STORE_MASK (0b01110000) // Mask
 
 // C Storage qualifiers
-#define CPL_XTRN 0b10000000 // Extern flag
+#define CPL_LOCAL 0b10000000 // Local flag, not set when declared as "extern int myint;"
 
 // Type information
 struct mccsubtype

@@ -60,6 +60,9 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
 
             struct mccnode * cexp = expr(curnsp, ']');
 
+            if ( tk != ']' ) mccfail("expected closing bracket");
+            ntok();
+
             // MAYBE add code emition for non-file scope arrays
             if ( cexp->oper < Number || cexp->oper > LongNumber ) mccfail("need constant integer expression in array declaration");
             *cas = cexp->val;
@@ -67,9 +70,6 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
             brk(erbp); // Free expression stack
 
             curtype->arrays++;
-
-            if ( tk != ']' ) mccfail("expected closing bracket");
-            ntok();
         }
     }
     else if ( tk == '(' ) // Get function declarations
@@ -280,31 +280,37 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
     brk(erbp);
 }
 
-// (extern|static) (const|register) (signed|unsigned) <void|char|int|...|struct|union|...|etc>
+// (extern) (const|register|static) (signed|unsigned) <void|char|int|...|struct|union|...|etc>
 void define( struct mccnsp * curnsp )
 {
     #define LNK_EXTERN 1
     #define LNK_STATIC 2
+
     unsigned int8_t ctype = 0, cnsp = 0, lnk = 0;
 
     unsigned int8_t nsptype = curnsp->type & CPL_NSPACE_MASK;
 
     if ( nsptype == CPL_BLOCK )
     {
-        // Determine linkage
-        switch ( tk )
-        {
-            case Extern: lnk = LNK_EXTERN; ntok(); break;
-            case Static: lnk = LNK_STATIC; ntok(); break;
-        }
+        if ( tk == Extern ) lnk = LNK_EXTERN, ntok();
 
         // Check storage type
         switch ( tk ) // Check for storage type
         {
-            case Const:    ctype |= CPL_CNST; ntok(); break;
-            case Register: ctype |= CPL_ZERO; ntok(); break;
+            case Const:    ctype = CPL_CNST; ntok(); break;
+            case Register: ctype = CPL_ZERO; ntok(); break;
+            case Static:
+                if ( lnk ) mccfail("variable cannot be extern and static");
+                lnk = LNK_STATIC;
+                ctype = CPL_BSS;
+                ntok();
+                break;
             case Auto:
-            default: ctype |= curnsp == &glbnsp ? CPL_BSS : CPL_STAK;
+                ntok();
+            default:
+                if ( curnsp == &glbnsp ) ctype = CPL_BSS;
+                else if ( lnk ) mccfail("non file scope variable cannot be extern");
+                else ctype = CPL_STAK;
         }
     }
     else ctype |= CPL_STAK;
@@ -476,18 +482,59 @@ void define( struct mccnsp * curnsp )
         if ( decnsp && (~decnsp->type & CPL_DEFN)
           && !( cursym->type.sub->inder || cursym->type.sub->ftype ) ) mccfail("cannot declare incomplete type");
 
-        // TODO compare to existing symbol
-//        compareSymbol( cursym,
+        struct mccsym * chksym = getSymbol( curnsp, cursym->name, cursym->len );
 
-        // Add symbol to current namespace (assuming it doesn't already exist)
-        *curnsp->symtail = cursym;
-        curnsp->symtail = &cursym->next;
+        if ( chksym )
+        {
+            // Types must be EXACT, not just compatible
+            struct mcctype * ta, * tb;
+            struct mccsubtype * sa, * sb;
+
+            ta = &cursym->type;
+            tb = &chksym->type;
+
+            if ( ta->stype != tb->stype ) mccfail("incompatible struct types in redeclaration");
+            if ( !ta->stype && (ta->ptype & CPL_DTYPE_MASK) != (tb->ptype & CPL_DTYPE_MASK) ) mccfail("incompatible primative types in redeclaration");
+
+            for ( sa = ta->sub, sb = tb->sub; sa && sb; sa = sa->sub, sb = sb->sub )
+            {
+                if ( sa->inder != sb->inder ) mccfail("inderection missmatch in redeclaration");
+                if ( sa->arrays != sb->arrays ) mccfail("array dimension missmatch in redeclaration");
+
+                int16_t i;
+                for ( i = 0; i < sa->arrays; i++ ) if ( sa->sizes[i] != sb->sizes[i] ) mccfail("array size missmatch in redeclaration");
+
+                if ( sa->ftype )
+                {
+                    if ( !sb->ftype ) mccfail("incompatible function types in redeclaration");
+
+                    if ( (sa->ftype->type & CPL_NSPACE_MASK) != (sb->ftype->type & CPL_NSPACE_MASK) ) mccfail("variadic function incompatible with non-variadic function in redeclaration");
+
+                    struct mccsym * asym, * bsym;
+                    for ( asym = sa->ftype->symtbl, bsym = sb->ftype->symtbl; asym && bsym; asym = asym->next, bsym = bsym->next )
+                    {
+                        if ( !isCompatible( &asym->type, &bsym->type ) ) mccfail("incompatible argument types in redeclaration");
+                    }
+
+                    if ( asym || bsym ) mccfail("incompatile number of arguments in redeclaration");
+                }
+            }
+
+            if ( sa || sb ) mccfail("type missmatch in redeclaration");
+
+            // Unallocate current symbol and start using old one
+            brk(cursym); cursym = chksym;
+
+            if ( (cursym->type.ptype & CPL_LOCAL) && lnk != LNK_EXTERN ) mccfail("variable has already been declared");
+        }
+        // Add new symbol to current namespace
+        else *curnsp->symtail = cursym, curnsp->symtail = &cursym->next;
 
         // Get innermost subtype
-        struct mccsubtype * sbt;
-        for ( sbt = cursym->type.sub; sbt->sub; sbt = sbt->sub );
+        struct mccsubtype * s;
+        for ( s = cursym->type.sub; s->sub; s = s->sub );
 
-        if ( sbt->ftype )
+        if ( s->ftype )
         {
             if ( curnsp != &glbnsp ) mccfail("function declared outside file scope");
 
@@ -495,20 +542,29 @@ void define( struct mccnsp * curnsp )
             if ( tk == '{' )
             {
                 // Mark function as defined
-                if ( sbt->ftype->type & CPL_DEFN ) mccfail("function already declared");
-                sbt->ftype->type |= CPL_DEFN;
+                if ( s->ftype->type & CPL_DEFN ) mccfail("function already declared");
+                s->ftype->type |= CPL_DEFN;
 
                 cursym->type.ptype &= ~CPL_STORE_MASK;
-                cursym->type.ptype |= CPL_TEXT;
+                cursym->type.ptype |= CPL_TEXT | CPL_LOCAL;
 
                 write( segs[SEG_TEXT], cursym->name, cursym->len );
-                write( segs[SEG_TEXT], ":\n", 2 );
 
-                statement(sbt->ftype);
-                break;
+                if ( lnk == LNK_STATIC ) write( segs[SEG_TEXT], ":\n", 2 );
+                else
+                {
+                    write( segs[SEG_TEXT], ": .glob ", 8 );
+                    write( segs[SEG_TEXT], cursym->name, cursym->len );
+                    write( segs[SEG_TEXT], "\n", 1 );
+                }
+
+                statement(s->ftype, 0);
             }
+
+            break; // Remember: execution stops here for functions
         }
-        else if ( (cursym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) // This variable was declared on the stack
+
+        if ( (cursym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) // Stack variable declaration
         {
             // Compute address
             unsigned int16_t tsz = typeSize(&cursym->type);
@@ -516,9 +572,15 @@ void define( struct mccnsp * curnsp )
             cursym->addr = curnsp->size;
             curnsp->size += tsz;
 
-            // TODO stack declarations
+            cursym->type.ptype |= CPL_LOCAL;
         }
-        else  // Not a function
+        else if ( lnk == LNK_EXTERN ) // Not declaring anything here, just marking as global
+        {
+            write( segs[SEG_DATA], "\t.glob ", 7 );
+            write( segs[SEG_DATA], cursym->name, cursym->len );
+            write( segs[SEG_DATA], "\n", 1 );
+        }
+        else // Data or BSS variable declaration
         {
             // No longer initialized to zero so convert BSS to DATA
             if ( tk == Ass && (cursym->type.ptype & CPL_STORE_MASK) == CPL_BSS )
@@ -543,13 +605,15 @@ void define( struct mccnsp * curnsp )
                 decwrite( segfd, typeSize(&cursym->type) );
                 write( segfd, "\n", 1 );
             }
+
+            cursym->type.ptype |= CPL_LOCAL;
         }
 
         // Only declare one variable per definition
         if ( nsptype == CPL_CAST
           || nsptype == CPL_FUNC
           || nsptype == CPL_VFUNC ) break;
-        else if ( tk == Comma ) ntok();
+        if ( tk == Comma ) ntok();
         else if ( tk != ';' ) mccfail("expected comma or semi-colon");
     }
 

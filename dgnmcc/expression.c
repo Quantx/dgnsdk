@@ -26,7 +26,7 @@ int8_t getPrec( unsigned int8_t op )
 }
 
 // Must be declared before stacks to prevent overflow nonsense
-unsigned int16_t otop, ntop, ctop;
+unsigned int16_t otop, ntop, ctop, unary;
 
 unsigned int8_t ostk[MAX_EXPR_OPER];
 
@@ -104,8 +104,8 @@ void reduce()
 struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 {
     struct mccnode * root, * n;
-    unsigned int16_t unary = 1;
 
+    unary = 1;
     otop = ntop = ctop = 0;
 
     // Build expression tree
@@ -757,6 +757,11 @@ struct, union: (In addition to pointers above)
 #endif
 
     return root;
+}
+
+void emitNode(struct mccnode * n)
+{
+    
 }
 
 void emit(struct mccnsp * curnsp, struct mccnode * root)
