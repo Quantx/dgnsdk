@@ -63,7 +63,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
             if ( tk != ']' ) mccfail("expected closing bracket");
             ntok();
 
-            // MAYBE add code emition for non-file scope arrays
+            // TODO add code emition for non-file scope arrays
             if ( cexp->oper < Number || cexp->oper > LongNumber ) mccfail("need constant integer expression in array declaration");
             *cas = cexp->val;
 
@@ -163,8 +163,6 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
         if ( tk != '{' ) mccfail("expected opening curly-brace");
         ntok();
 
-        void * arbp = sbrk(0);
-
         struct mcctype * dt = typeDeref(curtype);
 
         unsigned int16_t i = 0;
@@ -190,13 +188,81 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
             write( segfd, "\n", 1 );
         }
 
-        brk(arbp);
+        brk(dt);
 
         return;
     }
 
-    if ( curtype->stype ) // TODO struct initialization
+    if ( curtype->stype )
     {
+        if ( tk != '{' ) mccfail("expected opening curly-brace");
+        ntok();
+
+        int16_t isz = 0;
+        struct mccsym * cursym;
+        struct mccnsp * subnsp;
+        for ( cursym = curtype->stype->symtbl, subnsp = curtype->stype->nsptbl; cursym; cursym = cursym->next )
+        {
+            // Find next relevant anonymous child namespace
+            while ( subnsp
+                && ( !subnsp->symtbl || (!subnsp->name && (~subnsp->type & CPL_INST)))
+            ) subnsp = subnsp->next;
+
+            if ( subnsp && subnsp->symtbl->addr < cursym->addr )
+            {
+                if ( isz < subnsp->symtbl->addr ) // Mid struct padding
+                {
+                    write( segfd, "\t.zero ", 7 );
+                    decwrite( segfd, isz );
+                    write( segfd, "\n", 1 );
+                }
+
+                struct mcctype nspt;
+                nspt.stype = subnsp;
+                nspt.sub = sbrk( sizeof(struct mccsubtype) );
+                if ( nspt.sub == SBRKFAIL ) mccfail("unable to allocate space for instantiation anonymous sub namespace");
+                nspt.sub->inder = 0;
+                nspt.sub->arrays = 0;
+                nspt.sub->ftype = NULL;
+                nspt.sub->sub = NULL;
+
+                instantiate( curnsp, segfd, &nspt );
+
+                brk(nspt.sub);
+
+                isz += subnsp->size;
+                subnsp = subnsp->next;
+            }
+            else
+            {
+                if ( isz < subnsp->symtbl->addr ) // Mid struct padding
+                {
+                    write( segfd, "\t.zero ", 7 );
+                    decwrite( segfd, isz );
+                    write( segfd, "\n", 1 );
+                }
+
+                instantiate( curnsp, segfd, &cursym->type );
+                isz += typeSize( &cursym->type );
+            }
+
+            if ( tk == '}' ) break;
+            if ( tk == Comma ) ntok();
+            else mccfail("expected closing curly-brace or comma");
+        }
+
+        if ( tk != '}' ) mccfail("expected closing curly-brace");
+        ntok();
+
+        // End of struct padding
+        if ( isz = curtype->stype->size - isz )
+        {
+            // Fill rest of struct with zeros
+            write( segfd, "\t.zero ", 7 );
+            decwrite( segfd, isz );
+            write( segfd, "\n", 1 );
+        }
+
         return;
     }
 
@@ -219,7 +285,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
             case 8: write( segfd, "\t.quad ", 7 ); break;
         }
 
-        // TODO output floats
+        // TODO-FPU output floats
         if ( cexp->oper == LongNumber ) octwrite( segfd, cexp->valLong );
         else decwrite( segfd, cexp->val );
     }
@@ -558,7 +624,7 @@ void define( struct mccnsp * curnsp )
                     write( segs[SEG_TEXT], "\n", 1 );
                 }
 
-                statement(s->ftype, 0);
+                statement(cursym, s->ftype, 0);
             }
 
             break; // Remember: execution stops here for functions

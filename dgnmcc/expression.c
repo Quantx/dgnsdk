@@ -393,7 +393,7 @@ struct, union: (In addition to pointers above)
         write(2, "\n", 1);
 #endif
 
-        // MAYBE optimize typechecking/promotion
+        // TODO-OPTIMIZE typechecking/promotion
         if ( n->oper >= Ass && n->oper <= OrAss )
         {
             if ( ~n->left->flag & CPL_LVAL ) mccfail("lhs of assignment is not an l-value");
@@ -695,7 +695,7 @@ struct, union: (In addition to pointers above)
 
                 switch (n->oper)
                 {
-                    case LogOr:   vl = vl || vr; break; // MAYBE add short circuit behavior
+                    case LogOr:   vl = vl || vr; break; // TODO add short circuit behavior
                     case LogAnd:  vl = vl && vr; break;
                     case Or:      vl = vl |  vr; break;
                     case Xor:     vl = vl ^  vr; break;

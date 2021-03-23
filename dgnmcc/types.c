@@ -6,6 +6,12 @@ struct mccsubtype subtype_ptr = {
     1, 0, NULL, NULL, NULL
 };
 
+struct mcctype type_void = {
+    CPL_VOID,
+    NULL,
+    &subtype_val
+};
+
 struct mcctype type_char = {
     CPL_CHR,
     NULL,

@@ -1,4 +1,20 @@
-void statement( struct mccnsp * curnsp, int sws )
+void parenthesizedExpr( struct mccnsp * curnsp )
+{
+    if ( tk != '(' ) mccfail( "missing opening parenthasis in statement" );
+    ntok();
+
+    void * erbp = sbrk(0);
+
+    struct mccnode * root = expr( curnsp, ')' );
+
+    if ( tk != ')' ) mccfail( "missing closing parenthasis in statement" );
+    ntok();
+
+    emit(curnsp, root);
+    brk(erbp);
+}
+
+void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 {
     if ( tk == ';' ) ntok();
     else if ( tk == '{' )
@@ -23,7 +39,7 @@ void statement( struct mccnsp * curnsp, int sws )
         curnsp->nsptail = &cbnsp->next;
 
         ntok();
-        while ( tk != '}' ) statement( cbnsp, sws );
+        while ( tk != '}' ) statement( func, cbnsp, sws );
         ntok();
 
         // Drop child from parent namespace table
@@ -52,27 +68,16 @@ void statement( struct mccnsp * curnsp, int sws )
         write( segs[SEG_TEXT], "\tIF\n", 4 );
 
         ntok();
-        if ( tk != '(' ) mccfail( "missing opening parenthasis in if statement" );
-        ntok();
+        parenthesizedExpr(curnsp);
 
-        void * erbp = sbrk(0);
-
-        struct mccnode * root = expr( curnsp, ')' );
-
-        if ( tk != ')' ) mccfail( "missing closing parenthasis in if statement" );
-        ntok();
-
-        emit(curnsp, root);
-        brk(erbp);
-
-        statement(curnsp, sws);
+        statement( func, curnsp, sws);
 
         if ( tk == Else )
         {
             write( segs[SEG_TEXT], "\tELSE\n", 6 );
 
             ntok();
-            statement(curnsp, sws);
+            statement( func, curnsp, sws);
         }
 
         write( segs[SEG_TEXT], "\tIF_END\n", 8 );
@@ -82,20 +87,9 @@ void statement( struct mccnsp * curnsp, int sws )
         write( segs[SEG_TEXT], "\tSWITCH\n", 8 );
 
         ntok();
-        if ( tk != '(' ) mccfail( "missing opening parenthasis in switch statement" );
-        ntok();
+        parenthesizedExpr(curnsp);
 
-        void * erbp = sbrk(0);
-
-        struct mccnode * root = expr( curnsp, ')' );
-
-        if ( tk != ')' ) mccfail( "missing closing parenthasis in switch statement" );
-        ntok();
-
-        emit(curnsp, root);
-        brk(erbp);
-
-        statement(curnsp, 1);
+        statement(func, curnsp, 1);
 
         write( segs[SEG_TEXT], "\tEND_SWITCH\n", 12 );
     }
@@ -109,13 +103,13 @@ void statement( struct mccnsp * curnsp, int sws )
 
         struct mccnode * root = expr( curnsp, ':' );
 
+        if ( root->oper < Number || root->oper > LongNumber ) mccfail("need constant expression in case statement");
+
         if ( tk != ':' ) mccfail( "missing colon in case statement" );
         ntok();
 
         emit(curnsp, root);
         brk(erbp);
-
-        // TODO case requires constant expression
     }
     else if ( tk == Default )
     {
@@ -132,7 +126,7 @@ void statement( struct mccnsp * curnsp, int sws )
         write( segs[SEG_TEXT], "\tBREAK\n", 7 );
 
         ntok();
-        if ( tk != ';' ) mccfail( "missing semicolon after break" );
+        if ( tk != ';' ) mccfail( "missing semicolon after break statement" );
         ntok();
     }
     else if ( tk == Continue )
@@ -140,14 +134,41 @@ void statement( struct mccnsp * curnsp, int sws )
         write( segs[SEG_TEXT], "\tCONTINUE\n", 10 );
 
         ntok();
-        if ( tk != ';' ) mccfail( "missing semicolon after continue" );
+        if ( tk != ';' ) mccfail( "missing semicolon after continue statement" );
         ntok();
     }
     else if ( tk == Return )
     {
+        ntok();
+
+        struct mcctype * frt = typeClone(&func->type);
+        struct mccsubtype * s;
+        for ( s = frt->sub; s->sub; s = s->sub );
+        s->ftype = NULL;
+
+        if ( tk == ';' )
+        {
+            // Check if function expects void
+            if (!isCompatible( frt, &type_void ) ) mccfail("function expects non-void return type");
+
+            ntok();
+            write( segs[SEG_TEXT], "\tRETURN_VOID\n", 13 );
+            brk(frt);
+            return;
+        }
+
         write( segs[SEG_TEXT], "\tRETURN\n", 8 );
 
-        // TODO return statement
+        struct mccnode * root = expr( curnsp, ';' );
+
+        if ( tk != ';' ) mccfail( "missing semicolon after return statement" );
+        ntok();
+
+        if ( !isCompatible( frt, root->type ) ) mccfail("incompatible return type");
+
+        emit(curnsp, root);
+
+        brk(frt); // Also rolls back the expression
     }
     else if ( tk == For )
     {
@@ -198,7 +219,7 @@ void statement( struct mccnsp * curnsp, int sws )
 
         // Statement
 
-        statement(curnsp, sws);
+        statement(func, curnsp, sws);
 
         write( segs[SEG_TEXT], "\tEND_FOR\n", 9 );
     }
@@ -207,20 +228,9 @@ void statement( struct mccnsp * curnsp, int sws )
         write( segs[SEG_TEXT], "\tWHILE\n", 7 );
 
         ntok();
-        if ( tk != '(' ) mccfail( "missing opening parenthasis in while statement" );
-        ntok();
+        parenthesizedExpr(curnsp);
 
-        void * erbp = sbrk(0);
-
-        struct mccnode * root = expr( curnsp, ')' );
-
-        if ( tk != ')' ) mccfail( "missing closing parenthasis in while statement" );
-        ntok();
-
-        emit(curnsp, root);
-        brk(erbp);
-
-        statement(curnsp, sws);
+        statement(func, curnsp, sws);
 
         write( segs[SEG_TEXT], "\tEND_WHILE\n", 11 );
     }
@@ -229,27 +239,17 @@ void statement( struct mccnsp * curnsp, int sws )
         write( segs[SEG_TEXT], "\tDO\n", 4 );
 
         ntok();
-        statement(curnsp, sws);
+        statement(func, curnsp, sws);
 
         write( segs[SEG_TEXT], "\tEND_DO\n", 8 );
 
         if ( tk != While ) mccfail( "missing while in do-while statement" );
 
         ntok();
-        if ( tk != '(' ) mccfail( "missing opening parenthasis in switch statement" );
-        ntok();
+        parenthesizedExpr(curnsp);
 
-        void * erbp = sbrk(0);
-
-        struct mccnode * root = expr( curnsp, ')' );
-
-        if ( tk != ')' ) mccfail( "missing closing parenthasis in switch statement" );
-        ntok();
         if ( tk != ';' ) mccfail( "missing final semicolon in do-while statement" );
         ntok();
-
-        emit(curnsp, root);
-        brk(erbp);
     }
     else
     {

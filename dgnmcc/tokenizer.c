@@ -19,9 +19,9 @@ unsigned int16_t csc;
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
 int8_t * res_words[] = {
     "void", "int", "short", "char", "float", "long", "double",
+    "enum", "struct", "union",
     "signed", "unsigned",
     "extern",
-    "enum", "struct", "union",
     "auto", "static", "register", "const",
     "if", "else", "switch", "case", "default",
     "break", "continue", "return",
@@ -120,6 +120,8 @@ void ntok()
         // Numerical constant
         else if ( tk >= '0' && tk <= '9' )
         {
+            // TODO-FPU process floating point constants
+
             tkLong = 0;
 
             if ( tk != '0' ) // Decimal
