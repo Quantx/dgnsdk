@@ -19,6 +19,13 @@ enum
     SizeofRes, // Used only for identifying the reserved word, not be confused with Sizeof
 // ******* Misc *******
     Variadic,
+
+// ******* Intermediate Representation Tokens *******
+    End, // End of block
+    Allocate, Unallocate, // Allocate memory on the stack
+    Label, LabelExtern, // An assembly label
+    VariableStack, // Variable on the stack
+
 // ******* Expression tokens *******
     Named, Variable, // Named (an identifier string), Variable (ref to user defiend variable)
     Number, SmolNumber, LongNumber, FpvNumber, DblNumber, // Numerical constant in source (Char, Int, Long, Float, Double)
@@ -53,6 +60,12 @@ int8_t * tokenNames[] = {
     "goto",
     "sizeof (reserved word)",
     "...",
+
+    "End",
+    "Allocate", "Unallocate",
+    "Label", "LabelExtern",
+    "VariableStack",
+
     "named", "variable",
     "number", "small number", "long number", "float number", "double number",
 
@@ -75,32 +88,33 @@ int8_t * tokenNames[] = {
 #endif
 
 // Primative types
-#define IR_VOID CPL_VOID
-#define IR_CHR  CPL_CHR
-#define IR_UCHR CPL_UCHR
-#define IR_INT  CPL_INT
-#define IR_UINT CPL_UINT
-#define IR_LNG  CPL_LNG
-#define IR_ULNG CPL_ULNG
-#define IR_FPV  CPL_FPV
-#define IR_DBL  CPL_DBL
+#define IR_VOID 0 // ( 0 bits) Void
+#define IR_CHR  1 // ( 8 bits) Signed Character
+#define IR_UCHR 2 // ( 8 bits) Unsigned Character
+#define IR_INT  3 // (16 bits) Signed Integer
+#define IR_UINT 4 // (16 bits) Unsigned Integer
+#define IR_LNG  5 // (32 bits) Signed Long
+#define IR_ULNG 6 // (32 bits) Unsigned Long
+#define IR_FPV  7 // (32 bits) DG Nova Float
+#define IR_DBL  8 // (64 bits) DG Nova Double
 // Complex types
 #define IR_STRUC 9
-#define IR_UNION 10
 // Derived types
-#define IR_PTR   11
-#define IR_FUNC  12
+#define IR_PTR   10
+#define IR_FUNC  11
 
 #define IR_TYPE_MASK 0b00001111
 
+#define IR_STATIC (1 << 4) // Flag is set if type existis in text/data/bss, unset if stack
 
-// Intermediate Represntation Operator
-struct mcciro
+
+// Intermediate Represntation Assembler Node
+struct iranode
 {
     unsigned int8_t oper;
     unsigned int8_t flag;
+    unsigned int16_t size; // Size of pointer
     union {
-        unsigned int16_t size;
 	int16_t val;
 	int32_t valLong;
     };

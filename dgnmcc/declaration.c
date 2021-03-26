@@ -1,3 +1,5 @@
+unsigned int16_t svid = 1; // Static variable ID (starts at 1)
+
 void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype ** partype )
 {
     struct mccsubtype * curtype = *partype;
@@ -150,6 +152,11 @@ void outputVarAddr( int16_t segfd, struct mccnode * root )
     if ( !( n && n->oper == Variable ) ) mccfail("cannot output address of non-immediate-lvalue");
 
     write( segfd, n->sym->name, n->sym->len );
+    if ( n->sym->addr )
+    {
+        write( segfd, ".", 1 );
+        decwrite( segfd, n->sym->addr );
+    }
 }
 
 void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtype )
@@ -429,7 +436,6 @@ void define( struct mccnsp * curnsp )
     {
         if ( !(tk == Named || tk == '{') ) mccfail("expected struct name or anonymous struct definition");
 
-        // TODO struct overriding and anonymous child struct offset
         if ( tk == Named )
         {
             decnsp = findNamespace( curnsp, tkStr, tkVal );
@@ -633,15 +639,10 @@ void define( struct mccnsp * curnsp )
                 cursym->type.ptype &= ~CPL_STORE_MASK;
                 cursym->type.ptype |= CPL_TEXT | CPL_LOCAL;
 
-                write( segs[SEG_TEXT], cursym->name, cursym->len );
+                if ( lnk == LNK_STATIC ) emitStatement( Label, cursym->len );
+                else emitStatement( LabelExtern, cursym->len );
 
-                if ( lnk == LNK_STATIC ) write( segs[SEG_TEXT], ":\n", 2 );
-                else
-                {
-                    write( segs[SEG_TEXT], ": .glob ", 8 );
-                    write( segs[SEG_TEXT], cursym->name, cursym->len );
-                    write( segs[SEG_TEXT], "\n", 1 );
-                }
+                write( segs[SEG_TEXT], cursym->name, cursym->len );
 
                 statement(cursym, s->ftype, 0);
             }
@@ -662,12 +663,7 @@ void define( struct mccnsp * curnsp )
                 curnsp->size += tsz;
             }
 
-            if ( nsptype == CPL_BLOCK )
-            {
-                write( segs[SEG_TEXT], "\tALLOCATE ", 10 );
-                decwrite( segs[SEG_TEXT], tsz );
-                write( segs[SEG_TEXT], "\n", 1 );
-            }
+            if ( nsptype == CPL_BLOCK ) emitStatement( Allocate, tsz );
 
             cursym->type.ptype |= CPL_LOCAL;
         }
@@ -689,6 +685,14 @@ void define( struct mccnsp * curnsp )
             int16_t segfd = segs[(cursym->type.ptype & CPL_STORE_MASK) >> 4];
 
             write( segfd, cursym->name, cursym->len );
+
+            // A block scope static variable is being declared
+            if ( curnsp != &glbnsp )
+            {
+                write( segfd, ".", 1 );
+                decwrite( segfd, cursym->addr = svid++ );
+            }
+
             write( segfd, ":\n", 2 );
 
             if ( tk == Ass )

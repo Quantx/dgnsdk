@@ -8,10 +8,11 @@ void parenthesizedExpr( struct mccnsp * curnsp )
     struct mccnode * root = expr( curnsp, ')' );
 
     if ( tk != ')' ) mccfail( "missing closing parenthasis in statement" );
-    ntok();
 
     emit(curnsp, root);
     brk(erbp);
+
+    ntok();
 }
 
 void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
@@ -44,9 +45,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         ntok();
 
         // Unallocate current namespace from the stack
-        write( segs[SEG_TEXT], "\tUNALLOCATE ", 12 );
-        decwrite( segs[SEG_TEXT], cbnsp->size );
-        write( segs[SEG_TEXT], "\n", 1 );
+        emitStatement( Unallocate, cbnsp->size );
 
         // Drop child from parent namespace table
         struct mccnsp ** cnsp;
@@ -75,7 +74,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
     }
     else if ( tk == If )
     {
-        write( segs[SEG_TEXT], "\tIF\n", 4 );
+        emitStatement( If, 0 );
 
         ntok();
         parenthesizedExpr(curnsp);
@@ -84,28 +83,28 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         if ( tk == Else )
         {
-            write( segs[SEG_TEXT], "\tELSE\n", 6 );
+            emitStatement( Else, 0 );
 
             ntok();
             statement( func, curnsp, sws);
         }
 
-        write( segs[SEG_TEXT], "\tIF_END\n", 8 );
+        emitStatement( End, 0 );
     }
     else if ( tk == Switch )
     {
-        write( segs[SEG_TEXT], "\tSWITCH\n", 8 );
+        emitStatement( Switch, 0 );
 
         ntok();
         parenthesizedExpr(curnsp);
 
         statement(func, curnsp, 1);
 
-        write( segs[SEG_TEXT], "\tEND_SWITCH\n", 12 );
+        emitStatement( End, 0 );
     }
     else if ( tk == Case )
     {
-        write( segs[SEG_TEXT], "\tCASE\n", 6 );
+        emitStatement( Case, 0 );
 
         if ( !sws ) mccfail("case statement outside of switch statement");
 
@@ -118,12 +117,13 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         if ( tk != ':' ) mccfail( "missing colon in case statement" );
         ntok();
 
-        emit(curnsp, root);
+        emitStatement( Case, root->val );
+
         brk(erbp);
     }
     else if ( tk == Default )
     {
-        write( segs[SEG_TEXT], "\tDEFAULT\n", 9 );
+        emitStatement( Default, 0 );
 
         if ( !sws ) mccfail("default statement outside of switch statement");
 
@@ -133,7 +133,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
     }
     else if ( tk == Break )
     {
-        write( segs[SEG_TEXT], "\tBREAK\n", 7 );
+        emitStatement( Break, 0 );
 
         ntok();
         if ( tk != ';' ) mccfail( "missing semicolon after break statement" );
@@ -141,7 +141,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
     }
     else if ( tk == Continue )
     {
-        write( segs[SEG_TEXT], "\tCONTINUE\n", 10 );
+        emitStatement( Continue, 0 );
 
         ntok();
         if ( tk != ';' ) mccfail( "missing semicolon after continue statement" );
@@ -162,12 +162,12 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
             if (!isCompatible( frt, &type_void ) ) mccfail("function expects non-void return type");
 
             ntok();
-            write( segs[SEG_TEXT], "\tRETURN_VOID\n", 13 );
+            emitStatement( Return, 1 ); // NOTE: The 1 implies a VOID return type
             brk(frt);
             return;
         }
 
-        write( segs[SEG_TEXT], "\tRETURN\n", 8 );
+        emitStatement( Return, 0 );
 
         struct mccnode * root = expr( curnsp, ';' );
 
@@ -182,7 +182,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
     }
     else if ( tk == For )
     {
-        write( segs[SEG_TEXT], "\tFOR\n", 5 );
+        emitStatement( For, 0 );
 
         ntok();
         if ( tk != '(' ) mccfail( "missing opening parenthasis in for statement" );
@@ -231,27 +231,27 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         statement(func, curnsp, sws);
 
-        write( segs[SEG_TEXT], "\tEND_FOR\n", 9 );
+        emitStatement( End, 0 );
     }
     else if ( tk == While )
     {
-        write( segs[SEG_TEXT], "\tWHILE\n", 7 );
+        emitStatement( While, 0 );
 
         ntok();
         parenthesizedExpr(curnsp);
 
         statement(func, curnsp, sws);
 
-        write( segs[SEG_TEXT], "\tEND_WHILE\n", 11 );
+        emitStatement( End, 0 );
     }
     else if ( tk == Do )
     {
-        write( segs[SEG_TEXT], "\tDO\n", 4 );
+        emitStatement( Do, 0 );
 
         ntok();
         statement(func, curnsp, sws);
 
-        write( segs[SEG_TEXT], "\tEND_DO\n", 8 );
+        emitStatement( End, 1 );
 
         if ( tk != While ) mccfail( "missing while in do-while statement" );
 
@@ -268,10 +268,11 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         struct mccnode * root = expr( curnsp, ';' );
 
         if ( tk != ';' ) mccfail( "Expected semicolon after expression" );
-        ntok();
 
         emit(curnsp, root);
 
         brk(erbp); // Free memory allocated by the expression
+
+        ntok();
     }
 }
