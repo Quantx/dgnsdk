@@ -94,8 +94,8 @@ int8_t * tokenNames[] = {
 #define IR_TYPE_MASK 0b00001111
 
 
-
-struct mccirn
+// Intermediate Represntation Operator
+struct mcciro
 {
     unsigned int8_t oper;
     unsigned int8_t flag;

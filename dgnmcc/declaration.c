@@ -63,7 +63,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
             if ( tk != ']' ) mccfail("expected closing bracket");
             ntok();
 
-            // TODO add code emition for non-file scope arrays
+            // Don't support dynamic array sizes because that would require dynamic typing
             if ( cexp->oper < Number || cexp->oper > LongNumber ) mccfail("need constant integer expression in array declaration");
             *cas = cexp->val;
 
@@ -82,6 +82,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
 
         fncnsp->type = CPL_FUNC;
 
+        fncnsp->addr = 0;
         fncnsp->size = 0;
 
         fncnsp->symtbl = NULL;
@@ -193,7 +194,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
         return;
     }
 
-    if ( curtype->stype )
+    if ( curtype->stype ) // TODO union declaration
     {
         if ( tk != '{' ) mccfail("expected opening curly-brace");
         ntok();
@@ -208,9 +209,9 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
                 && ( !subnsp->symtbl || (!subnsp->name && (~subnsp->type & CPL_INST)))
             ) subnsp = subnsp->next;
 
-            if ( subnsp && subnsp->symtbl->addr < cursym->addr )
+            if ( subnsp && subnsp->addr < cursym->addr )
             {
-                if ( isz < subnsp->symtbl->addr ) // Mid struct padding
+                if ( isz < subnsp->addr ) // Mid struct padding
                 {
                     write( segfd, "\t.zero ", 7 );
                     decwrite( segfd, isz );
@@ -235,7 +236,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
             }
             else
             {
-                if ( isz < subnsp->symtbl->addr ) // Mid struct padding
+                if ( isz < subnsp->addr ) // Mid struct padding
                 {
                     write( segfd, "\t.zero ", 7 );
                     decwrite( segfd, isz );
@@ -426,57 +427,69 @@ void define( struct mccnsp * curnsp )
     // Get struct name or anonymous definition
     if ( cnsp & CPL_NSPACE_MASK )
     {
-        if ( tk == Named || tk == '{' )
+        if ( !(tk == Named || tk == '{') ) mccfail("expected struct name or anonymous struct definition");
+
+        // TODO struct overriding and anonymous child struct offset
+        if ( tk == Named )
         {
-            // TODO struct overriding and anonymous child struct offset
-            if ( tk == Named )
-            {
-                decnsp = findNamespace( curnsp, tkStr, tkVal );
-            }
-
-            if ( !decnsp || tk == '{' ) // Generate new struct
-            {
-                decnsp = sbrk( sizeof(struct mccnsp) );
-                if ( decnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
-
-                if ( tk == Named )
-                {
-                    // Copy name
-                    decnsp->name = sbrk( tkVal );
-                    if ( decnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
-
-                    int16_t i;
-                    for ( i = 0; i < tkVal; i++ ) decnsp->name[i] = tkStr[i];
-                    decnsp->len = tkVal;
-                }
-                else // Anonymous struct
-                {
-                    decnsp->name = NULL;
-                    decnsp->len = 0;
-                }
-
-                // Record namespace type
-                decnsp->type = cnsp;
-
-                // Init tables
-                decnsp->size = 0;
-                decnsp->symtbl = NULL;
-                decnsp->nsptbl = NULL;
-
-                decnsp->symtail = &decnsp->symtbl;
-                decnsp->nsptail = &decnsp->nsptbl;
-
-                // Add to parent namespace
-                decnsp->parent = curnsp;
-                decnsp->next = NULL;
-
-                *curnsp->nsptail = decnsp;
-                curnsp->nsptail = &decnsp->next;
-            }
-            // Type check existing struct
-            else if ( (decnsp->type & CPL_NSPACE_MASK) != (cnsp & CPL_NSPACE_MASK) ) mccfail("struct type missmatch");
+            decnsp = findNamespace( curnsp, tkStr, tkVal );
+            if ( decnsp ) ntok();
         }
-        else mccfail("expected struct name or anonymous struct definition");
+
+        if ( !decnsp || tk == '{' ) // Generate new struct
+        {
+            struct mccnsp * newnsp = sbrk( sizeof(struct mccnsp) );
+            if ( newnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
+
+            if ( decnsp ) // Override existing struct
+            {
+                // Copy name
+                newnsp->name = sbrk( decnsp->len );
+                if ( newnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
+
+                int16_t i;
+                for ( i = 0; i < decnsp->len; i++ ) newnsp->name[i] = decnsp->name[i];
+                newnsp->len = decnsp->len;
+            }
+            else if ( tk == Named ) // Creating a new struct for the first time
+            {
+                // Copy name
+                newnsp->name = sbrk( tkVal );
+                if ( newnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
+
+                int16_t i;
+                for ( i = 0; i < tkVal; i++ ) newnsp->name[i] = tkStr[i];
+                newnsp->len = tkVal;
+            }
+            else // Anonymous struct
+            {
+                newnsp->name = NULL;
+                newnsp->len = 0;
+            }
+
+            // Record namespace type
+            newnsp->type = cnsp;
+
+            // Init tables
+            newnsp->size = 0;
+            newnsp->symtbl = NULL;
+            newnsp->nsptbl = NULL;
+
+            newnsp->symtail = &newnsp->symtbl;
+            newnsp->nsptail = &newnsp->nsptbl;
+
+            // Add to parent namespace
+            newnsp->parent = curnsp;
+            newnsp->next = NULL;
+
+            *curnsp->nsptail = newnsp;
+            curnsp->nsptail = &newnsp->next;
+
+            decnsp = newnsp;
+            if ( tk != '{' ) ntok();
+        }
+        // Type check existing struct
+        else if ( (decnsp->type & CPL_NSPACE_MASK) != (cnsp & CPL_NSPACE_MASK) ) mccfail("struct type missmatch");
 
         // Struct definition
         if ( tk == '{' )
@@ -484,6 +497,9 @@ void define( struct mccnsp * curnsp )
             // Don't redfine things
             if ( decnsp->type & CPL_DEFN ) mccfail("struct redefinition");
             decnsp->type |= CPL_DEFN;
+
+            // Anonymous struct, inherit parent offset
+            if ( !decnsp->name ) decnsp->addr = curnsp->size;
 
             if ( cnsp == CPL_ENUM )
             {
@@ -501,6 +517,9 @@ void define( struct mccnsp * curnsp )
                     define(decnsp);
                 }
             }
+
+            // Anonymous struct, update parent size
+            if ( !decnsp->name ) curnsp->size += decnsp->size;
 
             ntok(); // Discard last
         }
@@ -634,9 +653,21 @@ void define( struct mccnsp * curnsp )
         {
             // Compute address
             unsigned int16_t tsz = typeSize(&cursym->type);
-            if ( curnsp->size & 1 && tsz > 1 ) curnsp->size++; // Align to word if needed
-            cursym->addr = curnsp->size;
-            curnsp->size += tsz;
+
+            if ( nsptype == CPL_UNION ) curnsp->size = tsz > curnsp->size ? tsz : curnsp->size;
+            else
+            {
+                if ( curnsp->size & 1 && tsz > 1 ) curnsp->size++; // Align to word if needed
+                cursym->addr = curnsp->size;
+                curnsp->size += tsz;
+            }
+
+            if ( nsptype == CPL_BLOCK )
+            {
+                write( segs[SEG_TEXT], "\tALLOCATE ", 10 );
+                decwrite( segs[SEG_TEXT], tsz );
+                write( segs[SEG_TEXT], "\n", 1 );
+            }
 
             cursym->type.ptype |= CPL_LOCAL;
         }

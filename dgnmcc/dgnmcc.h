@@ -68,6 +68,7 @@ struct mccnsp
 
     unsigned int8_t type; // Type of namespace
 
+    unsigned int16_t addr; // Base address offset for this namespace (used by anonymous namespaces)
     unsigned int16_t size; // Number of bytes occupied by member symbols
 
     struct mccsym * symtbl, ** symtail; // Member symbols

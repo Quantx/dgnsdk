@@ -26,7 +26,8 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         cbnsp->len = 0;
 
         cbnsp->type = CPL_BLOCK;
-        cbnsp->size = curnsp->size; // Inherit offset
+        cbnsp->addr = curnsp->size; // Inherit offset
+        cbnsp->size = 0;
 
         cbnsp->symtbl = NULL; cbnsp->symtail = &cbnsp->symtbl;
         cbnsp->nsptbl = NULL; cbnsp->nsptail = &cbnsp->nsptbl;
@@ -41,6 +42,11 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         ntok();
         while ( tk != '}' ) statement( func, cbnsp, sws );
         ntok();
+
+        // Unallocate current namespace from the stack
+        write( segs[SEG_TEXT], "\tUNALLOCATE ", 12 );
+        decwrite( segs[SEG_TEXT], cbnsp->size );
+        write( segs[SEG_TEXT], "\n", 1 );
 
         // Drop child from parent namespace table
         struct mccnsp ** cnsp;
@@ -62,6 +68,10 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         // Unallocate child block
         brk(cbnsp);
+    }
+    else if ( tk >= Void && tk <= Const )
+    {
+        define(curnsp);
     }
     else if ( tk == If )
     {

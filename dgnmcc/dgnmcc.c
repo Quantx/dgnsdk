@@ -5,7 +5,7 @@ unsigned int16_t curfno; // Current file number
 unsigned int16_t stksize; // Additional stack size
 int16_t segs[5]; // Text, Constant, Zero, Data, Bss
 
-struct mccnsp glbnsp = { NULL, 0, CPL_BLOCK, 0, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
+struct mccnsp glbnsp = { NULL, 0, CPL_BLOCK, 0, 0, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
 
 // Output an octal number
 void octwrite( int16_t nfd, unsigned int32_t val )
@@ -127,6 +127,10 @@ int16_t main( int16_t argc, int8_t ** argv )
         compile( argv[curfno] );
         curfno++;
     }
+
+#ifdef DEBUG
+    dumpGlbnsp("glbnsp.txt");
+#endif
 
     return 0;
 }

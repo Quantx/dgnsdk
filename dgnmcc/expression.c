@@ -1,4 +1,4 @@
-struct mccnsp castnsp = { NULL, 0, CPL_CAST, 0, NULL, &castnsp.symtbl, NULL, &castnsp.nsptbl };
+struct mccnsp castnsp = { NULL, 0, CPL_CAST, 0, 0, NULL, &castnsp.symtbl, NULL, &castnsp.nsptbl };
 
 const unsigned int8_t prectbl[] = {
     Comma,   // 0 - Lowest

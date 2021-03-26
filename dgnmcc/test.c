@@ -1,11 +1,15 @@
 struct test {
     int a;
-    int b;
-    union {
-        int c;
+    struct a {
         int d;
+        int f;
+    } b;
+    int c;
+    union {
+        int d;
+        int e;
     };
-    int e;
+    int f;
 };
 
 int main(int argc, char ** argv )
