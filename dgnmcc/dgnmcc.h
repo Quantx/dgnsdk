@@ -120,15 +120,15 @@ mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 
 */
 
-#define CPL_VOID 0 // ( 0 bits) Void
-#define CPL_CHR  1 // ( 8 bits) Signed Character
-#define CPL_UCHR 2 // ( 8 bits) Unsigned Character
-#define CPL_INT  3 // (16 bits) Signed Integer
-#define CPL_UINT 4 // (16 bits) Unsigned Integer
-#define CPL_LNG  5 // (32 bits) Signed Long
-#define CPL_ULNG 6 // (32 bits) Unsigned Long
-#define CPL_FPV  7 // (32 bits) DG Nova Float
-#define CPL_DBL  8 // (64 bits) DG Nova Double
+#define CPL_VOID IR_VOID // ( 0 bits) Void
+#define CPL_CHR  IR_CHR  // ( 8 bits) Signed Character
+#define CPL_UCHR IR_UCHR // ( 8 bits) Unsigned Character
+#define CPL_INT  IR_INT  // (16 bits) Signed Integer
+#define CPL_UINT IR_UINT // (16 bits) Unsigned Integer
+#define CPL_LNG  IR_LNG  // (32 bits) Signed Long
+#define CPL_ULNG IR_ULNG // (32 bits) Unsigned Long
+#define CPL_FPV  IR_FPV  // (32 bits) DG Nova Float
+#define CPL_DBL  IR_DBL  // (64 bits) DG Nova Double
 
 #define CPL_DTYPE_MASK 0b00001111 // Mask
 

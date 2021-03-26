@@ -1,4 +1,4 @@
-files = dgnmcc.h dgnmcc.c tokenizer.c declaration.c statement.c expression.c symbols.c types.c debug.c
+files = tokens.h dgnmcc.h dgnmcc.c tokenizer.c declaration.c statement.c expression.c symbols.c types.c debug.c
 
 dgnmcc: $(files)
 	gcc -fno-builtin-exit -DLINUX_COMPAT=1 -o dgnmcc dgnmcc.c

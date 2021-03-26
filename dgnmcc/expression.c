@@ -140,14 +140,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
                     nstk[ntop]->oper = Variable;
                     nstk[ntop]->type = &nsym->type;
                     nstk[ntop]->sym  = nsym;
-/*
-                    ntok();
-                    if ( tk == '(' ) // Function call
-                    {
-                        ostk[otop++] = FnCall;
-                        ostk[otop++] = '(';
-                    }
-*/
+                    nstk[ntop]->val  = nsym->addr;
                 }
                 else // Probably struct or union member
                 {
@@ -759,9 +752,40 @@ struct, union: (In addition to pointers above)
     return root;
 }
 
+void emitStatement(unsigned int8_t op, unsigned int32_t val)
+{
+    static unsigned int8_t nullVal[3];
+
+    write( segs[SEG_TEXT], &op, 1 );
+    write( segs[SEG_TEXT], &nullVal, sizeof(nullVal) );
+    write( segs[SEG_TEXT], &val, 4 );
+}
+
 void emitNode(struct mccnode * n)
 {
-    
+    // Check if this variable is actually on the stack
+    if ( n->oper == Variable && (n->sym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) n->oper = VariableStack;
+
+    write( segs[SEG_TEXT], &n->oper, 1 );
+
+    unsigned int8_t irntype;
+    unsigned int16_t irnsize;
+
+    if ( isPointer( n->type ) )
+    {
+        irntype = IR_PTR;
+
+        struct mcctype * dt = typeDeref(n->type);
+        irnsize = typeSize(dt);
+        brk(dt);
+    }
+    else if ( isFunction( n->type ) ) irntype = IR_FUNC;
+    else if ( n->type->stype ) irntype = IR_STRUC;
+    else irntype = n->type->ptype & CPL_DTYPE_MASK;
+
+    write( segs[SEG_TEXT], &irntype, 1 );
+    write( segs[SEG_TEXT], &irnsize, 2 );
+    write( segs[SEG_TEXT], &n->valLong, 4 );
 }
 
 void emit(struct mccnsp * curnsp, struct mccnode * root)
@@ -789,7 +813,7 @@ void emit(struct mccnsp * curnsp, struct mccnode * root)
             continue;
         }
 
-        // TODO final output
+        emitNode(n);
 
         n = NULL;
     }
