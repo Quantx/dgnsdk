@@ -136,6 +136,10 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 
                 if ( nsym )
                 {
+                    write( 1, "SYM: ", 5 );
+                    write( 1, nsym->name, nsym->len );
+                    write( 1, "\n", 1 );
+
                     nstk[ntop]->flag |= CPL_LVAL; // All named variables are l-values
                     nstk[ntop]->oper = Variable;
                     nstk[ntop]->type = &nsym->type;
