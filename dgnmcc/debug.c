@@ -128,7 +128,11 @@ void dumpTree( struct mccnode * n, int8_t * fname )
         else if ( n->oper == LongNumber ) octwrite( fexp, n->valLong );
         else writeToken( fexp, n->oper );
 
-        write( fexp, "\"];\n", 4 );
+        write( fexp, "\"", 1 );
+
+        if ( n->flag & CPL_LVAL ) write( fexp, ", color=blue", 12 );
+
+        write( fexp, "];\n", 3 );
 
 
         if ( n->left )

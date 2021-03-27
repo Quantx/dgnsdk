@@ -5,7 +5,7 @@ unsigned int16_t curfno; // Current file number
 unsigned int16_t stksize; // Additional stack size
 int16_t segs[5]; // Text, Constant, Zero, Data, Bss
 
-struct mccnsp glbnsp = { NULL, 0, CPL_BLOCK, 0, 0, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
+struct mccnsp glbnsp = { NULL, 0, CPL_BLOCK | CPL_DEFN, 0, 0, NULL, &glbnsp.symtbl, NULL, &glbnsp.nsptbl };
 
 // Output an octal number
 void octwrite( int16_t nfd, unsigned int32_t val )
@@ -28,7 +28,13 @@ void octwrite( int16_t nfd, unsigned int32_t val )
 
 void decwrite( int16_t nfd, unsigned int16_t val )
 {
-    if ( !val ) return (void)write( nfd, "0", 1 );
+    if ( !val ) return
+#ifdef LINUX_COMPAT
+(void)
+#else
+(void _)
+#endif
+write( nfd, "0", 1 );
 
     int8_t tmpbuf[6];
     int16_t tmppos = 6;

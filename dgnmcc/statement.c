@@ -26,7 +26,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         cbnsp->name = NULL;
         cbnsp->len = 0;
 
-        cbnsp->type = CPL_BLOCK;
+        cbnsp->type = CPL_BLOCK | CPL_DEFN;
         cbnsp->addr = curnsp->size; // Inherit offset
         cbnsp->size = 0;
 

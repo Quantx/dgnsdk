@@ -105,7 +105,7 @@ int8_t * tokenNames[] = {
 
 #define IR_TYPE_MASK 0b00001111
 
-#define IR_STATIC (1 << 4) // Flag is set if type existis in text/data/bss, unset if stack
+#define IR_LVAL (1 << 4) // Flag is set if this NODE is an L-value
 
 
 // Intermediate Represntation Assembler Node

@@ -5,7 +5,7 @@ int8_t * fp; // Name of the file
 
 // Line into
 int8_t lp[MAX_LINE]; // Stores current line
-int8_t * p = lp, * pp;
+int8_t * p, * pp;
 
 // Token information
 unsigned int8_t tk;
@@ -17,7 +17,7 @@ int8_t tkStr[256];
 unsigned int16_t csc;
 
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
-int8_t * res_words[] = {
+int8_t * res_words[30] = {
     "void", "int", "short", "char", "float", "long", "double",
     "enum", "struct", "union",
     "signed", "unsigned",
@@ -164,10 +164,8 @@ void ntok()
             int8_t out = *p;
 
             // Escape character
-            if ( *p == '\\' )
+            if ( *p++ == '\\' )
             {
-                p++;
-
                 if      ( *p == 'a'  ) { out = '\a'; p++; }
                 else if ( *p == 'b'  ) { out = '\b'; p++; }
                 else if ( *p == 'e'  ) { out = '\e'; p++; }
@@ -206,9 +204,8 @@ void ntok()
                 }
                 else mccfail("unknown escape sequence");
             }
-            else p++;
 
-            if ( *p != '\'' ) mccfail("missing end quote on character constant");
+            if ( *p++ != '\'' ) mccfail("missing end quote on character constant");
 
             // Record character constant
             tk = SmolNumber;

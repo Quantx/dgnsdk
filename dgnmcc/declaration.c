@@ -66,7 +66,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
             ntok();
 
             // Don't support dynamic array sizes because that would require dynamic typing
-            if ( cexp->oper < Number || cexp->oper > LongNumber ) mccfail("need constant integer expression in array declaration");
+            if ( cexp->oper < Number || cexp->oper > SmolNumber ) mccfail("need constant integer expression in array declaration");
             *cas = cexp->val;
 
             brk(erbp); // Free expression stack
@@ -87,13 +87,10 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
         fncnsp->addr = 0;
         fncnsp->size = 0;
 
-        fncnsp->symtbl = NULL;
-        fncnsp->nsptbl = NULL;
+        fncnsp->symtbl = NULL; fncnsp->symtail = &fncnsp->symtbl;
+        fncnsp->nsptbl = NULL; fncnsp->nsptail = &fncnsp->nsptbl;
 
-        fncnsp->symtail = &fncnsp->symtbl;
-        fncnsp->nsptail = &fncnsp->nsptbl;
-
-        fncnsp->parent = &glbnsp;
+        fncnsp->parent = curnsp;
         fncnsp->next = NULL;
 
         ntok();
@@ -201,7 +198,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
         return;
     }
 
-    if ( curtype->stype ) // TODO union declaration
+    if ( curtype->stype && !s->inder ) // TODO union declaration
     {
         if ( tk != '{' ) mccfail("expected opening curly-brace");
         ntok();
@@ -221,14 +218,17 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
                 if ( isz < subnsp->addr ) // Mid struct padding
                 {
                     write( segfd, "\t.zero ", 7 );
-                    decwrite( segfd, isz );
+                    decwrite( segfd, subnsp->addr - isz );
                     write( segfd, "\n", 1 );
                 }
 
                 struct mcctype nspt;
+                nspt.ptype = CPL_LOCAL | CPL_STAK;
                 nspt.stype = subnsp;
+
                 nspt.sub = sbrk( sizeof(struct mccsubtype) );
                 if ( nspt.sub == SBRKFAIL ) mccfail("unable to allocate space for instantiation anonymous sub namespace");
+
                 nspt.sub->inder = 0;
                 nspt.sub->arrays = 0;
                 nspt.sub->ftype = NULL;
@@ -243,13 +243,17 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
             }
             else
             {
-                if ( isz < subnsp->addr ) // Mid struct padding
+                if ( isz < cursym->addr ) // Mid struct padding
                 {
                     write( segfd, "\t.zero ", 7 );
-                    decwrite( segfd, isz );
+                    decwrite( segfd, cursym->addr - isz );
                     write( segfd, "\n", 1 );
                 }
 
+#ifdef DEBUG_DECLARE
+                writeType( 1, &cursym->type, cursym->name, cursym->len );
+                write( 1, "\n", 1 );
+#endif
                 instantiate( curnsp, segfd, &cursym->type );
                 isz += typeSize( &cursym->type );
             }
@@ -281,7 +285,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
     int16_t comp = isCompatible( curtype, cexp->type );
 
     if ( !comp ) mccfail("incompatible initialization type");
-    else if ( comp < 0 ) mccfail("constant to large for type");
+//    else if ( comp < 0 ) mccfail("constant to large for type");
 
     if ( cexp->oper >= Number && cexp->oper <= DblNumber ) // Integer expression
     {
@@ -387,7 +391,7 @@ void define( struct mccnsp * curnsp )
                 else ctype = CPL_STAK;
         }
     }
-    else ctype |= CPL_STAK;
+    else ctype = CPL_STAK;
 
     if ( tk == Unsigned )
     {
@@ -420,9 +424,9 @@ void define( struct mccnsp * curnsp )
         case Long:   ctype |= CPL_LNG;  break;
         case Float:  ctype |= CPL_FPV;  break;
         // Structures
-        case Struct: cnsp  |= CPL_STRC; break;
-        case Enum:   cnsp  |= CPL_ENUM; break;
-        case Union:  cnsp  |= CPL_UNION; break;
+        case Struct: cnsp = CPL_STRC; break;
+        case Enum:   cnsp = CPL_ENUM; break;
+        case Union:  cnsp = CPL_UNION; break;
 
         default: mccfail("missing type in declaration");
     }
@@ -442,7 +446,7 @@ void define( struct mccnsp * curnsp )
             if ( decnsp ) ntok();
         }
 
-        if ( !decnsp || tk == '{' ) // Generate new struct
+        if ( !decnsp || (tk == '{' && !getNamespace( curnsp, decnsp->name, decnsp->len )) ) // Generate new struct
         {
             struct mccnsp * newnsp = sbrk( sizeof(struct mccnsp) );
             if ( newnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
@@ -450,22 +454,32 @@ void define( struct mccnsp * curnsp )
             if ( decnsp ) // Override existing struct
             {
                 // Copy name
-                newnsp->name = sbrk( decnsp->len );
+                newnsp->name = sbrk( newnsp->len = decnsp->len );
                 if ( newnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
 
                 int16_t i;
                 for ( i = 0; i < decnsp->len; i++ ) newnsp->name[i] = decnsp->name[i];
-                newnsp->len = decnsp->len;
+
+#ifdef DEBUG_DECLARE
+                write( 2, "Coppied named struct ", 22 );
+                write( 2, newnsp->name, newnsp->len );
+                write( 2, "\n", 1 );
+#endif
             }
             else if ( tk == Named ) // Creating a new struct for the first time
             {
                 // Copy name
-                newnsp->name = sbrk( tkVal );
+                newnsp->name = sbrk( newnsp->len = tkVal );
                 if ( newnsp->name == SBRKFAIL ) mccfail("unable to allocate space for new struct name");
 
                 int16_t i;
                 for ( i = 0; i < tkVal; i++ ) newnsp->name[i] = tkStr[i];
-                newnsp->len = tkVal;
+
+#ifdef DEBUG_DECLARE
+                write( 2, "New named struct ", 17 );
+                write( 2, newnsp->name, newnsp->len );
+                write( 2, "\n", 1 );
+#endif
             }
             else // Anonymous struct
             {
@@ -476,13 +490,12 @@ void define( struct mccnsp * curnsp )
             // Record namespace type
             newnsp->type = cnsp;
 
-            // Init tables
+            newnsp->addr = 0;
             newnsp->size = 0;
-            newnsp->symtbl = NULL;
-            newnsp->nsptbl = NULL;
 
-            newnsp->symtail = &newnsp->symtbl;
-            newnsp->nsptail = &newnsp->nsptbl;
+            // Init tables
+            newnsp->symtbl = NULL; newnsp->symtail = &newnsp->symtbl;
+            newnsp->nsptbl = NULL; newnsp->nsptail = &newnsp->nsptbl;
 
             // Add to parent namespace
             newnsp->parent = curnsp;
@@ -504,23 +517,93 @@ void define( struct mccnsp * curnsp )
             if ( decnsp->type & CPL_DEFN ) mccfail("struct redefinition");
             decnsp->type |= CPL_DEFN;
 
+#ifdef DEBUG_DECLARE
+            if ( decnsp->name )
+            {
+                write( 2, "Declared namespace ", 19 );
+                write( 2, decnsp->name, decnsp->len );
+                write( 2, "\n", 1 );
+            }
+            else write( 2, "Declared anon namespace\n", 24 );
+#endif
+
             // Anonymous struct, inherit parent offset
             if ( !decnsp->name ) decnsp->addr = curnsp->size;
 
+            ntok();
             if ( cnsp == CPL_ENUM )
             {
+                int16_t enumVal = 0;
                 while ( tk != '}' )
                 {
-                    ntok();
                     if ( tk != Named ) mccfail("expected named symbol");
+
+                    struct mccsym * newsym = sbrk( sizeof(struct mccsym) );
+                    if ( newsym == SBRKFAIL ) mccfail("unable to allocate space for enum symbol");
+
+                    newsym->name = sbrk( newsym->len = tkVal );
+                    int16_t i;
+                    for ( i = 0; i < tkVal; i++ ) newsym->name[i] = tkStr[i];
+
+                    newsym->type.ptype = CPL_ENUM_CONST;
+                    newsym->type.stype = decnsp;
+
+                    newsym->type.sub = sbrk( sizeof(struct mccsubtype) );
+                    if ( newsym->type.sub == SBRKFAIL ) mccfail("unable to allocate space for enum symbol subtype");
+
+                    newsym->type.sub->inder = 0;
+                    newsym->type.sub->arrays = 0;
+                    newsym->type.sub->ftype = NULL;
+                    newsym->type.sub->sub = NULL;
+
+                    newsym->next = NULL;
+
+                    ntok();
+                    if ( tk == Ass )
+                    {
+                        ntok();
+
+                        void * erbp = sbrk(0);
+
+                        struct mccnode * cexp = expr(curnsp, Comma);
+
+                        if ( cexp->oper < Number || cexp->oper > SmolNumber ) mccfail("need constant integer expression in array declaration");
+                        enumVal = cexp->val;
+
+                        brk(erbp); // Free expression stack
+                    }
+
+                    newsym->addr = enumVal++;
+
+                    *decnsp->symtail = newsym;
+                    decnsp->symtail = &newsym->next;
+
+                    if ( tk == Comma ) ntok();
+                    else if ( tk != '}' ) mccfail("expected closing brace or comma");
                 }
             }
             else
             {
-                ntok(); // Drop opening {
-                while ( tk != '}' )
+                while ( tk != '}' ) define(decnsp);
+
+                // TODO move undefined namespaces to the global namespace
+                struct mccnsp ** chknsp, * udfnsp;
+                chknsp = &decnsp->nsptbl;
+                while ( udfnsp = *chknsp )
                 {
-                    define(decnsp);
+                    udfnsp = *chknsp;
+                    if ( ~udfnsp->type & CPL_DEFN )
+                    {
+                        *chknsp = udfnsp->next;
+                        if ( decnsp->nsptail == &udfnsp->next ) decnsp->nsptail = chknsp;
+
+                        udfnsp->parent = &glbnsp;
+                        udfnsp->next = NULL;
+
+                        *glbnsp.nsptail = udfnsp;
+                        glbnsp.nsptail = &udfnsp->next;
+                    }
+                    else chknsp = &udfnsp->next;
                 }
             }
 
@@ -561,7 +644,7 @@ void define( struct mccnsp * curnsp )
         // Process type information
         declare( curnsp, cursym, &cursym->type.sub );
 
-        if ( nsptype != CPL_CAST // You can cast to VOID
+        if ( nsptype != CPL_CAST // You can cast to void
           && !( (ctype & CPL_DTYPE_MASK) || (cnsp & CPL_NSPACE_MASK) )
           && !(  cursym->type.sub->inder ||  cursym->type.sub->ftype ) ) mccfail("can't declare variable storing void");
 
@@ -621,6 +704,8 @@ void define( struct mccnsp * curnsp )
         // Add new symbol to current namespace
         else *curnsp->symtail = cursym, curnsp->symtail = &cursym->next;
 
+        if ( nsptype == CPL_CAST ) return; // We're done casting
+
         // Get innermost subtype
         struct mccsubtype * s;
         for ( s = cursym->type.sub; s->sub; s = s->sub );
@@ -663,7 +748,34 @@ void define( struct mccnsp * curnsp )
                 curnsp->size += tsz;
             }
 
-            if ( nsptype == CPL_BLOCK ) emitStatement( Allocate, tsz );
+            if ( nsptype == CPL_BLOCK )
+            {
+                emitStatement( Allocate, tsz );
+
+                if ( tk == Ass )
+                {
+                    unary = 0;
+                    otop = ctop = 0; ntop = 1;
+
+                    void * erbp = sbrk(0);
+
+                    *nstk = sbrk(sizeof(struct mccnode));
+                    if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new node");
+
+                    (*nstk)->left = (*nstk)->right = NULL;
+                    (*nstk)->oper = Variable;
+                    (*nstk)->flag |= CPL_LVAL;
+                    (*nstk)->type = &cursym->type;
+                    (*nstk)->sym  = cursym;
+                    (*nstk)->val  = cursym->addr;
+
+                    struct mccnode * root = expr(curnsp, 0);
+
+                    emit(curnsp, root);
+
+                    brk(erbp);
+                }
+            }
 
             cursym->type.ptype |= CPL_LOCAL;
         }

@@ -64,6 +64,8 @@ struct mcctype * typeClone( struct mcctype * t )
         os = &(*os)->sub;
     }
 
+    *os = NULL;
+
     return out;
 }
 
@@ -135,15 +137,15 @@ int16_t typeSize( struct mcctype * t )
     }
     if ( i )
     {
-        void * drbp = sbrk(0);
-
         s->arrays = 0; // Temporarily drop all arrays
 
-        j *= typeSize(typeClone(t));
+        struct mcctype * tc;
+
+        j *= typeSize(tc=typeClone(t));
 
         s->arrays = i;
 
-        brk(drbp);
+        brk(tc);
 
         return j;
     }
@@ -161,7 +163,7 @@ int16_t typeSize( struct mcctype * t )
     // Must be a primative type
     int8_t ptype = t->ptype & CPL_DTYPE_MASK;
 
-    // Can't get size of void
+    // Cannot get sizeof void
     if ( ptype == CPL_VOID ) mccfail("tried to get sizeof void");
 
     if ( ptype <= CPL_UCHR ) return 1;

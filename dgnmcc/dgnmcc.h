@@ -3,6 +3,7 @@
 #ifdef DEBUG
 #define DEBUG_TOKEN 1
 #define DEBUG_EXPR 1
+#define DEBUG_DECLARE 1
 #endif
 
 #define MAX_LINE      256  // Maximum number of tokens per file line
@@ -25,7 +26,8 @@ int8_t * typeNames[] = {
     "long",
     "ulong",
     "float",
-    "double"
+    "double",
+    "enum_constant"
 };
 
 int8_t * namespaceNames[] = {
@@ -129,6 +131,7 @@ mccnsp_args->nsptbl = mccnsp_code // Code namespace is a child
 #define CPL_ULNG IR_ULNG // (32 bits) Unsigned Long
 #define CPL_FPV  IR_FPV  // (32 bits) DG Nova Float
 #define CPL_DBL  IR_DBL  // (64 bits) DG Nova Double
+#define CPL_ENUM_CONST 9 // (16 bits) Enum constant
 
 #define CPL_DTYPE_MASK 0b00001111 // Mask
 

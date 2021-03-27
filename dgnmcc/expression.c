@@ -101,12 +101,15 @@ void reduce()
 
 // Build and return an expression tree
 // stk = stop token
-struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
+struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 {
     struct mccnode * root, * n;
 
-    unary = 1;
-    otop = ntop = ctop = 0;
+    if ( stk )
+    {
+        unary = 1;
+        otop = ntop = ctop = 0;
+    }
 
     // Build expression tree
     while ( tk >= Named
@@ -136,11 +139,10 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
 
                 if ( nsym )
                 {
-                    write( 1, "SYM: ", 5 );
-                    write( 1, nsym->name, nsym->len );
-                    write( 1, "\n", 1 );
-
-                    nstk[ntop]->flag |= CPL_LVAL; // All named variables are l-values
+                    if ( !(nsym->type.stype
+                        && (nsym->type.stype->type & CPL_NSPACE_MASK) == CPL_ENUM
+                        && (nsym->type.ptype & CPL_DTYPE_MASK) == CPL_ENUM_CONST) )
+                             nstk[ntop]->flag |= CPL_LVAL; // All named variables are l-values
                     nstk[ntop]->oper = Variable;
                     nstk[ntop]->type = &nsym->type;
                     nstk[ntop]->sym  = nsym;
@@ -249,7 +251,7 @@ struct mccnode * expr(struct mccnsp * curnsp, int8_t stk)
             // Remember: '(' and '[' has a prec of -1
             prec = getPrec(tk);
             // Left associative
-            if ( prec == 1 || prec == 12 ) while ( otop && getPrec(ostk[otop - 1]) > prec ) reduce();
+            if ( prec == 2 || prec == 13 ) while ( otop && getPrec(ostk[otop - 1]) > prec ) reduce();
             // Right associative
             else while ( otop && getPrec(ostk[otop - 1]) >= prec ) reduce();
 
@@ -402,11 +404,13 @@ struct, union: (In addition to pointers above)
             }
             else if ( n->oper == AddAss )
             {
-                if ( isPointer(n->left->type) && !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is not integer type");
-                if ( isPointer(n->right->type) && !isInteger(n->left->type) ) mccfail("rhs is pointer, lhs is not integer type");
-
-                if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
-                if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+                if      ( isPointer(n->left->type)  ) if ( !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is not integer type");
+                else if ( isPointer(n->right->type) ) if ( !isInteger(n->left->type)  ) mccfail("rhs is pointer, lhs is not integer type");
+                else
+                {
+                    if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
+                    if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+                }
             }
             else if ( n->oper == SubAss )
             {
@@ -670,7 +674,16 @@ struct, union: (In addition to pointers above)
         if (!n->type) mccfail("no promotion rule for operator");
 #endif
 
-        if ( n->oper == Sizeof ) // Always results in a constant expr
+        if ( n->oper == Cast )
+        {
+            n->oper = n->right->oper;
+            n->flag = n->right->flag;
+            // Type stays the same
+            n->valLong = n->right->valLong;
+            n->left = n->right->left;
+            n->right = n->right->right;
+        }
+        else if ( n->oper == Sizeof ) // Always results in a constant expr
         {
             n->oper = Number;
             n->val = typeSize(n->right->type);
@@ -725,14 +738,14 @@ struct, union: (In addition to pointers above)
             }
             else if ( !n->left ) // Unary operator
             {
-                int16_t vd = 1, vl = n->left->val;
+                int16_t vd = 1, vr = n->right->val;
 
                 switch (n->oper)
                 {
-                    case Plus:   vl = +vl; break;
-                    case Minus:  vl = -vl; break;
-                    case Not:    vl = ~vl; break;
-                    case LogNot: vl = !vl; break;
+                    case Plus:   vr = +vr; break;
+                    case Minus:  vr = -vr; break;
+                    case Not:    vr = ~vr; break;
+                    case LogNot: vr = !vr; break;
                     default: vd = 0; // Not all unary operators can be resolved like casts, example: a = *12;
                 }
 
@@ -740,7 +753,7 @@ struct, union: (In addition to pointers above)
                 {
                     // All valid unary operations result in integer promotion
                     n->oper = Number;
-                    n->val = vl;
+                    n->val = vr;
                     n->right = NULL;
                 }
             }
@@ -772,8 +785,10 @@ void emitNode(struct mccnode * n)
 
     write( segs[SEG_TEXT], &n->oper, 1 );
 
-    unsigned int8_t irntype;
+    unsigned int8_t  irntype;
     unsigned int16_t irnsize;
+
+    unsigned int8_t pt = n->type->ptype & CPL_DTYPE_MASK;
 
     if ( isPointer( n->type ) )
     {
@@ -783,9 +798,15 @@ void emitNode(struct mccnode * n)
         irnsize = typeSize(dt);
         brk(dt);
     }
-    else if ( isFunction( n->type ) ) irntype = IR_FUNC;
-    else if ( n->type->stype ) irntype = IR_STRUC;
-    else irntype = n->type->ptype & CPL_DTYPE_MASK;
+    else if ( isFunction(n->type) ) irntype = IR_FUNC;
+    else if ( isStruct(n->type) )
+    {
+        if ( (n->type->stype->type & CPL_NSPACE_MASK) == CPL_ENUM ) irntype = IR_INT;
+        else irntype = IR_STRUC;
+    }
+    else irntype = pt;
+
+    if ( n->flag & CPL_LVAL ) irntype |= IR_LVAL;
 
     write( segs[SEG_TEXT], &irntype, 1 );
     write( segs[SEG_TEXT], &irnsize, 2 );
