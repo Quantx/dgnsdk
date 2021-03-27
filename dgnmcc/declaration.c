@@ -546,7 +546,7 @@ void define( struct mccnsp * curnsp )
                     for ( i = 0; i < tkVal; i++ ) newsym->name[i] = tkStr[i];
 
                     newsym->type.ptype = CPL_ENUM_CONST;
-                    newsym->type.stype = decnsp;
+                    newsym->type.stype = NULL;
 
                     newsym->type.sub = sbrk( sizeof(struct mccsubtype) );
                     if ( newsym->type.sub == SBRKFAIL ) mccfail("unable to allocate space for enum symbol subtype");
@@ -581,6 +581,11 @@ void define( struct mccnsp * curnsp )
                     if ( tk == Comma ) ntok();
                     else if ( tk != '}' ) mccfail("expected closing brace or comma");
                 }
+
+                // Switch to the primative ENUM type
+                decnsp = NULL;
+                cnsp = 0;
+                ctype |= CPL_ENUM_CONST;
             }
             else
             {
@@ -608,7 +613,7 @@ void define( struct mccnsp * curnsp )
             }
 
             // Anonymous struct, update parent size
-            if ( !decnsp->name ) curnsp->size += decnsp->size;
+            if ( decnsp && !decnsp->name ) curnsp->size += decnsp->size;
 
             ntok(); // Discard last
         }
@@ -645,7 +650,7 @@ void define( struct mccnsp * curnsp )
         declare( curnsp, cursym, &cursym->type.sub );
 
         if ( nsptype != CPL_CAST // You can cast to void
-          && !( (ctype & CPL_DTYPE_MASK) || (cnsp & CPL_NSPACE_MASK) )
+          && !( (cursym->type.stype && (cursym->type.stype->type & CPL_NSPACE_MASK)) || (cursym->type.ptype & CPL_DTYPE_MASK) )
           && !(  cursym->type.sub->inder ||  cursym->type.sub->ftype ) ) mccfail("can't declare variable storing void");
 
         // You can declare either a pointer to a function returning the struct, or a pointer to the struct itself

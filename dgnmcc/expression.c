@@ -114,12 +114,12 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
     // Build expression tree
     while ( tk >= Named
     ||      tk == '"'
-    ||      tk == '?'   || tk == ':'
-    ||      tk == '('   || tk == ')'
-    ||      tk == '['   || tk == ']' )
+    ||      tk == '?' || tk == ':'
+    ||      tk == '(' || tk == ')'
+    ||      tk == '[' || tk == ']' )
     {
         int8_t grp = 0;
-        unsigned int8_t prec;
+        int8_t prec;
 
         if ( tk == Named || (tk >= Number && tk <= DblNumber) || tk == '"' )
         {
@@ -130,6 +130,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
             nstk[ntop]->oper = tk;
             nstk[ntop]->flag = 0;
             nstk[ntop]->type = &type_int;
+            nstk[ntop]->sym = 0; // Unneeded
             nstk[ntop]->val = tkVal;
 
             if ( tk == Named )
@@ -139,14 +140,19 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
                 if ( nsym )
                 {
-                    if ( !(nsym->type.stype
-                        && (nsym->type.stype->type & CPL_NSPACE_MASK) == CPL_ENUM
-                        && (nsym->type.ptype & CPL_DTYPE_MASK) == CPL_ENUM_CONST) )
-                             nstk[ntop]->flag |= CPL_LVAL; // All named variables are l-values
-                    nstk[ntop]->oper = Variable;
+                    // Check if this is an Enum constant
+                    if ( !nsym->type.stype && (nsym->type.ptype & CPL_DTYPE_MASK) == CPL_ENUM_CONST )
+                    {
+                        nstk[ntop]->oper = Number;
+                        nstk[ntop]->val  = nsym->addr;
+                    }
+                    else
+                    {
+                        nstk[ntop]->flag |= CPL_LVAL; // All named variables are l-values
+                        nstk[ntop]->oper = Variable;
+                        nstk[ntop]->sym  = nsym;
+                    }
                     nstk[ntop]->type = &nsym->type;
-                    nstk[ntop]->sym  = nsym;
-                    nstk[ntop]->val  = nsym->addr;
                 }
                 else // Probably struct or union member
                 {
@@ -157,28 +163,23 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
                     int16_t i;
                     for ( i = 0; i < tkVal; i++ ) nstk[ntop]->name[i] = tkStr[i];
                 }
-
-                ntok();
             }
-            else
+            else if ( tk == SmolNumber )
             {
-                if ( tk == SmolNumber )
-                {
-                    nstk[ntop]->type = &type_char;
-                }
-                else if ( tk == LongNumber )
-                {
-                    nstk[ntop]->valLong = tkLong;
-                    nstk[ntop]->type = &type_long;
-                }
-                else if ( tk == '"' )
-                {
-                    nstk[ntop]->flag |= CPL_LVAL; // String constants are l-values
-                    nstk[ntop]->type = &type_string;
-                }
-
-                ntok();
+                nstk[ntop]->type = &type_char;
             }
+            else if ( tk == LongNumber )
+            {
+                nstk[ntop]->valLong = tkLong;
+                nstk[ntop]->type = &type_long;
+            }
+            else if ( tk == '"' )
+            {
+                nstk[ntop]->flag |= CPL_LVAL; // String constants are l-values
+                nstk[ntop]->type = &type_string;
+            }
+
+            ntok();
 
             unary = 0;
             ntop++;
@@ -208,6 +209,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
                 if ( n == SBRKFAIL ) mccfail("unable to allocate array node");
                 n->oper = '[';
                 n->flag = 0;
+                n->type = NULL;
 
                 if ( ntop < 2 ) mccfail("not enough nodes for array operator");
                 n->right = nstk[--ntop];
@@ -248,17 +250,23 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
             }
             else if (tk == '(') tk = FnCallArgs;
 
-            // Remember: '(' and '[' has a prec of -1
-            prec = getPrec(tk);
-            // Left associative
-            if ( prec == 2 || prec == 13 ) while ( otop && getPrec(ostk[otop - 1]) > prec ) reduce();
-            // Right associative
-            else while ( otop && getPrec(ostk[otop - 1]) >= prec ) reduce();
+            if ( tk == '[' ) while ( otop && getPrec(ostk[otop - 1]) == 14 ) reduce();
+            else
+            {
+                // Remember: '(' has a prec of -1
+                prec = getPrec(tk);
+                // Left associative
+                if ( prec == 2 || prec == 13 ) while ( otop && getPrec(ostk[otop - 1]) > prec ) reduce();
+                // Right associative
+                else while ( otop && getPrec(ostk[otop - 1]) >= prec ) reduce();
+            }
 
 #ifdef DEBUG_EXPR
             write( 2, "Push:", 5 );
             writeToken( 2, tk );
-            write( 2, "\r\n", 2 );
+            write( 2, ":", 1 );
+            decwrite( 2, prec );
+            write( 2, "\n", 1 );
 #endif
 
             ostk[otop++] = tk;
@@ -311,6 +319,10 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
     else if ( ntop > 1 ) mccfail("Not enough operators in expression");
 
     root = n = *nstk;
+
+#if DEBUG_EXPR
+    dumpTree( root, "expr_tree.dot" );
+#endif
 
     // Preform post order traversal for type propogation and constant reduction
     ntop = 0;
@@ -589,11 +601,11 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Arrow )
         {
-//            if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
             if ( !isStruct(n->left->type ) ) mccfail("lhs is not a struct type");
+            if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
 
             struct mccsubtype * s = n->left->type->sub;
-            if ( s->sub || s->inder + s->arrays - 1 ) mccfail("lhs not a pointer to struct");
+            if ( s->sub || s->inder + s->arrays != 1 ) mccfail("lhs not a pointer to struct");
 
             int8_t * name = n->right->name;
             int16_t len = n->right->val;
@@ -679,6 +691,7 @@ struct, union: (In addition to pointers above)
             n->oper = n->right->oper;
             n->flag = n->right->flag;
             // Type stays the same
+            n->sym = n->right->sym;
             n->valLong = n->right->valLong;
             n->left = n->right->left;
             n->right = n->right->right;
@@ -689,7 +702,8 @@ struct, union: (In addition to pointers above)
             n->val = typeSize(n->right->type);
             n->right->type = NULL;
         }
-        else if ( n->oper == Tern && (n->left->oper == Number || n->left->oper == SmolNumber) )
+        else if ( n->oper == ':' );
+        else if ( n->oper == Tern && (n->left->oper == Number || n->left->oper == SmolNumber ) )
         {
             *n = *(n->left->val ? n->right->left : n->right->right);
 
@@ -724,7 +738,10 @@ struct, union: (In addition to pointers above)
                     case Div:     vl = vl /  vr; break;
                     case Mod:     vl = vl %  vr; break;
 #ifdef DEBUG_EXPR
-                    default: mccfail("unknown constant expr operator");
+                    default:
+                        writeToken( 2, n->oper );
+                        write( 2, "\n", 1 );
+                        mccfail("unknown constant expr operator");
 #endif
                 }
 
@@ -799,11 +816,8 @@ void emitNode(struct mccnode * n)
         brk(dt);
     }
     else if ( isFunction(n->type) ) irntype = IR_FUNC;
-    else if ( isStruct(n->type) )
-    {
-        if ( (n->type->stype->type & CPL_NSPACE_MASK) == CPL_ENUM ) irntype = IR_INT;
-        else irntype = IR_STRUC;
-    }
+    else if ( isStruct(n->type) ) irntype = IR_STRUC;
+    else if ( pt == CPL_ENUM_CONST ) irntype = IR_INT;
     else irntype = pt;
 
     if ( n->flag & CPL_LVAL ) irntype |= IR_LVAL;

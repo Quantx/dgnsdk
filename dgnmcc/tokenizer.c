@@ -147,13 +147,13 @@ void ntok()
                 while ( *p >= '0' && *p <= '7' ) tkLong = (tkLong << 3) + *p++ - '0';
             }
 
-            tkVal = (int16_t)tkLong;
+            tkVal = (int16_t CAST_NAME)tkLong;
 
             if ( *p == 'l' || *p == 'L' ) { p++; tk = LongNumber; }
-            else if ( (unsigned int32_t)tkLong > 0xFFFF ) tk = LongNumber;
+            else if ( (unsigned int32_t CAST_NAME)tkLong > 0xFFFF ) tk = LongNumber;
 
             else if ( *p == 'c' || *p == 'C' ) { p++; tk = SmolNumber; }
-            else if ( (unsigned int16_t)tkVal <= 0xFF ) tk = SmolNumber;
+            else if ( (unsigned int16_t CAST_NAME)tkVal <= 0xFF ) tk = SmolNumber;
 
             else tk = Number;
 

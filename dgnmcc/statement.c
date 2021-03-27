@@ -219,7 +219,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         erbp = sbrk(0);
 
-        root = expr( curnsp, ';' );
+        root = expr( curnsp, ')' );
 
         if ( tk != ')' ) mccfail( "missing closing parenthasis in for statement" );
         ntok();

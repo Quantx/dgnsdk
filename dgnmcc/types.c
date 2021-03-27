@@ -175,12 +175,12 @@ int16_t typeSize( struct mcctype * t )
 
 
 // Prote arithmetic types
-struct mcctype * typePromote( struct mcctype * ta, struct mcctype * tb )
+struct mcctype * typePromote( struct mcctype * tl, struct mcctype * tr )
 {
-    unsigned int8_t pa = ta->ptype & CPL_DTYPE_MASK;
-    unsigned int8_t pb = tb->ptype & CPL_DTYPE_MASK;
+    unsigned int8_t pl = tl->ptype & CPL_DTYPE_MASK;
+    unsigned int8_t pr = tr->ptype & CPL_DTYPE_MASK;
 
-    return pa >= pb ? ta : tb;
+    return pl >= pr ? tl : tr;
 }
 
 /*
@@ -202,7 +202,7 @@ int16_t isInteger( struct mcctype * t )
 
     unsigned int8_t p = t->ptype & CPL_DTYPE_MASK;
 
-    return !(s->ftype || s->inder || s->arrays || t->stype ) && p && p <= CPL_ULNG;
+    return !(s->ftype || s->inder || s->arrays || t->stype ) && p && (p <= CPL_ULNG || p == CPL_ENUM_CONST);
 }
 
 int16_t isArith( struct mcctype * t )
@@ -254,7 +254,7 @@ int16_t isStruct( struct mcctype * t )
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
-    return t && t->stype && !s->ftype;
+    return t && t->stype && (t->stype->type & CPL_NSPACE_MASK) != CPL_ENUM && !s->ftype;
 }
 
 int16_t isArray( struct mcctype * t )
@@ -267,41 +267,41 @@ int16_t isArray( struct mcctype * t )
     return s->arrays;
 }
 
-int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
+int16_t isCompatible( struct mcctype * tl, struct mcctype * tr )
 {
-    if ( !(ta && tb) ) return 0;
+    if ( !(tl && tr) ) return 0;
 
     // These values may be invalid, confirm first
-    unsigned int8_t pa = ta->ptype & CPL_DTYPE_MASK;
-    unsigned int8_t pb = tb->ptype & CPL_DTYPE_MASK;
+    unsigned int8_t pl = tl->ptype & CPL_DTYPE_MASK;
+    unsigned int8_t pr = tr->ptype & CPL_DTYPE_MASK;
 
     // Pointer, must be exact match (or void pointer)
-    if ( isPointer(ta) )
+    if ( isPointer(tl) )
     {
-        if ( !isPointer(tb) ) return 0; // Pointer missmatch
+        if ( !isPointer(tr) ) return 0; // Pointer missmatch
 
         // Void pointers are compatible with everything
-        if ( !ta->stype && pa == CPL_VOID || !tb->stype && pb == CPL_VOID ) return 1;
+        if ( !tl->stype && pl == CPL_VOID || !tr->stype && pr == CPL_VOID ) return 1;
 
         // Struct types don't match or primative types don't match
-        if ( ta->stype != tb->stype || (!ta->stype && pa != pb) ) return 0;
+        if ( tl->stype != tr->stype || (!tl->stype && pl != pr) ) return 0;
 
         // Struct must be complete
-        if ( ta->stype && (~ta->stype->type & CPL_DEFN) ) mccfail("incomplete type is incompatible");
+        if ( tl->stype && (~tl->stype->type & CPL_DEFN) ) mccfail("incomplete type is incompatible");
 
-        struct mccsubtype * sa, * sb;
-        for ( sa = ta->sub, sb = tb->sub; sa && sb; sa = sa->sub, sb = sb->sub )
+        struct mccsubtype * sl, * sr;
+        for ( sl = tl->sub, sr = tr->sub; sl && sr; sl = sl->sub, sr = sr->sub )
         {
-            if ( sa->inder + sa->arrays != sb->inder + sb->arrays ) return 0; // Inderection missmatch
+            if ( sl->inder + sl->arrays != sr->inder + sr->arrays ) return 0; // Inderection missmatch
 
-            if ( sa->ftype )
+            if ( sl->ftype )
             {
-                if ( !sb->ftype ) return 0;
+                if ( !sr->ftype ) return 0;
 
-                if ( (sa->ftype->type & CPL_NSPACE_MASK) != (sb->ftype->type & CPL_NSPACE_MASK) ) mccfail("variadic function incompatible with non-variadic function");
+                if ( (sl->ftype->type & CPL_NSPACE_MASK) != (sr->ftype->type & CPL_NSPACE_MASK) ) mccfail("variadic function incompatible with non-variadic function");
 
                 struct mccsym * asym, * bsym;
-                for ( asym = sa->ftype->symtbl, bsym = sb->ftype->symtbl; asym && bsym; asym = asym->next, bsym = bsym->next )
+                for ( asym = sl->ftype->symtbl, bsym = sr->ftype->symtbl; asym && bsym; asym = asym->next, bsym = bsym->next )
                 {
                     if ( !isCompatible( &asym->type, &bsym->type ) ) mccfail("incompatible argument types");
                 }
@@ -311,26 +311,26 @@ int16_t isCompatible( struct mcctype * ta, struct mcctype * tb )
         }
 
         // Subtype count missmatch
-        if ( sa || sb ) return 0;
+        if ( sl || sr ) return 0;
 
         return 1;
     }
-    else if ( isPointer(tb) ) return 0; // Pointer missmatch
+    else if ( isPointer(tr) ) return 0; // Pointer missmatch
 
     // If either is a structure, make sure they're compatible
-    if ( ta->stype != tb->stype ) return 0;
+    if ( tl->stype != tr->stype ) return 0;
 
     // Both types are structs and match
-    if ( ta->stype )
+    if ( tl->stype )
     {
-        if ( ~ta->stype->type & CPL_DEFN ) mccfail("incomplete type is incompatible");
+        if ( ~tl->stype->type & CPL_DEFN ) mccfail("incomplete type is incompatible");
         return 1;
     }
 
     // Ensure primative types are compatible (void is only compatible with self)
-    if ( (pa == CPL_VOID) != (pb == CPL_VOID) ) return 0;
+    if ( (pl == CPL_VOID) != (pr == CPL_VOID) ) return 0;
 
-    if ( pa < pb ) return -1; // PB won't fit into PA
+    if ( pl < pr ) return -1; // pr won't fit into pl
 
     return 1;
 }

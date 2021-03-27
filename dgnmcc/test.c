@@ -1,10 +1,10 @@
-int a = 4;
+struct a {
+    int b[10];
+} * c;
+
 
 int main( int argc, char ** argv )
 {
-    static int a;
-
-    int b;
-
-    a = b;
+    int i, x;
+    x = c->b[i];
 }

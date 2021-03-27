@@ -28,13 +28,7 @@ void octwrite( int16_t nfd, unsigned int32_t val )
 
 void decwrite( int16_t nfd, unsigned int16_t val )
 {
-    if ( !val ) return
-#ifdef LINUX_COMPAT
-(void)
-#else
-(void _)
-#endif
-write( nfd, "0", 1 );
+    if ( !val ) return (void CAST_NAME)write( nfd, "0", 1 );
 
     int8_t tmpbuf[6];
     int16_t tmppos = 6;
@@ -80,7 +74,7 @@ void compile( int8_t * fname )
     sfd = open( fp = fname, 0 );
     if ( sfd < 0 ) mccfail( "Unable to open file for compilation" );
 
-    ln = 1;
+    ln = 0;
     readline();
 
     ntok();
