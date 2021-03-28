@@ -21,7 +21,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
     {
         ntok();
 
-        curtype->sub = sbrk( sizeof(struct mccsubtype) );
+        curtype->sub = sbrk( sizeof(struct mccsubtype CAST_NAME) );
         if ( curtype->sub == SBRKFAIL ) mccfail("unable to allocate space for subtype");
 
         declare( curnsp, cursym, &curtype->sub );
@@ -55,7 +55,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
         {
             ntok();
 
-            unsigned int16_t * cas = sbrk( sizeof(unsigned int16_t) );
+            unsigned int16_t * cas = sbrk( sizeof(unsigned int16_t CAST_NAME) );
             if ( cas == SBRKFAIL ) mccfail("unable to allocate space for array size");
 
             void * erbp = sbrk(0);
@@ -76,7 +76,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
     }
     else if ( tk == '(' ) // Get function declarations
     {
-        struct mccnsp * fncnsp = curtype->ftype = sbrk( sizeof(struct mccnsp) );
+        struct mccnsp * fncnsp = curtype->ftype = sbrk( sizeof(struct mccnsp CAST_NAME) );
         if ( fncnsp == SBRKFAIL ) mccfail("unable to allocate space for new namespace");
 
         fncnsp->name = NULL;
@@ -226,7 +226,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
                 nspt.ptype = CPL_LOCAL | CPL_STAK;
                 nspt.stype = subnsp;
 
-                nspt.sub = sbrk( sizeof(struct mccsubtype) );
+                nspt.sub = sbrk( sizeof(struct mccsubtype CAST_NAME) );
                 if ( nspt.sub == SBRKFAIL ) mccfail("unable to allocate space for instantiation anonymous sub namespace");
 
                 nspt.sub->inder = 0;
@@ -448,7 +448,7 @@ void define( struct mccnsp * curnsp )
 
         if ( !decnsp || (tk == '{' && !getNamespace( curnsp, decnsp->name, decnsp->len )) ) // Generate new struct
         {
-            struct mccnsp * newnsp = sbrk( sizeof(struct mccnsp) );
+            struct mccnsp * newnsp = sbrk( sizeof(struct mccnsp CAST_NAME) );
             if ( newnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
 
             if ( decnsp ) // Override existing struct
@@ -538,7 +538,7 @@ void define( struct mccnsp * curnsp )
                 {
                     if ( tk != Named ) mccfail("expected named symbol");
 
-                    struct mccsym * newsym = sbrk( sizeof(struct mccsym) );
+                    struct mccsym * newsym = sbrk( sizeof(struct mccsym CAST_NAME) );
                     if ( newsym == SBRKFAIL ) mccfail("unable to allocate space for enum symbol");
 
                     newsym->name = sbrk( newsym->len = tkVal );
@@ -548,7 +548,7 @@ void define( struct mccnsp * curnsp )
                     newsym->type.ptype = CPL_ENUM_CONST;
                     newsym->type.stype = NULL;
 
-                    newsym->type.sub = sbrk( sizeof(struct mccsubtype) );
+                    newsym->type.sub = sbrk( sizeof(struct mccsubtype CAST_NAME) );
                     if ( newsym->type.sub == SBRKFAIL ) mccfail("unable to allocate space for enum symbol subtype");
 
                     newsym->type.sub->inder = 0;
@@ -628,7 +628,7 @@ void define( struct mccnsp * curnsp )
         It will be deallocated later if it already exists
         */
 
-        struct mccsym * cursym = sbrk( sizeof(struct mccsym) );
+        struct mccsym * cursym = sbrk( sizeof(struct mccsym CAST_NAME) );
         if ( cursym == SBRKFAIL ) mccfail( "unable to allocate space for new symbol" );
 
         cursym->name = NULL;
@@ -643,15 +643,15 @@ void define( struct mccnsp * curnsp )
 
         cursym->next = NULL;
 
-        cursym->type.sub = sbrk( sizeof(struct mccsubtype) );
+        cursym->type.sub = sbrk( sizeof(struct mccsubtype CAST_NAME) );
         if ( cursym->type.sub == SBRKFAIL ) mccfail( "unable to allocate space for new symbol subtype" );
 
         // Process type information
         declare( curnsp, cursym, &cursym->type.sub );
 
         if ( nsptype != CPL_CAST // You can cast to void
-          && !( (cursym->type.stype && (cursym->type.stype->type & CPL_NSPACE_MASK)) || (cursym->type.ptype & CPL_DTYPE_MASK) )
-          && !(  cursym->type.sub->inder ||  cursym->type.sub->ftype ) ) mccfail("can't declare variable storing void");
+          && !( cursym->type.stype || (cursym->type.ptype & CPL_DTYPE_MASK)
+             || cursym->type.sub->inder || cursym->type.sub->ftype ) ) mccfail("can't declare variable storing void");
 
         // You can declare either a pointer to a function returning the struct, or a pointer to the struct itself
         if ( decnsp == curnsp
@@ -760,21 +760,21 @@ void define( struct mccnsp * curnsp )
                 if ( tk == Ass )
                 {
                     unary = 0;
-                    otop = ctop = 0; ntop = 1;
+                    otop = ctop = 0;
+                    expr_no_reset = ntop = 1;
 
                     void * erbp = sbrk(0);
 
-                    *nstk = sbrk(sizeof(struct mccnode));
-                    if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new node");
+                    *nstk = sbrk(sizeof(struct mccnode CAST_NAME));
+                    if ( *nstk == SBRKFAIL ) mccfail("unable to allocate space for new node");
 
                     (*nstk)->left = (*nstk)->right = NULL;
                     (*nstk)->oper = Variable;
                     (*nstk)->flag |= CPL_LVAL;
                     (*nstk)->type = &cursym->type;
                     (*nstk)->sym  = cursym;
-                    (*nstk)->val  = cursym->addr;
 
-                    struct mccnode * root = expr(curnsp, 0);
+                    struct mccnode * root = expr(curnsp, Comma);
 
                     emit(curnsp, root);
 

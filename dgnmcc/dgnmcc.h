@@ -4,6 +4,7 @@
 #define DEBUG_TOKEN 1
 #define DEBUG_EXPR 1
 #define DEBUG_DECLARE 1
+#define DEBUG_TYPECHECK 1
 #endif
 
 #define MAX_LINE      256  // Maximum number of tokens per file line

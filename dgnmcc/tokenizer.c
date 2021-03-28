@@ -102,7 +102,7 @@ void ntok()
             {
                 for ( i = 0; res_words[tk - Void][i] == pp[i]; i++ );
 
-                if ( !res_words[tk - Void][i] ) // Match
+                if ( !res_words[tk - Void][i] && tkVal == i ) // Match
                 {
                      if ( tk == Short  ) tk = Int; // Shorts are always Ints
                      if ( tk == SizeofRes ) tk = Sizeof; // Sizeof is located in a weird spot

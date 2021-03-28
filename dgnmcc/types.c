@@ -38,7 +38,7 @@ struct mcctype type_string = {
 
 struct mcctype * typeClone( struct mcctype * t )
 {
-    struct mcctype * out = sbrk(sizeof(struct mcctype));
+    struct mcctype * out = sbrk(sizeof(struct mcctype CAST_NAME));
     if ( out == SBRKFAIL ) mccfail("unable to allocate new type");
 
     out->ptype = t->ptype;
@@ -47,7 +47,7 @@ struct mcctype * typeClone( struct mcctype * t )
     struct mccsubtype * s, ** os = &out->sub;
     for ( s = t->sub; s; s = s->sub )
     {
-        *os = sbrk(sizeof(struct mccsubtype));
+        *os = sbrk(sizeof(struct mccsubtype CAST_NAME));
         if ( *os == SBRKFAIL ) mccfail("unable to allocate new subtype");
 
         (*os)->inder = s->inder;
@@ -80,7 +80,7 @@ struct mcctype * typeInder( struct mcctype * t )
 
     if ( s->arrays || s->ftype )
     {
-        s = s->sub = sbrk(sizeof(struct mccsubtype));
+        s = s->sub = sbrk(sizeof(struct mccsubtype CAST_NAME));
         if ( s == SBRKFAIL ) mccfail("unable to allocate new subtype");
 
         s->inder = 1;
@@ -232,7 +232,7 @@ int16_t isScalar( struct mcctype * t )
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
-    return !s->ftype && ( s->inder || s->arrays || !t->stype ) && t->ptype & CPL_DTYPE_MASK;
+    return !s->ftype && ( s->inder || s->arrays || ( !t->stype && t->ptype & CPL_DTYPE_MASK ) );
 }
 
 int16_t isFunction( struct mcctype * t )

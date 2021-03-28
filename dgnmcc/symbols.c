@@ -19,8 +19,10 @@ struct mccsym * getSymbol( struct mccnsp * sernsp, int8_t * name, int16_t len )
         unsigned int8_t nsptype = curnsp->type & CPL_NSPACE_MASK;
 
         // Search child anonymous namespaces and enums
-        if ( nsptype == CPL_ENUM || ((nsptype == CPL_STRC || nsptype == CPL_UNION)
-          && !curnsp->name && curnsp->type & CPL_DEFN && curnsp->type & CPL_INST ) )
+        if ( nsptype == CPL_ENUM || (
+            (nsptype == CPL_STRC || nsptype == CPL_UNION)
+            && !curnsp->name && (curnsp->type & CPL_DEFN) && (~curnsp->type & CPL_INST)
+        ) )
         {
             cursym = getSymbol( curnsp, name, len );
             if ( cursym ) return cursym;

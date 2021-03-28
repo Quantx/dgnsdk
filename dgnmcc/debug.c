@@ -126,6 +126,8 @@ void dumpTree( struct mccnode * n, int8_t * fname )
         }
         else if ( n->oper == Number || n->oper == SmolNumber ) decwrite( fexp, n->val );
         else if ( n->oper == LongNumber ) octwrite( fexp, n->valLong );
+        else if ( n->oper == '"' )
+            write( fexp, "\\\"", 2 );
         else writeToken( fexp, n->oper );
 
         write( fexp, "\"", 1 );

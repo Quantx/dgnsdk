@@ -20,7 +20,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
     if ( tk == ';' ) ntok();
     else if ( tk == '{' )
     {
-        struct mccnsp * cbnsp = sbrk(sizeof(struct mccnsp));
+        struct mccnsp * cbnsp = sbrk(sizeof(struct mccnsp CAST_NAME));
         if ( cbnsp == SBRKFAIL ) mccfail("unable to allocate room for child block");
 
         cbnsp->name = NULL;
@@ -107,6 +107,8 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         emitStatement( Case, 0 );
 
         if ( !sws ) mccfail("case statement outside of switch statement");
+
+        ntok();
 
         void * erbp = sbrk(0);
 

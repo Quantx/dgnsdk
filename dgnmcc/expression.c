@@ -1,6 +1,6 @@
 struct mccnsp castnsp = { NULL, 0, CPL_CAST, 0, 0, NULL, &castnsp.symtbl, NULL, &castnsp.nsptbl };
 
-const unsigned int8_t prectbl[] = {
+const unsigned int8_t prectbl[15] = {
     Comma,   // 0 - Lowest
     Ass,     // 1
     Tern,    // 2 (Right associativity)
@@ -22,7 +22,7 @@ int8_t getPrec( unsigned int8_t op )
 {
     int8_t i;
     for ( i = 0; i < sizeof(prectbl) && op >= prectbl[i]; i++ );
-    return --i;
+    return i - 1;
 }
 
 // Must be declared before stacks to prevent overflow nonsense
@@ -48,7 +48,7 @@ void reduce()
     if ( ostk[otop] == '(' || ostk[otop] == '[' || ostk[otop] == '?' )
         mccfail("wrong matched parenthasis or bracket in expression");
 
-    struct mccnode * n = sbrk(sizeof(struct mccnode));
+    struct mccnode * n = sbrk(sizeof(struct mccnode CAST_NAME));
     if ( n == SBRKFAIL ) mccfail("unable to allocate expression node");
 
     n->oper = ostk[otop];
@@ -78,7 +78,7 @@ void reduce()
     else if ( n->oper == Tern )
     {
         if ( ntop < 3 ) mccfail("not enough nodes for ternary operator");
-        struct mccnode * resn = sbrk(sizeof(struct mccnode));
+        struct mccnode * resn = sbrk(sizeof(struct mccnode CAST_NAME));
         if ( resn == SBRKFAIL ) mccfail("unable to allocate node for ternary operator");
 
         resn->oper = ':';
@@ -99,13 +99,40 @@ void reduce()
     nstk[ntop++] = n;
 }
 
+void makeCast(struct mccnsp * curnsp)
+{
+    castnsp.parent = curnsp;
+    define(&castnsp);
+
+    if ( tk != ')' ) mccfail("expected closing parenthasis in cast");
+    ntok();
+
+    cstk[ctop++] = &castnsp.symtbl->type;
+
+    // Reset casting namespace
+    castnsp.symtbl = NULL;
+    castnsp.symtail = &castnsp.symtbl;
+    castnsp.size = 0;
+}
+
+int16_t expr_no_reset;
+
 // Build and return an expression tree
 // stk = stop token
 struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 {
+#ifdef DEBUG_EXPR
+    write( 1, "*** EXPR ", 9 );
+    decwrite( 1, ln );
+    write( 1, ":", 1 );
+    decwrite( 1, p - pp );
+    write( 1, "\n", 1 );
+#endif
+
     struct mccnode * root, * n;
 
-    if ( stk )
+    if ( expr_no_reset ) expr_no_reset = 0;
+    else
     {
         unary = 1;
         otop = ntop = ctop = 0;
@@ -123,14 +150,13 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
         if ( tk == Named || (tk >= Number && tk <= DblNumber) || tk == '"' )
         {
-            nstk[ntop] = sbrk(sizeof(struct mccnode));
+            nstk[ntop] = sbrk(sizeof(struct mccnode CAST_NAME));
             if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new node");
 
             nstk[ntop]->left = nstk[ntop]->right = NULL;
             nstk[ntop]->oper = tk;
             nstk[ntop]->flag = 0;
             nstk[ntop]->type = &type_int;
-            nstk[ntop]->sym = 0; // Unneeded
             nstk[ntop]->val = tkVal;
 
             if ( tk == Named )
@@ -205,7 +231,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
             if ( ostk[otop] == '[' )
             {
-                n = sbrk(sizeof(struct mccnode));
+                n = sbrk(sizeof(struct mccnode CAST_NAME));
                 if ( n == SBRKFAIL ) mccfail("unable to allocate array node");
                 n->oper = '[';
                 n->flag = 0;
@@ -232,9 +258,17 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
             ntok();
         }
-        else if ( tk == stk ) break; // Stop token reached
+        else if ( tk == stk && tk != Comma ) break;
         else
         {
+            if ( tk == stk )
+            {
+                // Don't break for comma if we're currently in a function declaration
+                int16_t i;
+                for ( i = 0; i < otop && ostk[i] != FnCallArgs; i++ );
+                if ( i == otop ) break;
+            }
+
             // Convert to unary operators as needed
             if (unary)
             {
@@ -250,60 +284,66 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
             }
             else if (tk == '(') tk = FnCallArgs;
 
-            if ( tk == '[' ) while ( otop && getPrec(ostk[otop - 1]) == 14 ) reduce();
-            else
+            unsigned int8_t otk = tk;
+            ntok();
+
+            if ( otk == FnCallArgs && tk == ')' ) otk = FnCall, ntok(); // No args in function call
+            else if ( otk == '(' && tk >= Void && tk <= Unsigned )
             {
-                // Remember: '(' has a prec of -1
-                prec = getPrec(tk);
+                otk = Cast; // Check if cast
+                if ( ostk[otop - 1] == Sizeof )
+                {
+                    otop--;
+
+                    makeCast(curnsp);
+
+                    nstk[ntop] = sbrk(sizeof(struct mccnode CAST_NAME));
+                    if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new sizeof node");
+
+                    nstk[ntop]->oper = Sizeof;
+                    nstk[ntop]->flag = 0;
+                    nstk[ntop]->type = NULL;
+                    nstk[ntop]->left = NULL;
+
+                    struct mccnode * cn = nstk[ntop++]->right = sbrk(sizeof(struct mccnode CAST_NAME));
+                    if ( cn == SBRKFAIL ) mccfail("unable to allocate space for new sizeof-cast node");
+
+                    cn->oper = Cast;
+                    cn->flag = 0;
+                    cn->type = cstk[--ctop];
+                    cn->left = cn->right = NULL;
+
+                    unary = 0;
+                    otk = 0;
+                }
+            }
+
+            if ( otk )
+            {
+                // Remember: '(' and '[' has a prec of -1 everywhere except here
+                if ( otk == '(' || otk == '?' ) prec = 127;
+                else if ( otk == '[' ) prec = 14;
+                else prec = getPrec(otk);
+
                 // Left associative
                 if ( prec == 2 || prec == 13 ) while ( otop && getPrec(ostk[otop - 1]) > prec ) reduce();
                 // Right associative
                 else while ( otop && getPrec(ostk[otop - 1]) >= prec ) reduce();
-            }
 
 #ifdef DEBUG_EXPR
-            write( 2, "Push:", 5 );
-            writeToken( 2, tk );
-            write( 2, ":", 1 );
-            decwrite( 2, prec );
-            write( 2, "\n", 1 );
+                write( 2, "Push:", 5 );
+                writeToken( 2, otk );
+                write( 2, ":", 1 );
+                decwrite( 2, prec );
+                write( 2, "\n", 1 );
 #endif
 
-            ostk[otop++] = tk;
+                ostk[otop++] = otk;
 
-            if ( tk == FnCallArgs )
-            {
-                ntok();
+                if ( otk == FnCallArgs ) ostk[otop++] = '(', unary = 1;
+                else unary = otk != PostInc && otk != PostDec;
 
-                if ( tk == ')' ) ostk[otop - 1] = FnCall, ntok();
-                else ostk[otop++] = '(';
-
-                unary = 1;
-            }
-            else
-            {
-                unary = tk != PostInc && tk != PostDec;
-
-                ntok();
-            }
-
-            if ( ostk[otop - 1] == '(' && tk >= Void && tk <= Unsigned ) // Check if cast
-            {
-                ostk[otop - 1] = Cast;
-
-                castnsp.parent = curnsp;
-                define(&castnsp);
-
-                if ( tk != ')' ) mccfail("expected closing parenthasis in cast");
-                ntok();
-
-                cstk[ctop++] = &castnsp.symtbl->type;
-
-                // Reset casting namespace
-                castnsp.symtbl = NULL;
-                castnsp.symtail = &castnsp.symtbl;
-
-                castnsp.size = 0;
+                if ( otk == Cast ) makeCast(curnsp); // Process casting type
             }
         }
 
@@ -323,6 +363,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 #if DEBUG_EXPR
     dumpTree( root, "expr_tree.dot" );
 #endif
+
 
     // Preform post order traversal for type propogation and constant reduction
     ntop = 0;
@@ -398,8 +439,8 @@ struct, union: (In addition to pointers above)
 *** DON'T FORGET ABOUT CASTING
 */
 
-#if DEBUG_EXPR
-        write(2, "Tok: ", 5);
+#if DEBUG_TYPECHECK
+        write(2, "Type tok: ", 9);
         writeToken(2, n->oper);
         write(2, "\n", 1);
 #endif
@@ -447,7 +488,8 @@ struct, union: (In addition to pointers above)
                 if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
             }
 
-            n->type = n->left->type; // Always produces a non l-value
+            n->type = n->left->type;
+            n->flag = CPL_LVAL;
         }
         else if ( n->oper == Tern )
         {
@@ -537,7 +579,7 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Sizeof )
         {
-            if ( !isFunction(n->right->type) ) mccfail("cannot get sizeof function");
+            if ( isFunction(n->right->type) ) mccfail("cannot get sizeof function");
             n->type = &type_int;
         }
         else if ( n->oper == LogNot )
@@ -633,7 +675,7 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Cast )
         {
-            if ( !isScalar(n->right->type) ) mccfail("rhs of cast is not a scalar");
+            if ( n->right && !isScalar(n->right->type) ) mccfail("rhs of cast is not a scalar");
 
             // Type of cast is pre-defined
 
@@ -661,18 +703,32 @@ struct, union: (In addition to pointers above)
 
             if ( !s->ftype ) mccfail("lhs is not a function");
 
-            struct mccnode * fan;
+            struct mccnode * fan, * fsn;
             struct mccsym * cursym;
-            for ( cursym = s->ftype->symtbl, fan = n->right;
-                  cursym;
-                  cursym = cursym->next, fan = fan->left )
+
+            for ( fsn = n->right; fsn->oper == Comma; fsn = fsn->left ); fsn = fsn->left;
+
+            for ( cursym = s->ftype->symtbl; cursym; cursym = cursym->next, fsn = fan )
             {
-                if ( !isCompatible( &cursym->type, fan->oper == Comma ? fan->right->type : fan->type ) ) mccfail("incompatible argument");
-                if ( fan->oper != Comma ) { fan = NULL; cursym = cursym->next; break; }
+                for ( fan = n->right; fan->left != fsn; fan = fan->left );
+
+                if ( !isCompatible( &cursym->type, fan->type ) )
+                {
+#ifdef DEBUG_TYPECHECK
+                    write( 1, "Type A: ", 8 );
+                    writeType( 1, &cursym->type, cursym->name, cursym->len );
+                    write( 1, "\nType B: ", 9 );
+                    writeType( 1, fan->type, NULL, 0 );
+                    write( 1, "\n", 1 );
+#endif
+                    mccfail("incompatible argument");
+                }
+
+                if ( fan == n->right ) { cursym = cursym->next; break; }
             }
 
             if ( cursym ) mccfail("not enough arguments");
-            if ( fan && (s->ftype->type & CPL_NSPACE_MASK) != CPL_VFUNC ) mccfail("too many arguments");
+            if ( fan != n->right && (s->ftype->type & CPL_NSPACE_MASK) != CPL_VFUNC ) mccfail("too many arguments");
 
             // Just drop the function namespace to get the return type
             s->ftype = NULL;
@@ -680,13 +736,14 @@ struct, union: (In addition to pointers above)
             // Functions do not return l-values
         }
         else if ( n->oper == Comma ) n->type = n->right->type, n->flag = n->right->flag; // No rules for ,
-#ifdef DEBUG_EXPR
+#ifdef DEBUG_TYPECHECK
         else mccfail("no typecheck rule for operator");
 
         if (!n->type) mccfail("no promotion rule for operator");
 #endif
 
-        if ( n->oper == Cast )
+        if ( n->oper == ':' || n->oper == Comma );
+        else if ( n->oper == Cast && n->right )
         {
             n->oper = n->right->oper;
             n->flag = n->right->flag;
@@ -700,9 +757,8 @@ struct, union: (In addition to pointers above)
         {
             n->oper = Number;
             n->val = typeSize(n->right->type);
-            n->right->type = NULL;
+            n->right = NULL;
         }
-        else if ( n->oper == ':' );
         else if ( n->oper == Tern && (n->left->oper == Number || n->left->oper == SmolNumber ) )
         {
             *n = *(n->left->val ? n->right->left : n->right->right);
@@ -737,7 +793,7 @@ struct, union: (In addition to pointers above)
                     case Mul:     vl = vl *  vr; break;
                     case Div:     vl = vl /  vr; break;
                     case Mod:     vl = vl %  vr; break;
-#ifdef DEBUG_EXPR
+#ifdef DEBUG_TYPECHECK
                     default:
                         writeToken( 2, n->oper );
                         write( 2, "\n", 1 );
@@ -749,7 +805,7 @@ struct, union: (In addition to pointers above)
                 if (n->left->oper == Number || n->right->oper == Number
                      // Implicit promotion to integer
                      || n->oper == Shl || n->oper == Shr ) n->oper = Number, n->val = vl;
-                else n->oper = SmolNumber, n->val = (int8_t)vl;
+                else n->oper = SmolNumber, n->val = (int8_t CAST_NAME)vl;
 
                 n->left = n->right = NULL;
             }
@@ -779,7 +835,7 @@ struct, union: (In addition to pointers above)
         n = NULL;
     }
 
-#if DEBUG_EXPR
+#if DEBUG_TYPECHECK
     dumpTree( root, "type_tree.dot" );
 #endif
 
@@ -812,7 +868,9 @@ void emitNode(struct mccnode * n)
         irntype = IR_PTR;
 
         struct mcctype * dt = typeDeref(n->type);
-        irnsize = typeSize(dt);
+        // Handle a void pointer
+        if ( !( dt->stype || (dt->ptype & CPL_DTYPE_MASK) || dt->sub->inder || dt->sub->ftype ) ) irnsize = 1;
+        else irnsize = typeSize(dt);
         brk(dt);
     }
     else if ( isFunction(n->type) ) irntype = IR_FUNC;
