@@ -7,7 +7,9 @@ The tools incluse:
 
 dgnasm - The Data General Nova Assembler
 
-dgnmcc - The Data General Nova Minimal C Compiler
+dgnmcc - The Data General Nova Micro C Compiler
+
+dgnirc - The Data General Nova Intermediate Representation Compiler
 
 dgndbg - The Data General Nova Symbolic Debugger
 

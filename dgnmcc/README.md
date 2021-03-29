@@ -1,2 +1,2 @@
 # dgnmcc
-Data General Nova Minimal C Compiler
+Data General Nova Micro C Compiler

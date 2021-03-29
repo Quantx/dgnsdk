@@ -854,7 +854,7 @@ void emitStatement(unsigned int8_t op, unsigned int32_t val)
 void emitNode(struct mccnode * n)
 {
     // Check if this variable is actually on the stack
-    if ( n->oper == Variable && (n->sym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) n->oper = VariableStack;
+    if ( n->oper == Variable && (n->sym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) n->oper = VariableStack, n->val = n->sym->addr;
 
     write( segs[SEG_TEXT], &n->oper, 1 );
 
@@ -882,7 +882,35 @@ void emitNode(struct mccnode * n)
 
     write( segs[SEG_TEXT], &irntype, 1 );
     write( segs[SEG_TEXT], &irnsize, 2 );
-    write( segs[SEG_TEXT], &n->valLong, 4 );
+
+    if ( n->oper == Variable )
+    {
+        int32_t out = n->sym->len;
+
+        int8_t tmpbuf[6];
+        int16_t tmppos = 6;
+        int16_t val = n->sym->addr;
+
+        if ( val )
+        {
+            while ( val )
+            {
+                tmpbuf[--tmppos] = val % 10 + '0';
+                val /= 10;
+            }
+            out += 7 - tmppos; // Include the period seperator
+        }
+
+        write( segs[SEG_TEXT], &out, 4 );
+        write( segs[SEG_TEXT], n->sym->name, n->sym->len );
+
+        if ( n->sym->addr )
+        {
+            write( segs[SEG_TEXT], ".", 1 );
+            write( segs[SEG_TEXT], tmpbuf + tmppos, 6 - tmppos );
+        }
+    }
+    else write( segs[SEG_TEXT], &n->valLong, 4 );
 }
 
 void emit(struct mccnsp * curnsp, struct mccnode * root)

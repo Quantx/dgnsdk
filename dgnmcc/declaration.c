@@ -1,4 +1,4 @@
-unsigned int16_t svid = 1; // Static variable ID (starts at 1)
+unsigned int16_t svid; // Static variable ID (starts at 1)
 
 void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype ** partype )
 {
@@ -304,27 +304,24 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
     // String constant
     else if ( cexp->oper == '"' )
     {
-        write( segfd, "\t~SC", 4 );
+        write( segfd, "\t.word ~SC", 10 );
         decwrite( segfd, cexp->val );
-        write( segfd, "\n", 1 );
     }
     // Address-of (Inderection) operations
     else if ( cexp->oper == Inder )
     {
-        write( segfd, "\t", 1 );
+        write( segfd, "\t.word ", 7 );
         outputVarAddr( segfd, cexp->right );
-        write( segfd, "\n", 1 );
     }
     else if ( cexp->oper == Sub )
     {
         if ( cexp->left->oper != Inder ) mccfail("lhs of const subtraction is not address of");
         if ( cexp->right->oper < SmolNumber || cexp->right->oper > LongNumber ) mccfail("rhs of const subtraction is not number");
 
-        write( segfd, "\t", 1 );
+        write( segfd, "\t.word ", 7 );
         outputVarAddr( segfd, cexp->left );
         write( segfd, " - ", 3 );
         decwrite( segfd, cexp->right->val );
-        write( segfd, "\n", 1 );
     }
     else if ( cexp->oper == Add )
     {
@@ -345,11 +342,10 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
         }
         else mccfail("not a constant expression");
 
-        write( segfd, "\t", 1 );
+        write( segfd, "\t.word ", 7 );
         outputVarAddr( segfd, aofn );
         write( segfd, " + ", 3 );
         decwrite( segfd, av );
-        write( segfd, "\n", 1 );
     }
     else mccfail("non-constant initializer");
 
@@ -807,7 +803,7 @@ void define( struct mccnsp * curnsp )
             if ( curnsp != &glbnsp )
             {
                 write( segfd, ".", 1 );
-                decwrite( segfd, cursym->addr = svid++ );
+                decwrite( segfd, cursym->addr = ++svid );
             }
 
             write( segfd, ":\n", 2 );
