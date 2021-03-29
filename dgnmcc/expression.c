@@ -863,9 +863,9 @@ void emitNode(struct mccnode * n)
 
     unsigned int8_t pt = n->type->ptype & CPL_DTYPE_MASK;
 
-    if ( isPointer( n->type ) )
+    if ( isPointer(n->type) )
     {
-        irntype = IR_PTR;
+        irntype = isArray(n->type) ? IR_ARRAY : IR_PTR;
 
         struct mcctype * dt = typeDeref(n->type);
         // Handle a void pointer

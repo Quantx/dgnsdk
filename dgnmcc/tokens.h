@@ -101,7 +101,8 @@ int8_t * tokenNames[] = {
 #define IR_STRUC 9
 // Derived types
 #define IR_PTR   10
-#define IR_FUNC  11
+#define IR_ARRAY 11
+#define IR_FUNC  12
 
 #define IR_TYPE_MASK 0b00001111
 
