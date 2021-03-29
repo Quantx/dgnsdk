@@ -2,7 +2,7 @@ struct mccnsp castnsp = { NULL, 0, CPL_CAST, 0, 0, NULL, &castnsp.symtbl, NULL, 
 
 const unsigned int8_t prectbl[15] = {
     Comma,   // 0 - Lowest
-    Ass,     // 1
+    Ass,     // 1 (Right associativity)
     Tern,    // 2 (Right associativity)
     LogOr,   // 3
     LogAnd,  // 4
@@ -326,7 +326,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
                 else prec = getPrec(otk);
 
                 // Left associative
-                if ( prec == 2 || prec == 13 ) while ( otop && getPrec(ostk[otop - 1]) > prec ) reduce();
+                if ( prec == 1 || prec == 2 || prec == 13 ) while ( otop && getPrec(ostk[otop - 1]) > prec ) reduce();
                 // Right associative
                 else while ( otop && getPrec(ostk[otop - 1]) >= prec ) reduce();
 
@@ -489,7 +489,6 @@ struct, union: (In addition to pointers above)
             }
 
             n->type = n->left->type;
-            n->flag = CPL_LVAL;
         }
         else if ( n->oper == Tern )
         {
