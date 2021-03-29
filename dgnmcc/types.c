@@ -53,7 +53,7 @@ struct mcctype * typeClone( struct mcctype * t )
         (*os)->inder = s->inder;
         (*os)->arrays = s->arrays;
 
-        (*os)->sizes = sbrk(s->arrays);
+        (*os)->sizes = sbrk(s->arrays * sizeof(unsigned int16_t CAST_NAME));
         if ( (*os)->sizes == SBRKFAIL ) mccfail("unable to allocate new size list");
 
         int16_t i;
