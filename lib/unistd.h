@@ -1,3 +1,6 @@
+#ifndef UNISTD_H
+#define UNISTD_H
+
 // Define misc UNIX system calls and constants
 
 #ifdef LINUX_COMPAT // Pretend this is a 16-bit unix 6 system
@@ -27,3 +30,4 @@ int  read(int fd, void * buf, unsigned int count);
 int write(int fd, void * buf, unsigned int count);
 void * sbrk(int inc);
 int brk(void * addr);
+#endif

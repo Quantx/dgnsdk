@@ -9,7 +9,8 @@ void parenthesizedExpr( struct mccnsp * curnsp )
 
     if ( tk != ')' ) mccfail( "missing closing parenthasis in statement" );
 
-    emit(curnsp, root);
+    emit(root);
+
     brk(erbp);
 
     ntok();
@@ -17,7 +18,11 @@ void parenthesizedExpr( struct mccnsp * curnsp )
 
 void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 {
-    if ( tk == ';' ) ntok();
+    if ( tk == ';' )
+    {
+        emitStatement( Void, 0 ); // No-op statement
+        ntok();
+    }
     else if ( tk == '{' )
     {
         struct mccnsp * cbnsp = sbrk(sizeof(struct mccnsp CAST_NAME));
@@ -178,7 +183,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         if ( !isCompatible( frt, root->type ) ) mccfail("incompatible return type");
 
-        emit(curnsp, root);
+        emit(root);
 
         brk(frt); // Also rolls back the expression
     }
@@ -202,7 +207,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         if ( tk != ';' ) mccfail( "missing first semicolon in for statement" );
         ntok();
 
-        emit(curnsp, root);
+        emit(root);
         brk(erbp);
 
         // Eval expression
@@ -214,7 +219,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         if ( tk != ';' ) mccfail( "missing second semicolon in for statement" );
         ntok();
 
-        emit(curnsp, root);
+        emit(root);
         brk(erbp);
 
         // Iterator expression
@@ -226,7 +231,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         if ( tk != ')' ) mccfail( "missing closing parenthasis in for statement" );
         ntok();
 
-        emit(curnsp, root);
+        emit(root);
         brk(erbp);
 
         // Statement
@@ -271,7 +276,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         if ( tk != ';' ) mccfail( "Expected semicolon after expression" );
 
-        emit(curnsp, root);
+        emit(root);
 
         brk(erbp); // Free memory allocated by the expression
 

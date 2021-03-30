@@ -772,7 +772,7 @@ void define( struct mccnsp * curnsp )
 
                     struct mccnode * root = expr(curnsp, Comma);
 
-                    emit(curnsp, root);
+                    emit(root);
 
                     brk(erbp);
                 }

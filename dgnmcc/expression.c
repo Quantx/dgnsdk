@@ -912,34 +912,25 @@ void emitNode(struct mccnode * n)
     else write( segs[SEG_TEXT], &n->valLong, 4 );
 }
 
-void emit(struct mccnsp * curnsp, struct mccnode * root)
+void emit(struct mccnode * root)
 {
     struct mccnode * n = root;
 
-    // Preform post order traversal for code emission
+    // Preform pre order traversal for code emission
     ntop = 0;
     while ( n || ntop )
     {
         while (n)
         {
-            if ( n->right ) nstk[ntop++] = n->right;
             nstk[ntop++] = n;
-
             n = n->left;
         }
 
         n = nstk[--ntop];
 
-        if ( n->right && nstk[ntop - 1] == n->right )
-        {
-            nstk[ntop - 1] = n;
-            n = n->right;
-            continue;
-        }
-
         emitNode(n);
 
-        n = NULL;
+        n = n->right;
     }
 }
 

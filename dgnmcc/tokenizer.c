@@ -30,6 +30,8 @@ int8_t * res_words[30] = {
     "sizeof"
 };
 
+void mccfail( int8_t * msg ) { die( msg, ln, p - lp ); }
+
 int16_t readline()
 {
     int16_t i = 0;
