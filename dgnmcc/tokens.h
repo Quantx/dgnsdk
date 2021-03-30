@@ -109,14 +109,17 @@ int8_t * tokenNames[] = {
 #define IR_LVAL (1 << 4) // Flag is set if this NODE is an L-value
 
 
-// Intermediate Represntation Assembler Node
-struct iranode
+// Intermediate Represntation Compiler Node
+struct ircnode
 {
     unsigned int8_t oper;
-    unsigned int8_t flag;
+    unsigned int8_t type;
     unsigned int16_t size; // Size of pointer
     union {
-	int16_t val;
-	int32_t valLong;
+        struct {
+            unsigned int16_t val;
+            int8_t * name;
+        };
+	unsigned int32_t valLong;
     };
 };

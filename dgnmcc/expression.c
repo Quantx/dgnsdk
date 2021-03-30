@@ -843,11 +843,12 @@ struct, union: (In addition to pointers above)
 
 void emitStatement(unsigned int8_t op, unsigned int32_t val)
 {
-    static unsigned int8_t nullVal[3];
+    static struct ircnode irn;
 
-    write( segs[SEG_TEXT], &op, 1 );
-    write( segs[SEG_TEXT], &nullVal, sizeof(nullVal) );
-    write( segs[SEG_TEXT], &val, 4 );
+    irn.oper = op;
+    irn.val = val;
+
+    write( segs[SEG_TEXT], &irn, sizeof(struct ircnode CAST_NAME) );
 }
 
 void emitNode(struct mccnode * n)
@@ -855,61 +856,64 @@ void emitNode(struct mccnode * n)
     // Check if this variable is actually on the stack
     if ( n->oper == Variable && (n->sym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) n->oper = VariableStack, n->val = n->sym->addr;
 
-    write( segs[SEG_TEXT], &n->oper, 1 );
+    struct ircnode irn;
 
-    unsigned int8_t  irntype;
-    unsigned int16_t irnsize;
+    irn.oper = n->oper;
+    irn.size = 0;
 
     unsigned int8_t pt = n->type->ptype & CPL_DTYPE_MASK;
 
     if ( isPointer(n->type) )
     {
-        irntype = isArray(n->type) ? IR_ARRAY : IR_PTR;
+        irn.type = isArray(n->type) ? IR_ARRAY : IR_PTR;
 
         struct mcctype * dt = typeDeref(n->type);
         // Handle a void pointer
-        if ( !( dt->stype || (dt->ptype & CPL_DTYPE_MASK) || dt->sub->inder || dt->sub->ftype ) ) irnsize = 1;
-        else irnsize = typeSize(dt);
+        if ( !( dt->stype || (dt->ptype & CPL_DTYPE_MASK) || dt->sub->inder || dt->sub->ftype ) ) irn.size = 1;
+        else irn.size = typeSize(dt);
         brk(dt);
     }
-    else if ( isFunction(n->type) ) irntype = IR_FUNC;
-    else if ( isStruct(n->type) ) irntype = IR_STRUC;
-    else if ( pt == CPL_ENUM_CONST ) irntype = IR_INT;
-    else irntype = pt;
+    else if ( isFunction(n->type) ) irn.type = IR_FUNC;
+    else if ( isStruct(n->type) ) irn.type = IR_STRUC;
+    else if ( pt == CPL_ENUM_CONST ) irn.type = IR_INT;
+    else irn.type = pt;
 
-    if ( n->flag & CPL_LVAL ) irntype |= IR_LVAL;
+    if ( n->flag & CPL_LVAL ) irn.type |= IR_LVAL;
 
-    write( segs[SEG_TEXT], &irntype, 1 );
-    write( segs[SEG_TEXT], &irnsize, 2 );
+    int8_t tmpbuf[6];
+    int16_t tmppos = 6;
 
-    if ( n->oper == Variable )
+    if ( n->oper == Variable ) // Compute variable name length
     {
-        int32_t out = n->sym->len;
+        irn.name = NULL;
+        irn.val = n->sym->len;
 
-        int8_t tmpbuf[6];
-        int16_t tmppos = 6;
-        int16_t val = n->sym->addr;
+        unsigned int16_t addr;
 
-        if ( val )
+        if ( addr = n->sym->addr )
         {
-            while ( val )
+            while ( addr )
             {
-                tmpbuf[--tmppos] = val % 10 + '0';
-                val /= 10;
+                tmpbuf[--tmppos] = addr % 10 + '0';
+                addr /= 10;
             }
-            out += 7 - tmppos; // Include the period seperator
+            irn.val += 7 - tmppos; // Include the period seperator
         }
+    }
+    else irn.valLong = n->valLong;
 
-        write( segs[SEG_TEXT], &out, 4 );
+    write( segs[SEG_TEXT], &irn, sizeof(struct ircnode CAST_NAME) );
+
+    if ( n->oper == Variable ) // Output variable name
+    {
         write( segs[SEG_TEXT], n->sym->name, n->sym->len );
 
-        if ( n->sym->addr )
+        if ( n->sym->addr ) // Output static variable identifier
         {
             write( segs[SEG_TEXT], ".", 1 );
             write( segs[SEG_TEXT], tmpbuf + tmppos, 6 - tmppos );
         }
     }
-    else write( segs[SEG_TEXT], &n->valLong, 4 );
 }
 
 void emit(struct mccnode * root)
