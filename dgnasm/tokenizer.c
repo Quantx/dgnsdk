@@ -122,6 +122,7 @@ void ntok()
                     // Check flags if I/O instruction
                     if ( flagNum == 1
                     && ( tk == DGN_IO
+                    ||   tk == DGN_IONO
                     ||   tk == DGN_CTF
                     ||   tk == DGN_CTAF ) )
                     {
