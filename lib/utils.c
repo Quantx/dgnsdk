@@ -41,17 +41,41 @@ void decwrite( int16_t nfd, unsigned int16_t val )
 }
 
 // Output msg and error
-void die( int8_t * msg, unsigned int16_t ln, unsigned int16_t chr )
+void die( int8_t * msg )
 {
     int16_t i = 0;
     while ( msg[i] ) i++;
-
-    decwrite( 2, ln  );
-    write( 2, ":", 1 );
-    decwrite( 2, chr );
-    write( 2, ":", 1 );
 
     write( 2, msg, i );
     write( 2, "\n", 1 );
     exit(1);
 }
+
+/*
+// We need to do this to fix ASLR with sbrk
+#ifdef LINUX_COMPAT
+int8_t heap_data[HEAP_SIZE];
+void * heap = heap_data;
+unsigned int16_t brk_ptr;
+unsigned int16_t max_brk;
+
+void * sbrk( int size )
+{
+    int8_t * ptr = heap + brk_ptr;
+
+    brk_ptr += size;
+    if ( brk_ptr > max_brk ) max_brk = brk_ptr;
+    if ( brk_ptr > HEAP_SIZE ) return SBRKFAIL;
+
+    return ptr;
+}
+
+int brk( void * ptr )
+{
+    if ( ptr < heap || ptr >= heap + brk_ptr ) return -1;
+
+    brk_ptr = (unsigned int16_t)(ptr - heap);
+    return 0;
+}
+#endif
+*/

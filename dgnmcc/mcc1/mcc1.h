@@ -1,4 +1,4 @@
-#include "../lib/unistd.h"
+#include "../../lib/unistd.h"
 
 #ifdef DEBUG
 #define DEBUG_TOKEN 1
@@ -7,15 +7,14 @@
 #define DEBUG_TYPECHECK 1
 #endif
 
-#define MAX_LINE      256  // Maximum number of tokens per file line
-#define MAX_STR       256  // Maximum length of user defined strings
 #define PAGESIZE      1024 // 2 KB (1 KW) of memory (1 mmu page)
 
 #define MAX_EXPR_OPER 64   // Maximum size of the expression operator stack
-#define MAX_EXPR_NODE 256  // Maximum size of the expression node stack
+// MAX_EXPRE_NODE is defined in tokens.h
 #define MAX_EXPR_CAST 16    // Maximum number of casts in an expression
 
-#include "tokens.h"
+#include "../mcc0/tokens.h"
+#include "statements.h"
 
 #ifdef DEBUG
 int8_t * typeNames[] = {

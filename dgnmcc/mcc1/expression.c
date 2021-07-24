@@ -45,7 +45,7 @@ void reduce()
 #endif
 
     // This should never happen
-    if ( ostk[otop] == '(' || ostk[otop] == '[' || ostk[otop] == '?' )
+    if ( ostk[otop] == Paren_L || ostk[otop] == Square_L || ostk[otop] == Q_Mark )
         mccfail("wrong matched parenthasis or bracket in expression");
 
     struct mccnode * n = sbrk(sizeof(struct mccnode CAST_NAME));
@@ -81,7 +81,7 @@ void reduce()
         struct mccnode * resn = sbrk(sizeof(struct mccnode CAST_NAME));
         if ( resn == SBRKFAIL ) mccfail("unable to allocate node for ternary operator");
 
-        resn->oper = ':';
+        resn->oper = Colon;
         resn->flag = 0;
         resn->type = NULL;
         resn->right = nstk[--ntop];
@@ -104,7 +104,7 @@ void makeCast(struct mccnsp * curnsp)
     castnsp.parent = curnsp;
     define(&castnsp);
 
-    if ( tk != ')' ) mccfail("expected closing parenthasis in cast");
+    if ( tk != Paren_R ) mccfail("expected closing parenthasis in cast");
     ntok();
 
     cstk[ctop++] = &castnsp.symtbl->type;
@@ -121,6 +121,7 @@ int16_t expr_no_reset;
 // stk = stop token
 struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 {
+/*
 #ifdef DEBUG_EXPR
     write( 1, "*** EXPR ", 9 );
     decwrite( 1, ln );
@@ -128,7 +129,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
     decwrite( 1, p - pp );
     write( 1, "\n", 1 );
 #endif
-
+*/
     struct mccnode * root, * n;
 
     if ( expr_no_reset ) expr_no_reset = 0;
@@ -140,15 +141,15 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
     // Build expression tree
     while ( tk >= Named
-    ||      tk == '"'
-    ||      tk == '?' || tk == ':'
-    ||      tk == '(' || tk == ')'
-    ||      tk == '[' || tk == ']' )
+    ||      tk == String
+    ||      tk == Q_Mark   || tk == Colon
+    ||      tk == Paren_L  || tk == Paren_R
+    ||      tk == Square_L || tk == Square_R )
     {
         int8_t grp = 0;
         int8_t prec;
 
-        if ( tk == Named || (tk >= Number && tk <= DblNumber) || tk == '"' )
+        if ( tk == Named || (tk >= Number && tk <= DblNumber) || tk == String )
         {
             nstk[ntop] = sbrk(sizeof(struct mccnode CAST_NAME));
             if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new node");
@@ -199,7 +200,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
                 nstk[ntop]->valLong = tkLong;
                 nstk[ntop]->type = &type_long;
             }
-            else if ( tk == '"' )
+            else if ( tk == String )
             {
                 nstk[ntop]->flag |= CPL_LVAL; // String constants are l-values
                 nstk[ntop]->type = &type_string;
@@ -210,13 +211,13 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
             unary = 0;
             ntop++;
         }
-        else if ( tk == ']' || tk == ')' || tk == ':' )
+        else if ( tk == Square_R || tk == Paren_R || tk == Colon )
         {
             switch (tk)
             {
-                case ')': grp = '('; break;
-                case ']': grp = '['; break;
-                case ':': grp = '?'; break;
+                case Paren_R: grp = Paren_L; break;
+                case Square_R: grp = Square_L; break;
+                case Colon: grp = Q_Mark; break;
             }
 
             while ( otop && ostk[otop - 1] != grp ) reduce();
@@ -229,11 +230,11 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
             otop--;
 
-            if ( ostk[otop] == '[' )
+            if ( ostk[otop] == Square_L )
             {
                 n = sbrk(sizeof(struct mccnode CAST_NAME));
                 if ( n == SBRKFAIL ) mccfail("unable to allocate array node");
-                n->oper = '[';
+                n->oper = Square_L;
                 n->flag = 0;
                 n->type = NULL;
 
@@ -244,7 +245,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
                 unary = 0;
             }
-            else if ( ostk[otop] == '?' )
+            else if ( ostk[otop] == Q_Mark )
             {
                 n = nstk[--ntop];
                 while ( otop && getPrec(ostk[otop - 1]) > 1 ) reduce();
@@ -282,13 +283,13 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
                     case And: tk = Inder; break;
                 }
             }
-            else if (tk == '(') tk = FnCallArgs;
+            else if (tk == Paren_L) tk = FnCallArgs;
 
             unsigned int8_t otk = tk;
             ntok();
 
-            if ( otk == FnCallArgs && tk == ')' ) otk = FnCall, ntok(); // No args in function call
-            else if ( otk == '(' && tk >= Void && tk <= Unsigned )
+            if ( otk == FnCallArgs && tk == Paren_R ) otk = FnCall, ntok(); // No args in function call
+            else if ( otk == Paren_L && tk >= Void && tk <= Unsigned )
             {
                 otk = Cast; // Check if cast
                 if ( ostk[otop - 1] == Sizeof )
@@ -320,9 +321,9 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
             if ( otk )
             {
-                // Remember: '(' and '[' has a prec of -1 everywhere except here
-                if ( otk == '(' || otk == '?' ) prec = 127;
-                else if ( otk == '[' ) prec = 14;
+                // Remember: "(" and ")" has a prec of -1 everywhere except here
+                if ( otk == Paren_L || otk == Q_Mark ) prec = 127;
+                else if ( otk == Square_L ) prec = 14;
                 else prec = getPrec(otk);
 
                 // Left associative
@@ -340,7 +341,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
                 ostk[otop++] = otk;
 
-                if ( otk == FnCallArgs ) ostk[otop++] = '(', unary = 1;
+                if ( otk == FnCallArgs ) ostk[otop++] = Paren_L, unary = 1;
                 else unary = otk != PostInc && otk != PostDec;
 
                 if ( otk == Cast ) makeCast(curnsp); // Process casting type
@@ -496,7 +497,7 @@ struct, union: (In addition to pointers above)
             n->type = n->right->type;
             n->flag = n->right->flag;
         }
-        else if ( n->oper == ':' ) // Always results in an r-value
+        else if ( n->oper == Colon ) // Always results in an r-value
         {
             if ( !isCompatible( n->left->type, n->right->type ) ) mccfail("incompatible types");
             // Promote if needed
@@ -631,6 +632,7 @@ struct, union: (In addition to pointers above)
 
             struct mccsym * ms = getSymbol( n->left->type->stype, name, len );
 
+//            dumpNamespace( 2, n->left->type->stype );
             if ( !ms ) mccfail("rhs is not a member of lhs");
 
             n->type = &ms->type;
@@ -665,7 +667,7 @@ struct, union: (In addition to pointers above)
             n->right->type = &type_int;
             n->right->val = ms->addr;
         }
-        else if ( n->oper == '[' )
+        else if ( n->oper == Square_L )
         {
             if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
             if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
@@ -741,7 +743,7 @@ struct, union: (In addition to pointers above)
         if (!n->type) mccfail("no promotion rule for operator");
 #endif
 
-        if ( n->oper == ':' || n->oper == Comma );
+        if ( n->oper == Colon || n->oper == Comma );
         else if ( n->oper == Cast && n->right )
         {
             n->oper = n->right->oper;
@@ -843,12 +845,12 @@ struct, union: (In addition to pointers above)
 
 void emitStatement(unsigned int8_t op, unsigned int32_t val)
 {
-    static struct ircnode irn;
+    static struct mccstmt stn;
 
-    irn.oper = op;
-    irn.val = val;
+    stn.oper = op;
+    stn.val = val;
 
-    write( segs[SEG_TEXT], &irn, sizeof(struct ircnode CAST_NAME) );
+    write( segs[SEG_TEXT], &stn, sizeof(struct mccstmt CAST_NAME) - sizeof(struct mccstmt * CAST_NAME) * 2 );
 }
 
 void emitNode(struct mccnode * n)
@@ -856,37 +858,37 @@ void emitNode(struct mccnode * n)
     // Check if this variable is actually on the stack
     if ( n->oper == Variable && (n->sym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) n->oper = VariableStack, n->val = n->sym->addr;
 
-    struct ircnode irn;
+    struct mccstmt stn;
 
-    irn.oper = n->oper;
-    irn.size = 0;
+    stn.oper = n->oper;
+    stn.size = 0;
 
     unsigned int8_t pt = n->type->ptype & CPL_DTYPE_MASK;
 
     if ( isPointer(n->type) )
     {
-        irn.type = isArray(n->type) ? IR_ARRAY : IR_PTR;
+        stn.type = isArray(n->type) ? IR_ARRAY : IR_PTR;
 
         struct mcctype * dt = typeDeref(n->type);
         // Handle a void pointer
-        if ( !( dt->stype || (dt->ptype & CPL_DTYPE_MASK) || dt->sub->inder || dt->sub->ftype ) ) irn.size = 1;
-        else irn.size = typeSize(dt);
+        if ( !( dt->stype || (dt->ptype & CPL_DTYPE_MASK) || dt->sub->inder || dt->sub->ftype ) ) stn.size = 1;
+        else stn.size = typeSize(dt);
         brk(dt);
     }
-    else if ( isFunction(n->type) ) irn.type = IR_FUNC;
-    else if ( isStruct(n->type) ) irn.type = IR_STRUC;
-    else if ( pt == CPL_ENUM_CONST ) irn.type = IR_INT;
-    else irn.type = pt;
+    else if ( isFunction(n->type) ) stn.type = IR_FUNC;
+    else if ( isStruct(n->type) ) stn.type = IR_STRUC;
+    else if ( pt == CPL_ENUM_CONST ) stn.type = IR_INT;
+    else stn.type = pt;
 
-    if ( n->flag & CPL_LVAL ) irn.type |= IR_LVAL;
+    if ( n->flag & CPL_LVAL ) stn.type |= IR_LVAL;
 
     int8_t tmpbuf[6];
     int16_t tmppos = 6;
 
     if ( n->oper == Variable ) // Compute variable name length
     {
-        irn.name = NULL;
-        irn.val = n->sym->len;
+        stn.name = NULL;
+        stn.val = n->sym->len;
 
         unsigned int16_t addr;
 
@@ -897,12 +899,12 @@ void emitNode(struct mccnode * n)
                 tmpbuf[--tmppos] = addr % 10 + '0';
                 addr /= 10;
             }
-            irn.val += 7 - tmppos; // Include the period seperator
+            stn.val += 7 - tmppos; // Include the period seperator
         }
     }
-    else irn.valLong = n->valLong;
+    else stn.valLong = n->valLong;
 
-    write( segs[SEG_TEXT], &irn, sizeof(struct ircnode CAST_NAME) );
+    write( segs[SEG_TEXT], &stn, sizeof(struct mccstmt CAST_NAME) - sizeof(struct mccstmt * CAST_NAME) * 2 );
 
     if ( n->oper == Variable ) // Output variable name
     {

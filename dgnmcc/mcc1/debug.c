@@ -80,16 +80,11 @@ void writeType( int16_t fd, struct mcctype * t, int8_t * name, int16_t len )
 
 void writeToken( int16_t fd, unsigned int8_t tokn )
 {
-    if ( tokn >= 128 )
-    {
-        int8_t * opn = tokenNames[tokn - 128];
-        int16_t opl = 0;
-        while ( opn[opl] ) opl++;
+     int8_t * opn = tokenNames[tokn];
+     int16_t opl = 0;
+     while ( opn[opl] ) opl++;
 
-        write( fd, opn, opl );
-    }
-    else if ( tokn >= 32 ) write( fd, &tokn, 1 );
-    else decwrite( fd, tokn );
+     write( fd, opn, opl );
 }
 
 void dumpTree( struct mccnode * n, int8_t * fname )
@@ -126,7 +121,7 @@ void dumpTree( struct mccnode * n, int8_t * fname )
         }
         else if ( n->oper == Number || n->oper == SmolNumber ) decwrite( fexp, n->val );
         else if ( n->oper == LongNumber ) octwrite( fexp, n->valLong );
-        else if ( n->oper == '"' )
+        else if ( n->oper == String )
             write( fexp, "\\\"", 2 );
         else writeToken( fexp, n->oper );
 

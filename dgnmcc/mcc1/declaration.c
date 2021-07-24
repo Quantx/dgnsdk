@@ -17,7 +17,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
     while ( tk == Mul ) { curtype->inder++; ntok(); }
 
     // Get any subtypes
-    if ( tk == '(' )
+    if ( tk == Paren_L )
     {
         ntok();
 
@@ -26,7 +26,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
 
         declare( curnsp, cursym, &curtype->sub );
 
-        if ( tk != ')' ) mccfail("expected closing parenthasis 0");
+        if ( tk != Paren_R ) mccfail("expected closing parenthasis 0");
     }
     // Get symbol name
     else if ( tk != Named ) mccfail("expected declaration name");
@@ -49,9 +49,9 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
     curtype->sizes = sbrk(0);
 
     // Get array declarations
-    if ( tk == '[' )
+    if ( tk == Square_L )
     {
-        while ( tk == '[' )
+        while ( tk == Square_L )
         {
             ntok();
 
@@ -60,9 +60,9 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
 
             void * erbp = sbrk(0);
 
-            struct mccnode * cexp = expr(curnsp, ']');
+            struct mccnode * cexp = expr(curnsp, Square_R);
 
-            if ( tk != ']' ) mccfail("expected closing bracket");
+            if ( tk != Square_R ) mccfail("expected closing bracket");
             ntok();
 
             // Don't support dynamic array sizes because that would require dynamic typing
@@ -74,7 +74,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
             curtype->arrays++;
         }
     }
-    else if ( tk == '(' ) // Get function declarations
+    else if ( tk == Paren_L ) // Get function declarations
     {
         struct mccnsp * fncnsp = curtype->ftype = sbrk( sizeof(struct mccnsp CAST_NAME) );
         if ( fncnsp == SBRKFAIL ) mccfail("unable to allocate space for new namespace");
@@ -94,7 +94,7 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
         fncnsp->next = NULL;
 
         ntok();
-        while ( tk != ')' )
+        while ( tk != Paren_R )
         {
             // This is a variadic function
             if ( tk == Variadic )
@@ -102,14 +102,14 @@ void declare( struct mccnsp * curnsp, struct mccsym * cursym, struct mccsubtype 
                 fncnsp->type = CPL_VFUNC;
 
                 ntok();
-                if ( tk != ')' ) mccfail("expected closing parenthasis 1");
+                if ( tk != Paren_R ) mccfail("expected closing parenthasis 1");
                 break;
             }
 
             define( fncnsp );
 
             if ( tk == Comma ) ntok();
-            else if ( tk != ')' ) mccfail("expected closing parenthasis 2");
+            else if ( tk != Paren_R ) mccfail("expected closing parenthasis 2");
         }
 
         ntok();
@@ -165,7 +165,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
 
     if ( s->arrays )
     {
-        if ( tk != '{' ) mccfail("expected opening curly-brace");
+        if ( tk != Curly_L ) mccfail("expected opening curly-brace");
         ntok();
 
         struct mcctype * dt = typeDeref(curtype);
@@ -176,12 +176,12 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
             instantiate(curnsp, segfd, dt);
 
             i++;
-            if ( tk == '}' ) break;
+            if ( tk == Curly_R ) break;
             if ( tk == Comma ) ntok();
             else mccfail("expected closing curly-brace or comma");
         }
 
-        if ( tk != '}' ) mccfail("expected closing curly-brace");
+        if ( tk != Curly_R ) mccfail("expected closing curly-brace");
         ntok();
 
         // Output filler if needed
@@ -200,7 +200,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
 
     if ( curtype->stype && !s->inder ) // TODO union declaration
     {
-        if ( tk != '{' ) mccfail("expected opening curly-brace");
+        if ( tk != Curly_L ) mccfail("expected opening curly-brace");
         ntok();
 
         int16_t isz = 0;
@@ -258,12 +258,12 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
                 isz += typeSize( &cursym->type );
             }
 
-            if ( tk == '}' ) break;
+            if ( tk == Curly_R ) break;
             if ( tk == Comma ) ntok();
             else mccfail("expected closing curly-brace or comma");
         }
 
-        if ( tk != '}' ) mccfail("expected closing curly-brace");
+        if ( tk != Curly_R ) mccfail("expected closing curly-brace");
         ntok();
 
         // End of struct padding
@@ -302,7 +302,7 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
         else decwrite( segfd, cexp->val );
     }
     // String constant
-    else if ( cexp->oper == '"' )
+    else if ( cexp->oper == String )
     {
         write( segfd, "\t.word ~SC", 10 );
         decwrite( segfd, cexp->val );
@@ -434,7 +434,7 @@ void define( struct mccnsp * curnsp )
     // Get struct name or anonymous definition
     if ( cnsp & CPL_NSPACE_MASK )
     {
-        if ( !(tk == Named || tk == '{') ) mccfail("expected struct name or anonymous struct definition");
+        if ( !(tk == Named || tk == Curly_L) ) mccfail("expected struct name or anonymous struct definition");
 
         if ( tk == Named )
         {
@@ -442,7 +442,7 @@ void define( struct mccnsp * curnsp )
             if ( decnsp ) ntok();
         }
 
-        if ( !decnsp || (tk == '{' && !getNamespace( curnsp, decnsp->name, decnsp->len )) ) // Generate new struct
+        if ( !decnsp || (tk == Curly_L && !getNamespace( curnsp, decnsp->name, decnsp->len )) ) // Generate new struct
         {
             struct mccnsp * newnsp = sbrk( sizeof(struct mccnsp CAST_NAME) );
             if ( newnsp == SBRKFAIL ) mccfail("unable to allocate space for new struct");
@@ -457,7 +457,7 @@ void define( struct mccnsp * curnsp )
                 for ( i = 0; i < decnsp->len; i++ ) newnsp->name[i] = decnsp->name[i];
 
 #ifdef DEBUG_DECLARE
-                write( 2, "Coppied named struct ", 22 );
+                write( 2, "Copied named struct ", 21 );
                 write( 2, newnsp->name, newnsp->len );
                 write( 2, "\n", 1 );
 #endif
@@ -501,13 +501,13 @@ void define( struct mccnsp * curnsp )
             curnsp->nsptail = &newnsp->next;
 
             decnsp = newnsp;
-            if ( tk != '{' ) ntok();
+            if ( tk != Curly_L ) ntok();
         }
         // Type check existing struct
         else if ( (decnsp->type & CPL_NSPACE_MASK) != (cnsp & CPL_NSPACE_MASK) ) mccfail("struct type missmatch");
 
         // Struct definition
-        if ( tk == '{' )
+        if ( tk == Curly_L )
         {
             // Don't redfine things
             if ( decnsp->type & CPL_DEFN ) mccfail("struct redefinition");
@@ -530,7 +530,7 @@ void define( struct mccnsp * curnsp )
             if ( cnsp == CPL_ENUM )
             {
                 int16_t enumVal = 0;
-                while ( tk != '}' )
+                while ( tk != Curly_R )
                 {
                     if ( tk != Named ) mccfail("expected named symbol");
 
@@ -575,7 +575,7 @@ void define( struct mccnsp * curnsp )
                     decnsp->symtail = &newsym->next;
 
                     if ( tk == Comma ) ntok();
-                    else if ( tk != '}' ) mccfail("expected closing brace or comma");
+                    else if ( tk != Curly_R ) mccfail("expected closing brace or comma");
                 }
 
                 // Switch to the primative ENUM type
@@ -585,14 +585,14 @@ void define( struct mccnsp * curnsp )
             }
             else
             {
-                while ( tk != '}' ) define(decnsp);
+                while ( tk != Curly_R ) define(decnsp);
 
                 // TODO move undefined namespaces to the global namespace
                 struct mccnsp ** chknsp, * udfnsp;
                 chknsp = &decnsp->nsptbl;
                 while ( udfnsp = *chknsp )
                 {
-                    udfnsp = *chknsp;
+//                    udfnsp = *chknsp;
                     if ( ~udfnsp->type & CPL_DEFN )
                     {
                         *chknsp = udfnsp->next;
@@ -612,10 +612,14 @@ void define( struct mccnsp * curnsp )
             if ( decnsp && !decnsp->name ) curnsp->size += decnsp->size;
 
             ntok(); // Discard last
+
+#ifdef DEBUG_DECLARE
+            dumpNamespace( 2, decnsp );
+#endif
         }
     }
 
-    while ( tk != ';' )
+    while ( tk != SemiColon )
     {
         /*
         Allocate new symbol
@@ -716,7 +720,7 @@ void define( struct mccnsp * curnsp )
             if ( curnsp != &glbnsp ) mccfail("function declared outside file scope");
 
             // Function with codeblock
-            if ( tk == '{' )
+            if ( tk == Curly_L )
             {
                 // Mark function as defined
                 if ( s->ftype->type & CPL_DEFN ) mccfail("function already declared");
@@ -736,22 +740,23 @@ void define( struct mccnsp * curnsp )
             break; // Remember: execution stops here for functions
         }
 
-        if ( (cursym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) // Stack variable declaration
+        if ( (cursym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) // Stack variable or struct member declaration
         {
             // Compute address
             unsigned int16_t tsz = typeSize(&cursym->type);
+            unsigned int16_t pad = 0;
 
             if ( nsptype == CPL_UNION ) curnsp->size = tsz > curnsp->size ? tsz : curnsp->size;
             else
             {
-                if ( curnsp->size & 1 && tsz > 1 ) curnsp->size++; // Align to word if needed
+                if ( curnsp->size & 1 && tsz > 1 ) curnsp->size += (pad = 1); // Align to word if needed
                 cursym->addr = curnsp->size;
                 curnsp->size += tsz;
             }
 
-            if ( nsptype == CPL_BLOCK )
+            if ( nsptype == CPL_BLOCK ) // Stack variable
             {
-                emitStatement( Allocate, tsz );
+                emitStatement( Allocate, tsz + pad );
 
                 if ( tk == Ass )
                 {
@@ -763,6 +768,8 @@ void define( struct mccnsp * curnsp )
 
                     *nstk = sbrk(sizeof(struct mccnode CAST_NAME));
                     if ( *nstk == SBRKFAIL ) mccfail("unable to allocate space for new node");
+
+                    // TODO stack struct constant initialization: struct mystruct a = { 1, 2 };
 
                     (*nstk)->left = (*nstk)->right = NULL;
                     (*nstk)->oper = Variable;
@@ -828,8 +835,8 @@ void define( struct mccnsp * curnsp )
           || nsptype == CPL_FUNC
           || nsptype == CPL_VFUNC ) break;
         if ( tk == Comma ) ntok();
-        else if ( tk != ';' ) mccfail("expected comma or semi-colon");
+        else if ( tk != SemiColon ) mccfail("expected comma or semi-colon");
     }
 
-    if ( tk == ';' ) ntok();
+    if ( tk == SemiColon ) ntok();
 }

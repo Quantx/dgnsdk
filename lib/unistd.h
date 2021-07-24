@@ -11,6 +11,7 @@
 #define NULL ((void *)0)
 #define SBRKFAIL ((void *)-1)
 #define CAST_NAME
+#define HEAP_SIZE 65536
 #else // This is actually going to be compiled on a 16-bit system
 #define int8_t char
 #define int16_t int

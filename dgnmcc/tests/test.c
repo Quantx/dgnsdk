@@ -45,6 +45,8 @@ int main( int argc, char ** argv )
         int b;
     };
 
+//    struct test myt;
+
     a = myt.b;
 
     a = (c + g)[ (a++ + -g[2]) * ++b ] + 4, 7 + (char _)b;

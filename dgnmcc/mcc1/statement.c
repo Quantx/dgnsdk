@@ -1,13 +1,13 @@
 void parenthesizedExpr( struct mccnsp * curnsp )
 {
-    if ( tk != '(' ) mccfail( "missing opening parenthasis in statement" );
+    if ( tk != Paren_L ) mccfail( "missing opening parenthasis in statement" );
     ntok();
 
     void * erbp = sbrk(0);
 
-    struct mccnode * root = expr( curnsp, ')' );
+    struct mccnode * root = expr( curnsp, Paren_R );
 
-    if ( tk != ')' ) mccfail( "missing closing parenthasis in statement" );
+    if ( tk != Paren_R ) mccfail( "missing closing parenthasis in statement" );
 
     emit(root);
 
@@ -18,12 +18,12 @@ void parenthesizedExpr( struct mccnsp * curnsp )
 
 void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 {
-    if ( tk == ';' )
+    if ( tk == SemiColon )
     {
         emitStatement( Void, 0 ); // No-op statement
         ntok();
     }
-    else if ( tk == '{' )
+    else if ( tk == Curly_L )
     {
         struct mccnsp * cbnsp = sbrk(sizeof(struct mccnsp CAST_NAME));
         if ( cbnsp == SBRKFAIL ) mccfail("unable to allocate room for child block");
@@ -46,7 +46,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         curnsp->nsptail = &cbnsp->next;
 
         ntok();
-        while ( tk != '}' ) statement( func, cbnsp, sws );
+        while ( tk != Curly_R ) statement( func, cbnsp, sws );
         ntok();
 
         // Unallocate current namespace from the stack
@@ -109,19 +109,17 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
     }
     else if ( tk == Case )
     {
-        emitStatement( Case, 0 );
-
         if ( !sws ) mccfail("case statement outside of switch statement");
 
         ntok();
 
         void * erbp = sbrk(0);
 
-        struct mccnode * root = expr( curnsp, ':' );
+        struct mccnode * root = expr( curnsp, Colon );
 
         if ( root->oper < Number || root->oper > LongNumber ) mccfail("need constant expression in case statement");
 
-        if ( tk != ':' ) mccfail( "missing colon in case statement" );
+        if ( tk != Colon ) mccfail( "missing colon in case statement" );
         ntok();
 
         emitStatement( Case, root->val );
@@ -135,7 +133,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         if ( !sws ) mccfail("default statement outside of switch statement");
 
         ntok();
-        if ( tk != ':' ) mccfail( "missing colon after default statement" );
+        if ( tk != Colon ) mccfail( "missing colon after default statement" );
         ntok();
     }
     else if ( tk == Break )
@@ -143,7 +141,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         emitStatement( Break, 0 );
 
         ntok();
-        if ( tk != ';' ) mccfail( "missing semicolon after break statement" );
+        if ( tk != SemiColon ) mccfail( "missing semicolon after break statement" );
         ntok();
     }
     else if ( tk == Continue )
@@ -151,7 +149,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         emitStatement( Continue, 0 );
 
         ntok();
-        if ( tk != ';' ) mccfail( "missing semicolon after continue statement" );
+        if ( tk != SemiColon ) mccfail( "missing semicolon after continue statement" );
         ntok();
     }
     else if ( tk == Return )
@@ -163,7 +161,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         for ( s = frt->sub; s->sub; s = s->sub );
         s->ftype = NULL;
 
-        if ( tk == ';' )
+        if ( tk == SemiColon )
         {
             // Check if function expects void
             if (!isCompatible( frt, &type_void ) ) mccfail("function expects non-void return type");
@@ -176,9 +174,9 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         emitStatement( Return, 0 );
 
-        struct mccnode * root = expr( curnsp, ';' );
+        struct mccnode * root = expr( curnsp, SemiColon );
 
-        if ( tk != ';' ) mccfail( "missing semicolon after return statement" );
+        if ( tk != SemiColon ) mccfail( "missing semicolon after return statement" );
         ntok();
 
         if ( !isCompatible( frt, root->type ) ) mccfail("incompatible return type");
@@ -192,7 +190,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         emitStatement( For, 0 );
 
         ntok();
-        if ( tk != '(' ) mccfail( "missing opening parenthasis in for statement" );
+        if ( tk != Paren_L ) mccfail( "missing opening parenthasis in for statement" );
         ntok();
 
         void * erbp;
@@ -202,9 +200,9 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         erbp = sbrk(0);
 
-        root = expr( curnsp, ';' );
+        root = expr( curnsp, SemiColon );
 
-        if ( tk != ';' ) mccfail( "missing first semicolon in for statement" );
+        if ( tk != SemiColon ) mccfail( "missing first semicolon in for statement" );
         ntok();
 
         emit(root);
@@ -214,9 +212,9 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         erbp = sbrk(0);
 
-        root = expr( curnsp, ';' );
+        root = expr( curnsp, SemiColon );
 
-        if ( tk != ';' ) mccfail( "missing second semicolon in for statement" );
+        if ( tk != SemiColon ) mccfail( "missing second semicolon in for statement" );
         ntok();
 
         emit(root);
@@ -226,9 +224,9 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
 
         erbp = sbrk(0);
 
-        root = expr( curnsp, ')' );
+        root = expr( curnsp, Paren_R );
 
-        if ( tk != ')' ) mccfail( "missing closing parenthasis in for statement" );
+        if ( tk != Paren_R ) mccfail( "missing closing parenthasis in for statement" );
         ntok();
 
         emit(root);
@@ -265,16 +263,16 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         ntok();
         parenthesizedExpr(curnsp);
 
-        if ( tk != ';' ) mccfail( "missing final semicolon in do-while statement" );
+        if ( tk != SemiColon ) mccfail( "missing final semicolon in do-while statement" );
         ntok();
     }
     else
     {
         void * erbp = sbrk(0); // Expression RollBack Point
 
-        struct mccnode * root = expr( curnsp, ';' );
+        struct mccnode * root = expr( curnsp, SemiColon );
 
-        if ( tk != ';' ) mccfail( "Expected semicolon after expression" );
+        if ( tk != SemiColon ) mccfail( "Expected semicolon after expression" );
 
         emit(root);
 
