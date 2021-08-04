@@ -26,7 +26,7 @@ struct mccstmt
 {
     unsigned int8_t oper;
     unsigned int8_t type;
-    unsigned int16_t size; // Size of pointer
+    unsigned int16_t size; // Size of the type in bytes
     union {
         struct {
             unsigned int16_t val;
@@ -34,5 +34,4 @@ struct mccstmt
         };
         unsigned int32_t valLong;
     };
-    struct mccstmt * left, * right;
 };

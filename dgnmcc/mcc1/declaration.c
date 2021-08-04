@@ -746,16 +746,19 @@ void define( struct mccnsp * curnsp )
             unsigned int16_t tsz = typeSize(&cursym->type);
             unsigned int16_t pad = 0;
 
+            // We're declaring something inside of a union
             if ( nsptype == CPL_UNION ) curnsp->size = tsz > curnsp->size ? tsz : curnsp->size;
+            // Struct or stack declaration
             else
             {
-                if ( curnsp->size & 1 && tsz > 1 ) curnsp->size += (pad = 1); // Align to word if needed
+                if ( (curnsp->size & 1) && tsz > 1 ) curnsp->size += (pad = 1); // Align to word if needed
                 cursym->addr = curnsp->size;
                 curnsp->size += tsz;
             }
 
             if ( nsptype == CPL_BLOCK ) // Stack variable
             {
+                // It's important that we generate a new Allocation statement for each individual stack variable
                 emitStatement( Allocate, tsz + pad );
 
                 if ( tk == Ass )

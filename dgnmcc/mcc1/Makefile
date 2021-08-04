@@ -1,4 +1,4 @@
-files = ../mcc0/tokens.h statements.h mcc1.h mcc1.c tokenizer.c declaration.c statement.c expression.c symbols.c types.c debug.c
+files = ../mcc/tokens.h ../mcc/statements.h mcc1.h mcc1.c tokenizer.c declaration.c statement.c expression.c symbols.c types.c debug.c
 
 mcc1: $(files)
 	gcc -fno-builtin-exit -g -rdynamic -DLINUX_COMPAT=1 -o mcc1 mcc1.c

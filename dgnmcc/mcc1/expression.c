@@ -850,22 +850,23 @@ void emitStatement(unsigned int8_t op, unsigned int32_t val)
     stn.oper = op;
     stn.val = val;
 
-    write( segs[SEG_TEXT], &stn, sizeof(struct mccstmt CAST_NAME) - sizeof(struct mccstmt * CAST_NAME) * 2 );
+    write( segs[SEG_TEXT], &stn, sizeof(struct mccstmt CAST_NAME) );
 }
 
 void emitNode(struct mccnode * n)
 {
     // Check if this variable is actually on the stack
-    if ( n->oper == Variable && (n->sym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) n->oper = VariableStack, n->val = n->sym->addr;
+    if ( n->oper == Variable && (n->sym->type.ptype & CPL_STORE_MASK) == CPL_STAK ) n->oper = VariableLocal, n->val = n->sym->addr;
 
     struct mccstmt stn;
 
     stn.oper = n->oper;
-    stn.size = 0;
+    stn.size = typeSize(n->type);
 
     unsigned int8_t pt = n->type->ptype & CPL_DTYPE_MASK;
 
-    if ( isPointer(n->type) )
+    if ( isPointer(n->type) ) stn.type = isArray(n->type) ? IR_ARRAY : IR_PTR;
+/*
     {
         stn.type = isArray(n->type) ? IR_ARRAY : IR_PTR;
 
@@ -875,8 +876,13 @@ void emitNode(struct mccnode * n)
         else stn.size = typeSize(dt);
         brk(dt);
     }
+*/
     else if ( isFunction(n->type) ) stn.type = IR_FUNC;
-    else if ( isStruct(n->type) ) stn.type = IR_STRUC;
+    else if ( isStruct(n->type) )
+    {
+        stn.type = IR_STRUC;
+//        stn.size = typeSize(n->type);
+    }
     else if ( pt == CPL_ENUM_CONST ) stn.type = IR_INT;
     else stn.type = pt;
 
@@ -904,7 +910,7 @@ void emitNode(struct mccnode * n)
     }
     else stn.valLong = n->valLong;
 
-    write( segs[SEG_TEXT], &stn, sizeof(struct mccstmt CAST_NAME) - sizeof(struct mccstmt * CAST_NAME) * 2 );
+    write( segs[SEG_TEXT], &stn, sizeof(struct mccstmt CAST_NAME) );
 
     if ( n->oper == Variable ) // Output variable name
     {

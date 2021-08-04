@@ -13,8 +13,8 @@
 // MAX_EXPRE_NODE is defined in tokens.h
 #define MAX_EXPR_CAST 16    // Maximum number of casts in an expression
 
-#include "../mcc0/tokens.h"
-#include "statements.h"
+#include "../mcc/tokens.h"
+#include "../mcc/statements.h"
 
 #ifdef DEBUG
 int8_t * typeNames[] = {

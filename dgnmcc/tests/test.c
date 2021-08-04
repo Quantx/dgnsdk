@@ -35,7 +35,7 @@ struct test {
     int a;
 };
 
-int a, c, g[4], b = 0 ? c : 4;
+int a, c, g[4], b = 0 ? c : 4, * zx;
 
 int main( int argc, char ** argv )
 {
@@ -47,7 +47,9 @@ int main( int argc, char ** argv )
 
 //    struct test myt;
 
-    a = myt.b;
+//    a = myt.b;
 
-    a = (c + g)[ (a++ + -g[2]) * ++b ] + 4, 7 + (char _)b;
+//    a = (c + g)[ (a++ + -g[2]) * ++b ] + 4, 7 + (char _)b;
+
+    a = *g;
 }
