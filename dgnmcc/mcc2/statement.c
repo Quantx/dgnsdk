@@ -1,9 +1,3 @@
-
-unsigned int8_t zerosize; // Current size of the zero page resident portion of the local stack
-unsigned int16_t locsize; // Current size of the local stack
-
-unsigned int32_t stmtid;
-
 void statement( struct mccstmt * st )
 {
     struct mccstmt * ce;

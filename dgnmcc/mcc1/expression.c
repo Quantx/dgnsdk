@@ -617,7 +617,7 @@ struct, union: (In addition to pointers above)
             if ( !isScalar(n->right->type) ) mccfail("not a scalar type");
             n->type = n->right->type;
 
-            n->flag |= CPL_LVAL;
+            // According to cppreference.com, these operators never result in an l-value
         }
         else if ( n->oper == Dot )
         {

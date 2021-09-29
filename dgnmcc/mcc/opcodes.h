@@ -1,21 +1,26 @@
 enum
 {
-// *** Global Memory operations ***
-    // Load a global constant value (expects a label)
-    OpGlbConstByte,
-    OpGlbConstWord,
-    OpGlbConstLong,
+// *** Immediate Values ***
+    // Load a immediate value (value is embeded into opcode)
+    OpValueByte,
+    OpValueWord,
+    OpValueLong,
 
-// *** Local memory operations ***
-    // Load a local constant value (expects a stack offset)
-    OpLocConstByte,
-    OpLocConstWord,
-    OpLocConstLong,
+    // Load the address of a global variable (expects a label)
+    OpAddrGlb,
+    // Load the address of a local variable (expects a stack offset)
+    OpAddrLoc,
 
-// *** Transfer a register (src) to the memory location indicated by a pointer in a register (dst)
-    OpLoadByte, OpStoreByte,
-    OpLoadWord, OpStoreWord,
-    OpLoadLong, OpStoreLong,
+// *** Memory Operations ***
+    // [dst] -> src
+    OpLoadByte,
+    OpLoadWord,
+    OpLoadLong,
+
+    // src -> [dst]
+    OpStoreByte,
+    OpStoreWord,
+    OpStoreLong,
 
 // *** Statements ***
     OpEnd,
@@ -29,6 +34,17 @@ enum
     OpBreak, OpContinue,
     // Function
     OpCall, OpReturn,
+
+// *** Memory instructions (use same format as computational instructions)
+    // [dst] -> src
+    OpLoadByte,
+    OpLoadWord,
+    OpLoadLong,
+
+    // src -> [dst]
+    OpStoreByte,
+    OpStoreWord,
+    OpStoreLong,
 
 // *** Computational operations
     // Logical operations
@@ -45,21 +61,34 @@ enum
     OpInc, OpDec
 };
 
-struct mccoper_glbmem // Load constant or pointer from global memory
+struct mccoper_value // Load an immediate value
+{
+    // Value
+    union {
+        int16_t val;
+        int32_t valLong;
+    }
+    // Register address
+    unsigned int8_t reg;
+}
+
+struct mccoper_addrglb // Load address of global variable
 {
     // Variable name
     int8_t * name;
-    int8_t len;
-    int8_t reg;
+    // Variable name length
+    unsigned int8_t len;
+    // Register address
+    unsigned int8_t reg;
 };
 
 
-struct mccoper_locmem // Load constant or pointer from local memory
+struct mccoper_addrloc // Load address of local variable
 {
     // Stack offset
-    int16_t mem;
+    unsigned int16_t mem;
     // Register address
-    int8_t reg;
+    unsigned int8_t reg;
 };
 
 struct mccoper_statement
@@ -69,14 +98,21 @@ struct mccoper_statement
 };
 
 /*
-    Larger argument is always the destination:
+    Larger argument is always the destination (size) in bytes
+    Thus: src <= dst
+
+    Example:
     left (int) + right (long)
     right must be destination since left is too small
 */
 struct mccoper_computational
 {
-    int8_t src;
-    int8_t dst;
+    // Source register
+    unsigned int8_t src;
+    // Destination register
+    unsigned int8_t dst;
+    // Size of destination register
+    unsigned int16_t size;
 };
 
 struct mccoper
@@ -85,8 +121,9 @@ struct mccoper
     unsigned int8_t flag;
 
     union {
-        struct mccoper_glbmem g;
-        struct mccoper_locmem l;
+        struct mccoper_value v;
+        struct mccoper_addrglb g;
+        struct mccoper_addrloc l;
         struct mccoper_statement s;
         struct mccoper_computational c;
     };

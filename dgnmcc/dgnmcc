@@ -1,0 +1,18 @@
+#!/bin/bash
+
+aslr=$(cat "/proc/sys/kernel/randomize_va_space")
+if [ $aslr -gt 0 ]; then
+	if [[ $EUID -ne 0 ]]; then
+		echo "Address Space Layout Randomization needs to be disabled, re-run this script as root to preform this"
+		exit 1
+	else
+		echo 0 > "/proc/sys/kernel/randomize_va_space"
+		exit 0 # Stop privileged execution here, better safe than sorry
+	fi
+fi
+
+mkdir -p build/
+
+./mcc0/mcc0 < "$1" | ./mcc1/mcc1 | ./mcc2/mcc2 > text.seg
+
+mv *.seg build/

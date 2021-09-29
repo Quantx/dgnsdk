@@ -24,8 +24,6 @@ struct mccstmt * node()
         read( 0, out->name, out->val );
     }
 
-    out->left = out->right = NULL;
-
     cni++;
 
     return out;
