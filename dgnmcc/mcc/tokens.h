@@ -35,7 +35,7 @@ enum
     String, // String constant
     Number, SmolNumber, LongNumber, FpvNumber, DblNumber, // Numerical constant in source (Char, Int, Long, Float, Double)
 // ******* Operators *******
-    Comma,
+    Comma, Arg,
     Ass, AddAss, SubAss, MulAss, DivAss, ModAss, ShlAss, ShrAss, AndAss, XorAss, OrAss, // Assignment Operators
     Tern, // Ternary Conditional
     LogOr, // Logical Or
@@ -82,7 +82,7 @@ int8_t * tokenNames[] = {
     "string",
     "number", "small number", "long number", "float number", "double number",
 
-    ",",
+    ",", ", (Func Arg)"
     "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=",
     "?",
     "||",
