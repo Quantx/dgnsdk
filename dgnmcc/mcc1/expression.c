@@ -707,7 +707,9 @@ struct, union: (In addition to pointers above)
             struct mccnode * fan, * fsn;
             struct mccsym * cursym;
 
-            for ( fsn = n->right; fsn->oper == Comma; fsn = fsn->left ); fsn = fsn->left;
+            // Get first argument, and convert Commas to Args
+            for ( fsn = n->right; fsn->oper == Comma; fsn = fsn->left ) fsn->oper = Arg;
+            fsn = fsn->left;
 
             for ( cursym = s->ftype->symtbl; cursym; cursym = cursym->next, fsn = fan )
             {
