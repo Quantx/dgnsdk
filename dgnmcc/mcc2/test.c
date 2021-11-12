@@ -1,3 +1,4 @@
+#include <stdio.h>
 
 struct a {
     int b;
@@ -10,5 +11,8 @@ struct a f(void)
 
 int main()
 {
-    int c = f().b;
+//    int c = f().b;
+    int a = 1;
+    int b = a++;
+    printf( "%d\n", a );
 }

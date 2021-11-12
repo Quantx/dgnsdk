@@ -1,5 +1,16 @@
 unsigned int32_t cni;
 
+struct funcstat
+{
+    int8_t * name;
+    unsigned int16_t len;
+    
+    int16_t fd;
+#ifdef DEBUG
+    int16_t fd_dbg;
+#endif
+} curfunc;
+
 void mccfail( int8_t * msg )
 {
     octwrite( 2, cni );

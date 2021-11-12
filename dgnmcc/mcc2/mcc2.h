@@ -4,7 +4,8 @@
 
 #define MAX_STATEMENT 64
 #define MAX_EVAL_STK 64 // Maximum size (in words) of the zero page expression evaluation stack
-#define MAX_OPER_BUF 1024 // Maximum number of instructions per statement
+#define MAX_OPER_BUF 256 // Maximum number of instructions per statement
+#define MAX_STATEMENT_STK 64 // Maximum depth of statement stack depth
 
 #include "../mcc/opcodes.h"
 
@@ -14,10 +15,7 @@ void mccfail(int8_t * msg);
 // Used to pair expression nodes with their corresponding opcodes
 struct mcceval
 {
-    // Address and size of register containing the final value of this node
-    unsigned int8_t addr;
-    unsigned int8_t size;
-
+    struct mccoper * op;
     struct mccstmt * st;
-    struct mcceval * left, * right;
+    struct mcceval * left, * right, * parent;
 };

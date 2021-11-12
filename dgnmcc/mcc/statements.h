@@ -19,7 +19,7 @@
 // Types mask
 #define IR_TYPE_MASK 0b1111
 
-#define IR_LVAL (1 << 4) // Flag is set if this NODE is an L-value
+#define IR_LVAL (1 << 4) // Flag is set if this node is an L-value
 
 // Intermediate Represntation Compiler Block
 struct mccstmt

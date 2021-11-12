@@ -169,6 +169,7 @@ int16_t typeSize( struct mcctype * t )
     if ( ptype <= CPL_UCHR ) return 1;
     if ( ptype <= CPL_UINT ) return 2;
     if ( ptype <= CPL_FPV  ) return 4;
+    if ( ptype == CPL_DBL  ) return 8;
 
     return 8; // Double
 }
