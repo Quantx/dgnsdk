@@ -63,10 +63,12 @@ void statement( struct mccstmt * st )
             locsize += st->val;
             // Ensure at least MAX_EVAL_STK is available
             if ( locsize < (0xFF - MAX_EVAL_STK) ) zerosize = locsize;
+            brk(st);
             break;
         case Unallocate:
             locsize -= st->val;
             if ( locsize < zerosize ) zerosize = locsize;
+            brk(st);
             break;
         case If:
             st->val = stmtid++;

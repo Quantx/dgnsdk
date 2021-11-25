@@ -20,7 +20,7 @@ void emit( struct mccoper * emop )
     write( fd, opn, opl );
     
     // Output dest register
-    write( fd, "Dest: ", 6 );
+    write( fd, "\nDest: ", 7 );
     decwrite( fd, emop->reg );
     write( fd, "|", 1 );
     decwrite( fd, emop->size );
@@ -74,7 +74,6 @@ void emitOpBuffer()
     for ( opout = obuf; opout != optr; opout++ )
     {
         emit( opout );
-        write( 2, "!", 1 );
     }
     
     optr = NULL;
@@ -109,7 +108,7 @@ int16_t opClass( struct mccstmt * st )
 void expr(struct mccstmt * nd)
 {
     if ( !optr ) optr = obuf;
-//    if ( nd && nd->oper == Void ) nd = NULL; // Nothing to do here, this is a void expression
+    if ( nd && nd->oper == Void ) nd = NULL; // Nothing to do here, this is a void expression
 
     // Deserialize and reconstruct expression tree
     struct mcceval * ev = sbrk(sizeof(struct mcceval CAST_NAME));

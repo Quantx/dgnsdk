@@ -936,25 +936,21 @@ void emitNode(struct mccnode * n)
     }
 }
 
-void emit(struct mccnode * root)
+void emit(struct mccnode * n)
 {
-    struct mccnode * n = root;
+    //struct mccnode * n = root;
 
     // Preform pre order traversal for code emission
-    ntop = 0;
-    while ( n || ntop )
+    *nstk = n;
+    ntop = 1;
+    while ( ntop )
     {
-        while (n)
-        {
-            nstk[ntop++] = n;
-            n = n->left;
-        }
-
         n = nstk[--ntop];
-
+    
         emitNode(n);
-
-        n = n->right;
+        
+        if ( n->right ) nstk[ntop++] = n->right;
+        if ( n->left  ) nstk[ntop++] = n->left;
     }
 }
 

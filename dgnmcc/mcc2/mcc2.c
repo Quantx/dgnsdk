@@ -27,6 +27,5 @@ int16_t main( int16_t argc, int8_t ** argv )
     while ( st = node() )
     {
         statement(st);
-        write( 2, "?", 1 );
     }
 }

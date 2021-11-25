@@ -76,7 +76,7 @@ int8_t * tokenNames[] = {
     "End",
     "Allocate", "Unallocate",
     "Label", "LabelExtern",
-    "VariableStack",
+    "VariableLocal",
 
     "named", "variable",
     "string",
