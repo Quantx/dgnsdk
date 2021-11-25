@@ -718,11 +718,11 @@ struct, union: (In addition to pointers above)
                 if ( !isCompatible( &cursym->type, fan->type ) )
                 {
 #ifdef DEBUG_TYPECHECK
-                    write( 1, "Type A: ", 8 );
-                    writeType( 1, &cursym->type, cursym->name, cursym->len );
-                    write( 1, "\nType B: ", 9 );
-                    writeType( 1, fan->type, NULL, 0 );
-                    write( 1, "\n", 1 );
+                    write( 2, "Type A: ", 8 );
+                    writeType( 2, &cursym->type, cursym->name, cursym->len );
+                    write( 2, "\nType B: ", 9 );
+                    writeType( 2, fan->type, NULL, 0 );
+                    write( 2, "\n", 1 );
 #endif
                     mccfail("incompatible argument");
                 }
@@ -847,10 +847,18 @@ struct, union: (In addition to pointers above)
 
 void emitStatement(unsigned int8_t op, unsigned int32_t val)
 {
-    static struct mccstmt stn;
+    struct mccstmt stn;
+
+#ifdef DEBUG
+    if ( op == 0 )
+    {
+        write( 2, "ZERO STMT\n", 12 );
+    }
+#endif
 
     stn.oper = op;
     stn.val = val;
+    stn.type = IR_VOID;
 
     write( segs[SEG_TEXT], &stn, sizeof(struct mccstmt CAST_NAME) );
 }

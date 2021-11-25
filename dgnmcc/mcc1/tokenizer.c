@@ -69,9 +69,9 @@ void ntok()
 {
     debug_ntok();
 
-    write( 1, "Token '", 7 );
-    writeToken( 1, tk );
-    write( 1, "'", 1 );
+    write( 2, "Token '", 7 );
+    writeToken( 2, tk );
+    write( 2, "'", 1 );
 /*
     if ( tk )
     {
@@ -79,6 +79,6 @@ void ntok()
         write( 1, pp, p - pp );
     }
 */
-    write( 1, "\r\n", 2 );
+    write( 2, "\r\n", 2 );
 }
 #endif

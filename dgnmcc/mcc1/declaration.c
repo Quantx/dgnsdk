@@ -251,8 +251,8 @@ void instantiate( struct mccnsp * curnsp, int16_t segfd, struct mcctype * curtyp
                 }
 
 #ifdef DEBUG_DECLARE
-                writeType( 1, &cursym->type, cursym->name, cursym->len );
-                write( 1, "\n", 1 );
+                writeType( 2, &cursym->type, cursym->name, cursym->len );
+                write( 2, "\n", 1 );
 #endif
                 instantiate( curnsp, segfd, &cursym->type );
                 isz += typeSize( &cursym->type );
