@@ -2,6 +2,10 @@
 #include "../mcc/tokens.h"
 #include "../mcc/statements.h"
 
+#ifdef DEBUG
+#define DEBUG_NODE 1
+#endif
+
 #define MAX_STATEMENT 64
 #define MAX_EVAL_STK 64 // Maximum size (in words) of the zero page expression evaluation stack
 #define MAX_OPER_BUF 256 // Maximum number of instructions per statement

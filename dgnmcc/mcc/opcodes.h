@@ -1,6 +1,3 @@
-// Size of a pointer
-#define OP_PTR_SIZE 2
-
 #define OP_CLASS_VOID 0
 #define OP_CLASS_SIGNED 1
 #define OP_CLASS_UNSIGNED 2

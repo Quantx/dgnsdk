@@ -1,5 +1,7 @@
 #define MAX_EXPR_NODE 256  // Maximum size of the expression node stack
 
+#define IR_PTR_SIZE 2 // Size of a pointer in bytes
+
 // Primative types
 #define IR_VOID 0 // ( 0 bits) Void
 #define IR_CHR  1 // ( 8 bits) Signed Character

@@ -6,17 +6,17 @@ struct mccstmt * stmtstk[MAX_STATEMENT_STK];
 void statement( struct mccstmt * st )
 {
     struct mccstmt * ce;
-    struct mccstmt * stop;
+    struct mccstmt * stop = stmtstk[stmttop - 1];
 
     switch ( st->oper )
     {
         case Label:
         case LabelExtern: // Function declaration
             locsize = 0; // Reset local allocation size
-            if ( curfunc.fd >= 0 ) close( curfunc.fd ); // Close existing function
+            if ( curfunc.fd > 0 ) close( curfunc.fd ); // Close existing function
 
 #ifdef DEBUG
-            if ( curfunc.fd_dbg >= 0 ) close( curfunc.fd_dbg );
+            if ( curfunc.fd_dbg > 0 ) close( curfunc.fd_dbg );
 #endif
 
             curfunc.name = st->name;
@@ -24,6 +24,9 @@ void statement( struct mccstmt * st )
             
             int8_t * fpath = sbrk(st->val + 6);
             if (fpath == SBRKFAIL) mccfail("unable to allocate room for function file name");
+            
+//            write( 2, curfunc.name, curfunc.len );
+//            write( 2, "\n", 1 );
             
             unsigned int16_t i;
             for ( i = 0; i < st->val; i++ ) fpath[i] = curfunc.name[i];
@@ -35,6 +38,7 @@ void statement( struct mccstmt * st )
             fpath[i+5] = '\0';
             
 //            write( 2, fpath, st->val + 6 );
+//            write( 2, "\n", 1 );
             
             if ( (curfunc.fd = creat( fpath, 0666 )) < 0 ) mccfail("unable to creat file for new function");
             
@@ -46,9 +50,12 @@ void statement( struct mccstmt * st )
             fpath[i+4] = 'g';
             fpath[i+5] = '\0';
             
+//            write( 2, fpath, st->val + 6 );
+//            write( 2, "\n", 1 );
+            
             if ( (curfunc.fd_dbg = creat( fpath, 0666 )) < 0 ) mccfail("unable to creat debug file for new function");
 #endif
-            brk(fpath);
+            //brk(fpath); // handled by the next brk() statement
 
             brk(st);
             break;
@@ -75,8 +82,6 @@ void statement( struct mccstmt * st )
             emitOpBuffer();
             break;
         case Else:
-            stop = stmtstk[stmttop - 1];
-        
             if ( stop->oper != If ) mccfail("ELSE does not follow IF");
             
             optr->op = OpElse;
@@ -103,9 +108,17 @@ void statement( struct mccstmt * st )
         case Continue:
             break;
         case Return:
+            expr(ce = node()); // Process return statement's expression
+            
+            optr->op = OpReturn;
+            optr++;
+            
+            emitOpBuffer();
+            
+            brk(st);
             break;
         case End:
-            stop = stmtstk[--stmttop];
+            stmttop--;
             
             if ( stmttop == -1 ) mccfail("statement stack underflow");
             
@@ -123,8 +136,9 @@ void statement( struct mccstmt * st )
             break;
         default: // Expression (NOTE: might be a "Void" expression)
             expr(st);
+            emitOpBuffer();
+            
+            brk(st);
             break;
     }
-    
-    
 }

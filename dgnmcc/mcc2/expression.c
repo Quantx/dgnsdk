@@ -71,9 +71,10 @@ void emit( struct mccoper * emop )
 void emitOpBuffer()
 {
     struct mccoper * opout;
-    for ( opout = obuf; opout != optr; optr++ )
+    for ( opout = obuf; opout != optr; opout++ )
     {
         emit( opout );
+        write( 2, "!", 1 );
     }
     
     optr = NULL;
@@ -108,7 +109,7 @@ int16_t opClass( struct mccstmt * st )
 void expr(struct mccstmt * nd)
 {
     if ( !optr ) optr = obuf;
-    if ( nd && nd->oper == Void ) nd = NULL; // Nothing to do here, this is a void expression
+//    if ( nd && nd->oper == Void ) nd = NULL; // Nothing to do here, this is a void expression
 
     // Deserialize and reconstruct expression tree
     struct mcceval * ev = sbrk(sizeof(struct mcceval CAST_NAME));
@@ -167,7 +168,14 @@ void expr(struct mccstmt * nd)
 
                     cn->left = ev;
                     estk[etop++] = cn;
-                    if ( etop > MAX_EXPR_NODE ) mccfail("expression stack full");
+                    if ( etop > MAX_EXPR_NODE )
+                    {
+#ifdef DEBUG
+                        decwrite(2, etop);
+                        write(2, "\n", 1);
+#endif
+                        mccfail("expression stack full");
+                    }
                 }
             }
         }
@@ -426,17 +434,17 @@ void expr(struct mccstmt * nd)
                             optr->a.name = ev->st->name;
                             optr->a.val = ev->st->val;
 
-                            optr->size = OP_PTR_SIZE;
+                            optr->size = IR_PTR_SIZE;
                             optr->reg = evlstk;
                             
-                            evlstk += OP_PTR_SIZE;
+                            evlstk += IR_PTR_SIZE;
                             break;
 
                         case VariableLocal: // Local var
                             optr->op = OpAddrLoc;
                             optr->a.val = ev->st->val;
 
-                            optr->size = OP_PTR_SIZE;
+                            optr->size = IR_PTR_SIZE;
 
                             // Don't allocate any space on the eval stack for a zero page local var which is also an l-value
                             if ( ev->st->val < zerosize && (ev->st->type & IR_LVAL) )
@@ -447,7 +455,7 @@ void expr(struct mccstmt * nd)
                             {
                                 optr->reg = evlstk;
                                 
-                                evlstk += OP_PTR_SIZE;
+                                evlstk += IR_PTR_SIZE;
                             }
 
                             break;
