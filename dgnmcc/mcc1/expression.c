@@ -579,7 +579,7 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Sizeof )
         {
-            if ( isFunction(n->right->type) ) mccfail("cannot get sizeof function");
+            if ( isFunction(n->right->type) ) mccfail("sizeof can not be used on a function");
             n->type = &type_int;
         }
         else if ( n->oper == LogNot )
@@ -863,7 +863,7 @@ void emitNode(struct mccnode * n)
     struct mccstmt stn;
 
     stn.oper = n->oper;
-    stn.size = typeSize(n->type);
+    stn.size = -1;
 
     unsigned int8_t pt = n->type->ptype & CPL_DTYPE_MASK;
 
@@ -879,7 +879,7 @@ void emitNode(struct mccnode * n)
         brk(dt);
     }
 */
-    else if ( isFunction(n->type) ) stn.type = IR_FUNC;
+    else if ( isFunction(n->type) ) stn.size = IR_PTR_SIZE, stn.type = IR_FUNC;
     else if ( isStruct(n->type) )
     {
         stn.type = IR_STRUC;
@@ -887,6 +887,8 @@ void emitNode(struct mccnode * n)
     }
     else if ( pt == CPL_ENUM_CONST ) stn.type = IR_INT;
     else stn.type = pt;
+
+    if ( stn.size == -1 ) stn.size = typeSize(n->type);
 
     if ( n->flag & CPL_LVAL ) stn.type |= IR_LVAL;
 
