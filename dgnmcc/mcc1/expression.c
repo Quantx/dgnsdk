@@ -871,7 +871,7 @@ void emitNode(struct mccnode * n)
     struct mccstmt stn;
 
     stn.oper = n->oper;
-    stn.size = -1;
+    stn.size = 0;
 
     unsigned int8_t pt = n->type->ptype & CPL_DTYPE_MASK;
 
@@ -896,7 +896,7 @@ void emitNode(struct mccnode * n)
     else if ( pt == CPL_ENUM_CONST ) stn.type = IR_INT;
     else stn.type = pt;
 
-    if ( stn.size == -1 ) stn.size = typeSize(n->type);
+    if ( !stn.size ) stn.size = typeSize(n->type);
 
     if ( n->flag & CPL_LVAL ) stn.type |= IR_LVAL;
 
