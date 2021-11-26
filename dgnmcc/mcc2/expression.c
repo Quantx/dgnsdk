@@ -190,28 +190,28 @@ void expr(struct mccstmt * nd)
 #endif    
 
     int16_t evlstk = zerosize; // Eval stack starts at end of zero page stack
+    struct mcceval * cn, * ln = NULL; // Current and last nodes
 
     // https://leetcode.com/problems/binary-tree-postorder-traversal/discuss/45648/three-ways-of-iterative-postorder-traversing-easy-explanation
-    ev = root;
-    while ( ev || etop ) // Post order traversal
+    cn = root;
+    while ( cn || etop ) // Post order traversal
     {
-        if ( ev ) // Traverse left children
+        if ( cn )
         {
-            if ( ev->right ) estk[etop++] = ev->right;
-            estk[etop++] = ev;
-
-            ev = ev->left;
+            estk[etop++] = cn;
+            cn = cn->left;
             continue;
         }
         
-        ev = estk[--etop];
+        ev = estk[etop - 1];
         
-        if ( etop && estk[etop - 1] == ev->right ) // Traverse right children
+        if ( ev->right && ln != ev->right )
         {
-            estk[etop - 1] = ev;
-            ev = ev->right;
+            cn = ev->right;
             continue;
         }
+        
+        ln = ev; etop--;
 
         struct mcceval * pv = ev->parent;
 
@@ -219,7 +219,7 @@ void expr(struct mccstmt * nd)
         unsigned int8_t opc = opClass(ev->st);
 
         if ( ev->right )
-        {                    
+        {
             if ( ev->left )
             {
                 struct mccoper * l_op = ev->left->op;
@@ -546,13 +546,10 @@ void expr(struct mccstmt * nd)
         // TODO
 
         // Eval stack overran zero page
-        if ( evlstk > 0x100 ) mccfail("eval stack overflow");
-        if ( evlstk < 0     ) mccfail("eval stack underflow");
+        if ( evlstk > 0x100    ) mccfail("eval stack overflow");
+        if ( evlstk < zerosize ) mccfail("eval stack underflow");
 
         // Increment current operation pointer
         ev->op = optr++;
-
-        // Do this last
-        ev = NULL;
     }
 }
