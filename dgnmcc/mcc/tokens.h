@@ -29,7 +29,7 @@ enum
     Allocate, Unallocate, // Allocate memory on the stack
     Label, LabelExtern, // An assembly label
     VariableLocal, // Local variable on the stack
-
+    StartOfArgs,
 // ******* Expression tokens *******
     Named, Variable, // Named (an identifier string), Variable (ref to user defiend variable)
     String, // String constant
@@ -77,6 +77,7 @@ int8_t * tokenNames[] = {
     "Allocate", "Unallocate",
     "Label", "LabelExtern",
     "VariableLocal",
+    "StartOfArgs",
 
     "named", "variable",
     "string",

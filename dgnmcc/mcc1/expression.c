@@ -708,9 +708,29 @@ struct, union: (In addition to pointers above)
             struct mccsym * cursym;
 
             // Get first argument, and convert Commas to Args
-            for ( fsn = n->right; fsn->oper == Comma; fsn = fsn->left ) fsn->oper = Arg;
-            fsn = fsn->left;
+            for ( fsn = n->right; fsn->left->oper == Comma; fsn = fsn->left ) fsn->oper = Arg;
+            fsn->oper = Arg;
 
+            fan = fsn->left;
+            // Insert last Arg node
+            fsn->left = sbrk(sizeof(struct mccnode CAST_NAME));
+            if ( fsn->left == SBRKFAIL ) mccfail( "unable to allocate room for new argument node");
+            fsn = fsn->left;
+            
+            fsn->oper = Arg;
+            fsn->flag = 0;
+            fsn->type = fan->type; 
+            fsn->right = fan; // Place first arg in correct spot
+            
+            fsn->left = sbrk(sizeof(struct mccnode CAST_NAME));
+            if ( fsn->left == SBRKFAIL ) mccfail( "unable to allocate room for new StartOfArgs node");
+            fsn = fsn->left;
+            
+            fsn->oper = StartOfArgs;
+            fsn->flag = 0;
+            fsn->type = n->type;
+            fsn->left = fan->right = NULL;
+            
             for ( cursym = s->ftype->symtbl; cursym; cursym = cursym->next, fsn = fan )
             {
                 for ( fan = n->right; fan->left != fsn; fan = fan->left );
@@ -726,6 +746,12 @@ struct, union: (In addition to pointers above)
 #endif
                     mccfail("incompatible argument");
                 }
+#ifdef DEBUG_TYPECHECK
+                else
+                {
+                    write( 2, "Args match\n", 11 );
+                }
+#endif
 
                 if ( fan == n->right ) { cursym = cursym->next; break; }
             }

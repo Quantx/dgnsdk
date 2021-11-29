@@ -13,8 +13,7 @@ fi
 
 mkdir -p build/
 
-./mcc0/mcc0 < "$1" | ./mcc1/mcc1 > text.seg
-# | ./mcc2/mcc2 > text.seg
+./mcc0/mcc0 < "$1" | ./mcc1/mcc1 | ./mcc2/mcc2 > text.seg
 
 mv *.seg build/
 mv *.func build/

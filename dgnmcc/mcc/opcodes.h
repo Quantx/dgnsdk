@@ -28,7 +28,7 @@ enum
     // Flow
     OpBreak, OpContinue,
     // Function
-    OpCall, OpArg, OpReturn,
+    OpArg, OpCall, OpReturn,
 
 // *** Memory instructions (use same format as computational instructions)
     // [r_arg] -> reg
@@ -97,7 +97,7 @@ int8_t * opNames[] = {
 
     "OpBreak", "OpContinue",
 
-    "OpCall", "OpArg", "OpReturn",
+    "OpArg", "OpCall", "OpReturn",
 
     "OpLoad",
 

@@ -405,6 +405,11 @@ void expr(struct mccstmt * nd)
                 // *** Unary Operators ***
                     case FnCall:
                         optr->op = OpCall;
+                        optr[1] = *optr;
+                        
+                        optr->op = OpArg;
+                        optr++;                    
+
                         break;
                     case PostInc:
                         optr->op = OpPostInc;
@@ -442,6 +447,10 @@ void expr(struct mccstmt * nd)
         {
             switch ( op )
             {
+                case StartOfArgs: // Not an operand, just tells us that we're about to start pushing arguments for a function call
+                    optr->op = OpArg;
+                    break;
+            
                 case Variable: // Global var
                 case String: // Strings constants are effectively global vars
                     optr->op = OpAddrGlb;
