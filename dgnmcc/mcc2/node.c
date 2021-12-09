@@ -1,20 +1,13 @@
 unsigned int32_t cni;
 
+int16_t fd;
+
 #ifdef DEBUG_NODE
+int16_t fd_dbg;
+
 unsigned int32_t cfp; // Current file position
 unsigned int32_t lnp; // Last node position
 #endif
-
-struct funcstat
-{
-    int8_t * name;
-    unsigned int16_t len;
-
-    int16_t fd;
-#ifdef DEBUG
-    int16_t fd_dbg;
-#endif
-} curfunc;
 
 void mccfail( int8_t * msg )
 {

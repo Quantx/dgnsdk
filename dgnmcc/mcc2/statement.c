@@ -1,6 +1,6 @@
 unsigned int16_t stmtid; // Current statement ID
 
-unsigned int16_t stmttop;
+int16_t stmttop;
 struct mccstmt * stmtstk[MAX_STATEMENT_STK];
 
 void statement( struct mccstmt * st )
@@ -13,49 +13,49 @@ void statement( struct mccstmt * st )
         case Label:
         case LabelExtern: // Function declaration
             locsize = 0; // Reset local allocation size
-            if ( curfunc.fd > 0 ) close( curfunc.fd ); // Close existing function
 
-#ifdef DEBUG
-            if ( curfunc.fd_dbg > 0 ) close( curfunc.fd_dbg );
-#endif
+            curfunc = getFunc(st);            
+            
+            if (!curfunc)
+            {
+                curfunc = sbrk2(sizeof(struct mccfunc CAST_NAME));
+                if ( curfunc == SBRKFAIL ) mccfail( "cannot allocate room for new function" );
+                
+                (*functail)->next = curfunc;
+                functail = &curfunc;
+                
+                curfunc->name = sbrk2(st->val);
+                if ( curfunc->name == SBRKFAIL ) mccfail( "cannot allocate room for new function name" );
+                curfunc->len = st->val;
 
-            curfunc.name = st->name;
-            curfunc.len = st->val;
+                unsigned int16_t i;
+                for ( i = 0; i < st->val; i++ ) curfunc->name[i] = st->name[i]; 
+            }
             
-            int8_t * fpath = sbrk(st->val + 6);
-            if (fpath == SBRKFAIL) mccfail("unable to allocate room for function file name");
+            // Last thing allocated should be the statement's name
+            if (sbrk(6) == SBRKFAIL) mccfail("unable to allocate room for function file name");
             
-//            write( 2, curfunc.name, curfunc.len );
-//            write( 2, "\n", 1 );
+            st->name[st->val  ] = '.';
+            st->name[st->val+1] = 'f';
+            st->name[st->val+2] = 'u';
+            st->name[st->val+3] = 'n';
+            st->name[st->val+4] = 'c';
+            st->name[st->val+5] = '\0';
             
-            unsigned int16_t i;
-            for ( i = 0; i < st->val; i++ ) fpath[i] = curfunc.name[i];
-            fpath[i] = '.';
-            fpath[i+1] = 'f';
-            fpath[i+2] = 'u';
-            fpath[i+3] = 'n';
-            fpath[i+4] = 'c';
-            fpath[i+5] = '\0';
-            
-//            write( 2, fpath, st->val + 6 );
-//            write( 2, "\n", 1 );
-            
-            if ( (curfunc.fd = creat( fpath, 0666 )) < 0 ) mccfail("unable to creat file for new function");
+            if ( fd > 0 ) close( fd ); // Close existing function
+            if ( (fd = creat( st->name, 0666 )) < 0 ) mccfail("unable to creat file for new function");
             
 #ifdef DEBUG
-            fpath[i] = '.';
-            fpath[i+1] = 'd';
-            fpath[i+2] = 'e';
-            fpath[i+3] = 'b';
-            fpath[i+4] = 'g';
-            fpath[i+5] = '\0';
-            
-//            write( 2, fpath, st->val + 6 );
-//            write( 2, "\n", 1 );
-            
-            if ( (curfunc.fd_dbg = creat( fpath, 0666 )) < 0 ) mccfail("unable to creat debug file for new function");
+            st->name[st->val  ] = '.';
+            st->name[st->val+1] = 'd';
+            st->name[st->val+2] = 'e';
+            st->name[st->val+3] = 'b';
+            st->name[st->val+4] = 'g';
+            st->name[st->val+5] = '\0';
+
+            if ( fd_dbg > 0 ) close( fd_dbg );
+            if ( (fd_dbg = creat( st->name, 0666 )) < 0 ) mccfail("unable to creat debug file for new function");
 #endif
-            //brk(fpath); // handled by the next brk() statement
 
             brk(st);
             break;

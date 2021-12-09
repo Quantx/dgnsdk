@@ -1,4 +1,4 @@
-files = ../mcc/tokens.h ../mcc/statements.h ../mcc/opcodes.h mcc2.h mcc2.c node.c statement.c expression.c
+files = ../mcc/tokens.h ../mcc/statements.h ../mcc/opcodes.h mcc2.h mcc2.c node.c function.c statement.c expression.c analysis.c generator.c
 
 mcc2: $(files)
 	gcc -fno-builtin-exit -g -rdynamic -DLINUX_COMPAT=1 -o mcc2 mcc2.c
