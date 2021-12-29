@@ -641,6 +641,7 @@ struct, union: (In addition to pointers above)
             n->right->oper = Number;
             n->right->type = &type_int;
             n->right->val = ms->addr;
+            n->right->flag = 0;
         }
         else if ( n->oper == Arrow )
         {
@@ -666,6 +667,7 @@ struct, union: (In addition to pointers above)
             n->right->oper = Number;
             n->right->type = &type_int;
             n->right->val = ms->addr;
+            n->right->flag = 0;
         }
         else if ( n->oper == Square_L )
         {
