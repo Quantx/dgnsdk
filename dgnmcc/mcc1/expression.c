@@ -202,7 +202,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
             }
             else if ( tk == String )
             {
-                nstk[ntop]->flag |= CPL_LVAL; // String constants are l-values
+                //nstk[ntop]->flag |= CPL_LVAL; // String constants are NOT l-values
                 nstk[ntop]->type = &type_string;
             }
 
