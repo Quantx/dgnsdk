@@ -3,6 +3,10 @@ dgnasm/a.out
 dgnasm/symbols.dat
 dgnasm/build_symbols
 
+dgnmcc/build/
+
+*.debg
+*.func
 *.seg
 dgnova
 a.out
