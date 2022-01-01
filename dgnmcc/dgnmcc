@@ -7,13 +7,15 @@ if [ $aslr -gt 0 ]; then
 		exit 1
 	else
 		echo 0 > "/proc/sys/kernel/randomize_va_space"
+		echo "Address Space Layout Randomization has been disabled, please stop running this script as root"
 		exit 0 # Stop privileged execution here, better safe than sorry
 	fi
 fi
 
 mkdir -p build/
 
-./mcc0/mcc0 < "$1" | ./mcc1/mcc1 | ./mcc2/mcc2 > text.seg
+./mcc0/mcc0 < "$1" | ./mcc1/mcc1 > text.seg
+# | ./mcc2/mcc2 > text.seg
 
 mv *.seg build/
 mv *.func build/

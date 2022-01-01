@@ -13,24 +13,27 @@ void statement( struct mccstmt * st )
         case Label:
         case LabelExtern: // Function declaration
             locsize = 0; // Reset local allocation size
-
-            curfunc = getFunc(st);            
             
-            if (!curfunc)
-            {
-                curfunc = sbrk2(sizeof(struct mccfunc CAST_NAME));
-                if ( curfunc == SBRKFAIL ) mccfail( "cannot allocate room for new function" );
-                
-                (*functail)->next = curfunc;
-                functail = &curfunc;
-                
-                curfunc->name = sbrk2(st->val);
-                if ( curfunc->name == SBRKFAIL ) mccfail( "cannot allocate room for new function name" );
-                curfunc->len = st->val;
+            if ( curfunc ) brk2( curfunc );
 
-                unsigned int16_t i;
-                for ( i = 0; i < st->val; i++ ) curfunc->name[i] = st->name[i]; 
-            }
+            curfunc = sbrk2(sizeof(struct mccfunc CAST_NAME));
+            if ( curfunc == SBRKFAIL ) mccfail( "cannot allocate room for new function" );
+            
+//            (*functail)->next = curfunc;
+//            functail = &curfunc;
+            
+            curfunc->vartail = &curfunc->vartbl;
+            
+            curfunc->name = sbrk2(st->val);
+            if ( curfunc->name == SBRKFAIL ) mccfail( "cannot allocate room for new function name" );
+            curfunc->len = st->val;
+
+            unsigned int16_t i;
+            for ( i = 0; i < st->val; i++ ) curfunc->name[i] = st->name[i];
+            
+            curfunc->vac = 0;
+            curfunc->z_size = 0;
+            curfunc->s_size = 0;
             
             // Last thing allocated should be the statement's name
             if (sbrk(6) == SBRKFAIL) mccfail("unable to allocate room for function file name");
@@ -62,19 +65,19 @@ void statement( struct mccstmt * st )
         case Allocate:
             locsize += st->val;
             // Ensure at least MAX_EVAL_STK is available
-            if ( locsize < (0xFF - MAX_EVAL_STK) ) zerosize = locsize;
+//            if ( locsize < (0xFF - MAX_EVAL_STK) ) zerosize = locsize;
             brk(st);
             break;
         case Unallocate:
             locsize -= st->val;
-            if ( locsize < zerosize ) zerosize = locsize;
+//            if ( locsize < zerosize ) zerosize = locsize;
             brk(st);
             break;
         case If:
             st->val = stmtid++;
             stmtstk[stmttop++] = st;
             
-            expr(ce = node()); // Process if statement's expression
+            generate(expr(ce = node())); // Process if statement's expression
             brk(ce);
             
             optr->op = OpIf;
@@ -110,7 +113,7 @@ void statement( struct mccstmt * st )
         case Continue:
             break;
         case Return:
-            expr(ce = node()); // Process return statement's expression
+            generate(expr(ce = node())); // Process return statement's expression
             
             optr->op = OpReturn;
             optr++;
@@ -137,7 +140,7 @@ void statement( struct mccstmt * st )
             brk(stop);
             break;
         default: // Expression (NOTE: might be a "Void" expression)
-            expr(st);
+            generate(expr(st));
             emitOpBuffer();
             
             brk(st);

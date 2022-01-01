@@ -43,3 +43,53 @@ struct mccfunc * getFunc( struct mccstmt * st )
     
     return NULL;
 }
+
+struct mccvar * getVarFunc( struct mccstmt * st, struct mccfunc * fn )
+{
+    struct mccvar * cv;
+    
+    if ( st->oper == VariableLocal ) // Local
+    {
+        for ( cv = fn->vartbl; cv; cv = cv->next )
+        {
+            if ( !cv->len && st->val == cv->addr ) return cv;
+        }
+    }
+    else if ( st->oper == Variable ) // Global
+    {
+        for ( cv = fn->vartbl; cv; cv = cv->next )
+        {
+            if ( cv->len == st->val )
+            {
+                unsigned int16_t i;
+                for ( i = 0; i < st->val; i++ )
+                {
+                    if ( st->name[i] != cv->name[i] ) break;
+                }
+                
+                if ( i == st->val ) return cv;
+            }
+        }
+    }
+#ifdef DEBUG
+    else
+    {
+        write( 2, "Non-variable type in getVar: ", 29 );
+
+        int8_t * nn = tokenNames[st->oper];
+        int16_t i;
+        for ( i = 0; nn[i]; i++ );
+        write( 2, nn, i );
+        write( 2, "\n", 1 );
+    }
+#endif
+    
+    return NULL;
+}
+
+struct mccvar * getVar( struct mccstmt * st ) { return getVarFunc( st, curfunc ); }
+
+int16_t regAlloc( struct mccvar * v )
+{
+
+}

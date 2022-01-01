@@ -1,0 +1,65 @@
+*** Inside myprog.c:
+    int myfunc( int a, char b, long c, int d )
+    {
+        return c - (a + b);
+    }
+
+*** Inside myprog.asm:
+    MOV AC0, AC1
+    ADD AC2, AC1 ; Some random assembly code
+    
+    ; Start of function call
+    SAVZ myfunc ; Macro-instruction saves all zero page registers that will be clobbered by "myfunc" to the stack
+    
+    ; Arguments are pushed in REVERSE ORDER (LAST ARGUMENT FIRST)
+
+    ; Push "int d" argument
+    LDA AC0, AC2 + 7
+    PSHA AC0
+    
+    ; Push first half of "long c" argument
+    ; Push Least Significant Word first (Nova's are technically Big Endian)
+    LDA AC0, AC2 + 14
+    PSHA AC0
+    
+    ; NOTE: Last 3 words are pushed using accumulators AC0, AC1, AC2 (in that order) you can use AC3 as a scratch register
+    
+    ; Push second half of "long c" argument
+    ; Most Significant Word comes next
+    LDA AC0, AC2 + 15
+    
+    ; Push "char b" argument
+    LDA AC1, AC2 + 2
+    ; This masking may not be nescessary depending on how it's implemented in C (haven't decided this yet)
+    LDA AC3, BYTE ; BYTE is a label in zero page to the value 0377
+    AND AC1, AC3
+    
+    ; Push "int a" argument
+    LDA AC2, AC2 + 7
+    
+    ; Make function call
+    CALL myfunc ; Macro-instruction which decodes to the following lines:
+    ;   JSR PC + 1
+    ;   myfunc
+    ; Function reterns here (all arguments pushed to stack will be cleaned up for you)
+    ; Zero page registers stored with "SAVZ myfunc" will be restored from stack automatically
+    ; Return value will be in AC0 (with the most significant word in AC1 if it's a long)
+
+*** Stack looks like this from inside function call:
+    "fp" is frame pointer, "sp" is stack pointer
+    
+    (bottom of memory)
+    ...
+    (bottom of stack)
+    
+    fp - 6 | int d
+    fp - 5 | long c (least significant word)
+    fp - 4 | long c (most significant word)
+    fp - 3 | char b
+    fp - 2 | int a
+    fp - 1 | old frame pointer
+    fp, sp | bit 0 = carry bit, bit 1-15 = return address
+    
+    (top of stack)
+    ...
+    (top of memory)

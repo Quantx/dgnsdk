@@ -32,9 +32,14 @@ enum
 
 // *** Memory instructions (use same format as computational instructions)
     // [r_arg] -> reg
+    // r_size = Maximum number of bytes to read from memory
+    // size = Number of registers to fill (number of bytes to actually read)
     OpLoad,
 
     // reg -> [r_arg]
+    // Reg must be the source register because the value may be referenced by additional statements
+    // r_size = Maximum number of bytes to write to memory
+    // size = Number of registers to write (number of bytes to actually write)
     OpStore,
     
     // reg -> [stack_top]
@@ -44,6 +49,8 @@ enum
     OpPop,
     
 // *** Computational operations ( S:signed, U:unsigned, F:float, P:pointer )
+    // r_arg -> reg (If r_arg == reg then this is a no-op)
+    OpMov,
     // Logical operations
     OpLogOr, OpLogAnd, OpLogNot,
     OpEq, OpNeq,
@@ -63,10 +70,17 @@ enum
     OpMul_F, OpDiv_F, // (OpMod_F isn't supported)
 
     OpNegate, OpNegate_F,
-    
-    OpPreInc, OpPreDec,
-    OpPreInc_F, OpPreDec_F,
-    OpPostInc, OpPostDec,
+
+    // Indirect Pre/Pos Inc/Dec
+    OpPreIncLoad,    OpPreDecLoad,
+    OpPreIncLoad_F,  OpPreDecLoad_F,
+    OpPostIncLoad,   OpPostDecLoad,
+    OpPostIncLoad_F, OpPostDecLoad_F,
+
+    // Direct Pre/Pos Inc/Dec
+    OpPreInc,    OpPreDec,
+    OpPreInc_F,  OpPreDec_F,
+    OpPostInc,   OpPostDec,
     OpPostInc_F, OpPostDec_F,
     
     // Floating point and int conversion 
@@ -75,6 +89,9 @@ enum
 
     // Structure Operators
     OpArrow, OpDot, OpArray
+#ifdef DEBUG
+    , _OpListCount
+#endif
 };
 
 #ifdef DEBUG
@@ -107,6 +124,8 @@ int8_t * opNames[] = {
     
     "OpPop",
     
+    "OpMov",
+    
     "OpLogOr", "OpLogAnd", "OpLogNot",
     "OpEq", "OpNeq",
     "OpLess_S", "OpLessEq_S", "OpGreat_S", "OpGreatEq_S",
@@ -124,6 +143,11 @@ int8_t * opNames[] = {
     "OpMul_F", "OpDiv_F",
 
     "OpNegate", "OpNegate_F",
+
+    "OpPreIncLoad", "OpPreDecLoad",
+    "OpPreIncLoad_F", "OpPreDecLoad_F",
+    "OpPostIncLoad", "OpPostDecLoad",
+    "OpPostIncLoad_F", "OpPostDecLoad_F",
     
     "OpPreInc", "OpPreDec",
     "OpPreInc_F", "OpPreDec_F",

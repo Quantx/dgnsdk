@@ -2,13 +2,13 @@
 
 #include "../../lib/utils.c"
 
-int16_t zerosize; // Current size of the zero page resident portion of the local stack
+//int16_t zerosize; // Current size of the zero page resident portion of the local stack
 int16_t locsize; // Current size of the local stack
 
 #include "node.c"
 #include "function.c"
 #include "expression.c"
-#include "analysis.c"
+#include "regalloc.c"
 #include "generator.c"
 #include "statement.c"
 
@@ -21,6 +21,10 @@ int16_t main( int16_t argc, int8_t ** argv )
 
         argv++; argc--;
     }
+
+#ifdef DEBUG
+    if ( (sizeof(opNames) / sizeof(*opNames)) != _OpListCount ) mccfail( "OpNames length doesn't match OpList legnth" );
+#endif
 
     br2 = sbrk(MAX_ANALYSIS_BRK);
     if ( br2 == SBRKFAIL ) mccfail( "unable to allocate room for analysis brk region" );

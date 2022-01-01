@@ -1,3 +1,6 @@
+struct mccoper * optr;
+struct mccoper obuf[MAX_OPER_BUF];
+
 unsigned int16_t etop;
 struct mcceval * estk[MAX_EXPR_NODE];
 
@@ -35,14 +38,14 @@ struct mcceval * expr(struct mccstmt * nd)
             ev->left = ev->right = NULL;
 
             // Unary operators that strips l-value status
+            // if ( op == Inder ||   op == FnCall ) cn->right = ev, nd->type &= ~IR_LVAL;
+            // Unary operator
             if ( op == PreInc  || op == PreDec
             ||   op == PostInc || op == PostDec
-            ||   op == Inder
-            ||   op == FnCall                     ) cn->right = ev, nd->type &= ~IR_LVAL;
-            // Unary operator
-            else if ( op == Minus   || op == Plus
-            ||        op == Deref
-            ||        op == LogNot  || op == Not  ) cn->right = ev;
+            ||   op == Minus   || op == Plus
+            ||   op == Deref   || op == Inder
+            ||   op == LogNot  || op == Not
+            ||   op == FnCall ) cn->right = ev;
             // Binary operator
             else
             {
@@ -62,8 +65,8 @@ struct mcceval * expr(struct mccstmt * nd)
                 else // Do left side first
                 {
                     // Binary operators that strips l-value status of the left operand
-                    if ( op >= Ass && op <= OrAss
-                    ||   op == Dot || op == FnCallArgs ) nd->type &= ~IR_LVAL;
+                    //if ( op >= Ass && op <= OrAss
+                    //||   op == Dot || op == FnCallArgs ) nd->type &= ~IR_LVAL;
 
                     cn->left = ev;
                     estk[etop++] = cn;

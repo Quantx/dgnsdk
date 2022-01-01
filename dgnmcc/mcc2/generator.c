@@ -1,6 +1,3 @@
-struct mccoper * optr;
-struct mccoper obuf[MAX_OPER_BUF];
-
 void emit( struct mccoper * emop )
 {
     write( fd, emop, sizeof(struct mccoper CAST_NAME) );
@@ -19,7 +16,7 @@ void emit( struct mccoper * emop )
     decwrite( fd_dbg, emop->reg );
     write( fd_dbg, "|", 1 );
     decwrite( fd_dbg, emop->size );
-    write( fd_dbg, "\n", 1 );
+    write( fd_dbg, "B\n", 2 );
 
     if ( emop->op >= OpValueByte && emop->op <= OpValueLong )
     {
@@ -52,14 +49,16 @@ void emit( struct mccoper * emop )
         decwrite( fd_dbg, emop->c.l_arg );
         write( fd_dbg, "|", 1 );
         decwrite( fd_dbg, emop->c.l_size );
-        write( fd_dbg, "\n", 1 );
+        write( fd_dbg, "B\n", 2 );
         
         write( fd_dbg, "Comp R: ", 8 );
         decwrite( fd_dbg, emop->c.r_arg );
         write( fd_dbg, "|", 1 );
         decwrite( fd_dbg, emop->c.r_size );
-        write( fd_dbg, "\n", 1 );
+        write( fd_dbg, "B\n", 2 );
     }
+    
+    write( fd_dbg, "\n", 1 );
 #endif
 }
 
@@ -74,14 +73,30 @@ void emitOpBuffer()
     optr = NULL;
 }
 
+int16_t evlstk;
+int16_t stkadj( int16_t bytes )
+{
+    // Conver to words
+    if ( bytes < -1 || bytes > 1 ) bytes >>= 1;
+
+    evlstk += bytes;
+
+    if ( evlstk < curfunc->z_size ) mccfail("stack underflow");
+    if ( evlstk >= MAX_ZEROPAGE   ) mccfail("stack overflow");
+    
+    return evlstk;
+}
+
 void generate(struct mcceval * cn)
 {
     if ( !optr ) optr = obuf;
+    
+    regalloc(cn); // Spill and allocate the needed registers, returns how much of zero page was used to do this
+    
+    evlstk = curfunc->z_size; // Eval stak starts at the end of the zero page
 
-    int16_t evlstk = zerosize; // Eval stack starts at end of zero page stack
     struct mcceval * ev, * ln = NULL; // Current and last nodes
 
-    // https://leetcode.com/problems/binary-tree-postorder-traversal/discuss/45648/three-ways-of-iterative-postorder-traversing-easy-explanation
     while ( cn || etop ) // Post order traversal
     {
         if ( cn )
@@ -108,51 +123,222 @@ void generate(struct mcceval * cn)
 
         if ( ev->right )
         {
+            struct mccoper * r_op = ev->right->op;
+        
             if ( ev->left )
             {
                 struct mccoper * l_op = ev->left->op;
-                struct mccoper * r_op = ev->right->op;
-                
-                unsigned int8_t scratch = evlstk;
-                
-                evlstk -= l_op->size + r_op->size;
-                
-                // Move the result to the evlstk if needed
-                optr->reg = l_op->reg < zerosize ? evlstk : l_op->reg;
-                optr->size = ev->st->size;
-                
-                evlstk += ev->st->size;
-                
-                optr->c.l_arg = l_op->reg;
-                optr->c.l_size = l_op->size;
-                
-                optr->c.r_arg = r_op->reg;
-                optr->c.r_size = r_op->size;
-                
-                if ( op > Ass && op <= OrAss ) // Handle read-modify-write assignments (no
+            
+                if ( op >= Ass && op <= OrAss ) // Handle assignments
                 {
-                    // Push existing value onto eval stack
-                    optr->op = OpLoad;
-                    optr->reg = scratch;
-                    optr++;
+                    if ( r_op->reg < curfunc->z_size ) // Right argument (left-hand-side of assignment) is currently allocated inside a register
+                    {
+                        if ( op == Ass )
+                        {
+                            // Alter previous MOV instruction to copy old value
+                            l_op->reg = r_op->reg;
+                            l_op->size = r_op->size;
+                            
+                            optr--; // Don't generate a new instruction (this should be harmless)
+                        }
+                        else
+                        {
+                            // Preform modification
+                            optr->reg = r_op->reg;
+                            optr->size = r_op->size;
+                            
+                            optr->c.l_arg = l_op->reg;
+                            optr->c.l_size = l_op->size;
+                            
+                            optr->c.r_arg = r_op->reg;
+                            optr->c.r_size = r_op->size;
+                            
+                            switch ( op )
+                            {
+                                case AddAss:
+                                    optr->op = opc == OP_CLASS_POINTER ? OpAdd_P : OpAdd;
+                                    break;
+                                case SubAss:
+                                    optr->op = opc == OP_CLASS_POINTER ? OpSub_P : OpSub;
+                                    break;
+                                case Mul:
+                                    optr->op = opc == OP_CLASS_SIGNED ? OpMul_S : OpMul_U;
+                                    break;
+                                case Div:
+                                    optr->op = opc == OP_CLASS_SIGNED ? OpDiv_S : OpDiv_U;
+                                    break;
+                                case Mod:
+                                    optr->op = opc == OP_CLASS_SIGNED ? OpMod_S : OpMod_S;
+                                    break;
+                                case ShlAss:
+                                    optr->op = OpShl;
+                                    break;
+                                case ShrAss:
+                                    optr->op = opc == OP_CLASS_SIGNED ? OpShr_S : OpShr_U;
+                                    break;
+                                case AndAss:
+                                    optr->op = OpAnd;
+                                    break;
+                                case XorAss:
+                                    optr->op = OpXor;
+                                    break;
+                                case OrAss:
+                                    optr->op = OpOr;
+                                    break;
+                            }
+                        }
+                    }
+                    else // Right argument (left-hand-side of assignment) is currently allocated in main memory
+                    {
+                        if ( op == Ass )
+                        {
+                            optr--; // Last instruction should be a LOAD
+#ifdef DEBUG_GEN                                
+                            if ( optr->op != OpLoad ) mccfail( "Last op before assignment was not LOAD!" );
+#endif
+                            stkadj( -optr->size ); // Unallocate space from load op
+
+                            optr->op = OpStore;
+                            
+                            optr->c.r_arg = r_op->reg;
+                            optr->c.r_size = ev->right->st->size;
+                        }
+                        else // Resultant type is always the same as the left-hand-side
+                        {                            
+                            // Store location of pointer
+                            unsigned int8_t ptrreg = r_op->reg;
+
+                            // Update last load instruction to keep the original pointer intact
+                            stkadj( IR_PTR_SIZE );
+                            r_op->reg += IR_PTR_SIZE >> 1;
+#ifdef DEBUG_GEN
+                            if ( l_op->size != ev->st->size ) mccfail("modify-assignment l_op->size != st->size");
+#endif                               
+                            // Move the result to the eval stack if needed
+                            optr->reg = l_op->reg;
+                            optr->size = l_op->size;
+                            
+                            optr->c.l_arg = l_op->reg;
+                            optr->c.l_size = l_op->size;
+                            
+                            optr->c.r_arg = r_op->reg;
+                            optr->c.r_size = r_op->size;
                     
-                    // Preform modification
-                    optr->reg = l_op->reg;
-                    optr->size = ev->st->size;
+                            switch ( op )
+                            {
+                                case AddAss:
+                                    optr->op = opc == OP_CLASS_POINTER ? OpAdd_P : OpAdd;
+                                    break;
+                                case SubAss:
+                                    optr->op = opc == OP_CLASS_POINTER ? OpSub_P : OpSub;
+                                    break;
+                                case Mul:
+                                    optr->op = opc == OP_CLASS_SIGNED ? OpMul_S : OpMul_U;
+                                    break;
+                                case Div:
+                                    optr->op = opc == OP_CLASS_SIGNED ? OpDiv_S : OpDiv_U;
+                                    break;
+                                case Mod:
+                                    optr->op = opc == OP_CLASS_SIGNED ? OpMod_S : OpMod_S;
+                                    break;
+                                case ShlAss:
+                                    optr->op = OpShl;
+                                    break;
+                                case ShrAss:
+                                    optr->op = opc == OP_CLASS_SIGNED ? OpShr_S : OpShr_U;
+                                    break;
+                                case AndAss:
+                                    optr->op = OpAnd;
+                                    break;
+                                case XorAss:
+                                    optr->op = OpXor;
+                                    break;
+                                case OrAss:
+                                    optr->op = OpOr;
+                                    break;
+                            }
+                            
+                            optr++;
+                            
+                            // Store final result
+                            optr->op = OpStore;
+                            
+                            optr->reg = l_op->reg;
+                            optr->size = ev->st->size;
+                            
+                            optr->c.r_arg = r_op->reg;
+                            optr->c.r_size = r_op->size;
+                            
+                            // Cleanup eval stack
+                            stkadj( -(r_op->size + IR_PTR_SIZE) );
+                        }
+                    }
+                }
+                else
+                {
+                    if ( l_op->reg > curfunc->z_size ) stkadj( -l_op->size );
+                    if ( r_op->reg > curfunc->z_size ) stkadj( -r_op->size );
+                    
+                    optr->reg = evlstk;
+                    stkadj( optr->size = ev->st->size );
                     
                     optr->c.l_arg = l_op->reg;
                     optr->c.l_size = l_op->size;
                     
-                    optr->c.r_arg = scratch;
-                    optr->c.r_size = optr->size;
+                    optr->c.r_arg = r_op->reg;
+                    optr->c.r_size = r_op->size;
                     
                     switch ( op )
                     {
-                        case AddAss:
+                    // *** Binary Operators ***
+                        // case Comma: // Handled by left child
+                        // case Ass: // Handled above
+                        case LogOr:
+                            optr->op = OpLogOr;
+                            break;
+                        case LogAnd:
+                            optr->op = OpLogAnd;
+                            break;
+                        case Or:
+                            optr->op = OpOr;
+                            break;
+                        case Xor:
+                            optr->op = OpXor;
+                            break;
+                        case And:
+                            optr->op = OpAnd;
+                            break;
+                        case Eq:
+                            optr->op = OpEq;
+                            break;
+                        case Neq:
+                            optr->op = OpNeq;
+                            break;
+                        case Less:
+                            optr->op = opc == OP_CLASS_SIGNED ? OpLess_S : OpLess_U;
+                            break;
+                        case LessEq:
+                            optr->op = opc == OP_CLASS_SIGNED ? OpLessEq_S : OpLessEq_U;
+                            break;
+                        case Great:
+                            optr->op = opc == OP_CLASS_SIGNED ? OpGreat_S : OpGreat_U;
+                            break;
+                        case GreatEq:
+                            optr->op = opc == OP_CLASS_SIGNED ? OpGreatEq_S : OpGreatEq_U;
+                            break;
+                        case Shl:
+                            optr->op = OpShl;
+                            break;
+                        case Shr:
+                            optr->op = opc == OP_CLASS_SIGNED ? OpShr_S : OpShr_U;
+                            break;
+                        case Add:
                             optr->op = opc == OP_CLASS_POINTER ? OpAdd_P : OpAdd;
                             break;
-                        case SubAss:
+                        case Sub:
                             optr->op = opc == OP_CLASS_POINTER ? OpSub_P : OpSub;
+                            // Subtracting a pointer from a pointer
+                            if ( opClass(ev->right->st) == OP_CLASS_POINTER ) optr->op = OpSub_PP;
                             break;
                         case Mul:
                             optr->op = opc == OP_CLASS_SIGNED ? OpMul_S : OpMul_U;
@@ -163,127 +349,35 @@ void generate(struct mcceval * cn)
                         case Mod:
                             optr->op = opc == OP_CLASS_SIGNED ? OpMod_S : OpMod_S;
                             break;
-                        case ShlAss:
-                            optr->op = OpShl;
+                        case Arrow:
+                            optr->op = OpArrow;
                             break;
-                        case ShrAss:
-                            optr->op = opc == OP_CLASS_SIGNED ? OpShr_S : OpShr_U;
+                        case Dot:
+                            optr->op = OpDot;
                             break;
-                        case AndAss:
-                            optr->op = OpAnd;
+                        case Square_L:
+                            optr->op = OpArray;
                             break;
-                        case XorAss:
-                            optr->op = OpXor;
+                        case FnCallArgs:
+                            optr->op = OpCall;
                             break;
-                        case OrAss:
-                            optr->op = OpOr;
+                        case Arg:
+                            optr->op = OpPush;
                             break;
-                    }
-                    optr++;
-                    
-                    // Store final result
-                    optr->reg = l_op->reg;
-                    optr->size = ev->st->size;
-                    
-                    optr->c.r_arg = r_op->reg;
-                    optr->c.r_size = r_op->size;
-                    
-                    optr->op = OpStore;
-                }
-                else switch ( op )
-                {
-                // *** Binary Operators ***
-                    // case Comma: // Handled by left child
-                    case Ass:
-                        optr->op = OpStore;
-                        break;
-                    case LogOr:
-                        optr->op = OpLogOr;
-                        break;
-                    case LogAnd:
-                        optr->op = OpLogAnd;
-                        break;
-                    case Or:
-                        optr->op = OpOr;
-                        break;
-                    case Xor:
-                        optr->op = OpXor;
-                        break;
-                    case And:
-                        optr->op = OpAnd;
-                        break;
-                    case Eq:
-                        optr->op = OpEq;
-                        break;
-                    case Neq:
-                        optr->op = OpNeq;
-                        break;
-                    case Less:
-                        optr->op = opc == OP_CLASS_SIGNED ? OpLess_S : OpLess_U;
-                        break;
-                    case LessEq:
-                        optr->op = opc == OP_CLASS_SIGNED ? OpLessEq_S : OpLessEq_U;
-                        break;
-                    case Great:
-                        optr->op = opc == OP_CLASS_SIGNED ? OpGreat_S : OpGreat_U;
-                        break;
-                    case GreatEq:
-                        optr->op = opc == OP_CLASS_SIGNED ? OpGreatEq_S : OpGreatEq_U;
-                        break;
-                    case Shl:
-                        optr->op = OpShl;
-                        break;
-                    case Shr:
-                        optr->op = opc == OP_CLASS_SIGNED ? OpShr_S : OpShr_U;
-                        break;
-                    case Add:
-                        optr->op = opc == OP_CLASS_POINTER ? OpAdd_P : OpAdd;
-                        break;
-                    case Sub:
-                        optr->op = opc == OP_CLASS_POINTER ? OpSub_P : OpSub;
-                        // Subtracting a pointer from a pointer
-                        if ( opClass(ev->right->st) == OP_CLASS_POINTER ) optr->op = OpSub_PP;
-                        break;
-                    case Mul:
-                        optr->op = opc == OP_CLASS_SIGNED ? OpMul_S : OpMul_U;
-                        break;
-                    case Div:
-                        optr->op = opc == OP_CLASS_SIGNED ? OpDiv_S : OpDiv_U;
-                        break;
-                    case Mod:
-                        optr->op = opc == OP_CLASS_SIGNED ? OpMod_S : OpMod_S;
-                        break;
-                    case Arrow:
-                        optr->op = OpArrow;
-                        break;
-                    case Dot:
-                        optr->op = OpDot;
-                        break;
-                    case Square_L:
-                        optr->op = OpArray;
-                        break;
-                    case FnCallArgs:
-                        optr->op = OpCall;
-                        break;
-                    case Arg:
-                        optr->op = OpPush;
-                        break;
-#ifdef DEBUG
-                    default: mccfail("no such binary operator");
+#ifdef DEBUG_GEN
+                        case Comma: break; // Don't let comma trigger this error
+                        default: mccfail("no such binary operator");
 #endif
+                    }
                 }
             }
             else
             {
-                struct mccoper * r_op = ev->right->op;
-
-                evlstk -= r_op->size;
+                if ( r_op->reg > curfunc->z_size ) stkadj( -r_op->size );
                 
-                // Move the result to the evlstk if needed
-                optr->reg = r_op->reg < zerosize ? evlstk : r_op->reg;
-                optr->size = ev->st->size;
-                
-                evlstk += ev->st->size;
+                // Move the result to the eval stack if needed
+                optr->reg = evlstk;
+                stkadj( optr->size = ev->st->size );
                 
                 optr->c.r_arg = r_op->reg;
                 optr->c.r_size = r_op->size;
@@ -296,20 +390,20 @@ void generate(struct mcceval * cn)
                         optr[1] = *optr;
                         
                         optr->op = OpArg;
-                        optr++;                    
+                        optr++;
 
                         break;
                     case PostInc:
-                        optr->op = OpPostInc;
+                        optr->op = ev->st->type & IR_LVAL ? OpPostIncLoad : OpPostInc;
                         break;
                     case PostDec:
-                        optr->op = OpPostDec;
+                        optr->op = ev->st->type & IR_LVAL ? OpPostDecLoad : OpPostDec;
                         break;
                     case PreInc:
-                        optr->op = OpPreInc;
+                        optr->op = ev->st->type & IR_LVAL ? OpPreIncLoad  : OpPreInc;
                         break;
                     case PreDec:
-                        optr->op = OpPreDec;
+                        optr->op = ev->st->type & IR_LVAL ? OpPreDecLoad  : OpPreDec;
                         break;
                   //case Plus: // Does nothing
                     case Minus:
@@ -325,7 +419,7 @@ void generate(struct mcceval * cn)
                     case Not:
                         optr->op = OpNot;
                         break;
-#ifdef DEBUG
+#ifdef DEBUG_GEN
                     default: mccfail("no such unary operator");
 #endif
                 }
@@ -336,89 +430,109 @@ void generate(struct mcceval * cn)
             switch ( op )
             {
                 case StartOfArgs: // Not an operand, just tells us that we're about to start pushing arguments for a function call
+                    // TODO set reg/size to associated call pointer
                     optr->op = OpArg;
                     break;
-            
-                case Variable: // Global var
-                case String: // Strings constants are effectively global vars
+
+                case String: // Strings constant
                     optr->op = OpAddrGlb;
                     optr->a.name = ev->st->name;
                     optr->a.val = ev->st->val;
 
-                    optr->size = IR_PTR_SIZE;
                     optr->reg = evlstk;
-                    
-                    evlstk += IR_PTR_SIZE;
+                    stkadj( optr->size = IR_PTR_SIZE );
                     break;
 
+                case Variable: // Global var
                 case VariableLocal: // Local var
-                    optr->op = OpAddrLoc;
-                    optr->a.val = ev->st->val;
-
-                    optr->size = IR_PTR_SIZE;
-
-                    // Don't allocate any space on the eval stack for a zero page local var which is also an l-value
-                    if ( ev->st->val < zerosize && (ev->st->type & IR_LVAL) )
+#ifdef DEBUG_GEN
+                    if ( !ev->var ) mccfail("non-existant variable durring code generation");
+                    if ( (ev->var->flags & VAR_ALC_MASK) == VAR_ALC_NA ) mccfail("variable was not allocated anywhere durring code generation");
+#endif
+                    if ( (ev->var->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) // Allocated in zero page
                     {
-                        optr->reg = ev->st->val;
+                        // Use a no-op MOV to pass along the address
+                        // This MOV instruction can be repurpoused by an assignment
+                        optr->op = OpMov;
+                        optr->reg = ev->var->z_addr;
+                        optr->size = ev->st->size;
+                        
+                        optr->c.r_arg = optr->reg;
+                        optr->c.r_size = ev->var->size;
+                        
+                        ev->st->type &= ~IR_LVAL; // This is not an l-value
                     }
-                    else
+                    else // Allocated in main memory, we'll have to load it ourselves
                     {
+                        if (ev->var->len) // Global variable
+                        {
+                            optr->op = OpAddrGlb;
+                            optr->a.name = ev->st->name;
+                        }
+                        else // Local variable
+                        {
+                            optr->op = OpAddrLoc;
+                        }
+
+                        optr->a.val = ev->st->val;
+
                         optr->reg = evlstk;
                         
-                        evlstk += IR_PTR_SIZE;
-                    }
+                        stkadj( optr->size = IR_PTR_SIZE );
 
+                        // Mark complex types as non l-values as they cannot be dereferenced
+                        unsigned int8_t type = ev->st->type & IR_TYPE_MASK;
+                        
+                        if ( type >= IR_STRUC && type <= IR_FUNC ) ev->st->type &= ~IR_LVAL;
+                    }
                     break;
 
                 case SmolNumber:
                     optr->op = OpValueByte;
-                    optr->v.val = ev->st->val;
+                    optr->v.val = ev->st->val & 0xFF;
                     
-                    optr->size = ev->st->size;
                     optr->reg = evlstk;
                     
-                    evlstk += ev->st->size;
+                    stkadj( optr->size = ev->st->size );
                     break;
 
                 case Number:
                     optr->op = OpValueWord;
                     optr->v.val = ev->st->val;
                     
-                    optr->size = ev->st->size;
                     optr->reg = evlstk;
                     
-                    evlstk += ev->st->size;
+                    stkadj( optr->size = ev->st->size );
                     break;
 
                 case LongNumber:
                     optr->op = OpValueLong;
                     optr->v.valLong = ev->st->valLong;
                     
-                    optr->size = ev->st->size;
                     optr->reg = evlstk;
                     
-                    evlstk += ev->st->size;
+                    stkadj( optr->size = ev->st->size );
                     break;
-#ifdef DEBUG
+#ifdef DEBUG_GEN
                 default: mccfail("no such operand");
 #endif
             }
         }
 
-        // Preform l-to-r value conversion for non-zero-page registers
-        if ( ev->st->val >= zerosize && (ev->st->type & IR_LVAL) )
+        // Preform l-to-r value conversion
+        if ( ev->st->type & IR_LVAL )
         {
             optr++;
             optr->op = OpLoad;
             
             optr->c.r_arg = optr->reg = (optr-1)->reg;
-            optr->c.r_size = (optr-1)->size;
+            optr->c.r_size = optr->size = ev->st->size; // This should be the actual size in bytes
             
-            optr->size = ev->st->size;
+            unsigned int8_t sz = optr->size;
+            if ( sz < 2 ) sz = 2;
             
             // Update eval stack size with loaded type's size
-            evlstk += ev->st->size - optr->c.r_size;
+            stkadj( sz - IR_PTR_SIZE );
         }
         
         /* Handle implicit conversion between floats & ints which happens durring:
@@ -436,15 +550,28 @@ void generate(struct mcceval * cn)
             !!!TODO!!!
         */
         
-        // Discard result if left child of comma operator
-        if ( pv && pv->st->oper == Comma && pv->left == ev ) evlstk -= ev->st->size;
+        if ( pv )
+        {
+            if ( pv->left == ev )
+            {
+                // Discard result if left child of comma operator
+                if ( pv->st->oper == Comma ) stkadj( -ev->st->size );
+                else if ( pv->st->oper > Ass && pv->st->oper <= OrAss ) // Ensure right-hand-side of modify-assignment has correct size and is on eval stack
+                {
+                    optr->size = pv->st->size;
+                    if (!optr->size) optr->size++;
+                    
+                    if ( optr->reg < curfunc->z_size )
+                    {
+                        optr->reg = evlstk;
+                        stkadj( optr->size );
+                    }
+                }
+            }
+        }
 
         // Handle case where the parent node is an assignment expression to a variable in zeropage
         // TODO
-
-        // Eval stack overran zero page
-        if ( evlstk > 0x100    ) mccfail("eval stack overflow");
-        if ( evlstk < zerosize ) mccfail("eval stack underflow");
 
         // Increment current operation pointer
         ev->op = optr++;

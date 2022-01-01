@@ -15,9 +15,9 @@
 // Complex types
 #define IR_STRUC 9
 // Derived types
-#define IR_PTR   10
-#define IR_ARRAY 11
-#define IR_FUNC  12
+#define IR_ARRAY 10
+#define IR_FUNC  11
+#define IR_PTR   12
 // Types mask
 #define IR_TYPE_MASK 0b1111
 

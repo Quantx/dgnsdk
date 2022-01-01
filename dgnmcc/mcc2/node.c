@@ -14,7 +14,37 @@ void mccfail( int8_t * msg )
     octwrite( 2, cni );
     write( 2, ":", 1 );
 
+#ifdef DEBUG
+    int * a = 0, b = *a;
+#endif    
+
     die(msg);
+}
+
+int16_t opClass( struct mccstmt * st )
+{
+    unsigned int8_t t = st->type & IR_TYPE_MASK;
+    switch (t)
+    {
+        case IR_VOID:
+            return OP_CLASS_VOID;
+        case IR_CHR:
+        case IR_INT:
+        case IR_LNG:
+            return OP_CLASS_SIGNED;
+        case IR_UCHR:
+        case IR_UINT:
+        case IR_ULNG:
+            return OP_CLASS_UNSIGNED;
+        case IR_FPV:
+        case IR_DBL:
+            return OP_CLASS_FLOAT;
+        case IR_PTR:
+        case IR_ARRAY: // Remember, arrays aren't always pointers, try reconsidering this later
+            return OP_CLASS_POINTER;
+    }
+    
+    return -1;
 }
 
 struct mccstmt * node()

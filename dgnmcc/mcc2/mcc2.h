@@ -4,6 +4,8 @@
 
 #ifdef DEBUG
 #define DEBUG_NODE 1
+#define DEBUG_ALLOC 1
+#define DEBUG_GEN 1
 #endif
 
 #define MAX_STATEMENT 64
@@ -12,6 +14,10 @@
 #define MAX_STATEMENT_STK 64 // Maximum depth of statement stack depth
 
 #define MAX_ANALYSIS_BRK 4096 // Number of bytes for analysis brk region
+
+// 216 = 256 (size of zero page) - 40 (number in use by system: 0 through 047)
+#define MAX_REG 32 // Number of registers available for allocation per function
+#define MAX_ZEROPAGE 216 // The absolute maximum number of registers available for allocation (this can change based on the OS and memory mapping)
 
 #include "../mcc/opcodes.h"
 
@@ -23,31 +29,46 @@ struct mcceval
 {
     struct mccoper * op;
     struct mccstmt * st;
+    struct mccvar * var;
     struct mcceval * left, * right, * parent;
 };
+
+#define VAR_ALC_ZP 0 // Currently allocated in zero page
+#define VAR_ALC_MM 1 // Currently allocated in main memory
+#define VAR_ALC_DA 2 // Don't allocate (used for arrays, structs, and functions), also used when the address of a variable is taken
+#define VAR_ALC_NA 3 // Not allocated anywhere
+#define VAR_ALC_MASK 0b11
 
 struct mccvar
 {
     union
     {
         int8_t * name; // Global variable
-        unsigned int16_t addr; // Local variable
+        unsigned int16_t addr; // Local variable address (assuming everything is allocated to the stack)
     };
-    // For glb: length of name
-    // For loc: number of allocs before active (0 = function args, 1 = start of function, etc...)
-    unsigned int16_t val;
+    // Length of global var's name, 0 for local var
+    unsigned int16_t len;
+
+    unsigned int8_t flags;
+    unsigned int8_t z_addr; // Zero page address
     
-    // Number of times this variable is read from
-    unsigned int16_t reads;
-    // Number of times this variable is written to
-    unsigned int16_t writes;
+    unsigned int16_t s_addr; // Spill address
+    unsigned int16_t size;
+    
+    unsigned int16_t lac; // Last access count
+    
+    struct mccvar * next;
 };
 
 struct mccfunc
 {
     int8_t * name;
     unsigned int8_t len;
-    unsigned int8_t flag;
+    unsigned int8_t z_size; // Number of registers currently in use
+    
+    unsigned int16_t s_size; // Stack size
+    
+    unsigned int16_t vac; // Variable access count
     
     struct mccvar * vartbl, ** vartail;
     

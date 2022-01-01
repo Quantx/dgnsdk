@@ -1,0 +1,111 @@
+OpMov
+Dest: 0|2B
+Comp L: 0|0B
+Comp R: 0|2B
+
+OpMov
+Dest: 1|2B
+Comp L: 0|0B
+Comp R: 1|2B
+
+OpAdd_P
+Dest: 4|2B
+Comp L: 0|2B
+Comp R: 1|2B
+
+OpMov
+Dest: 2|2B
+Comp L: 0|0B
+Comp R: 2|2B
+
+OpPostInc
+Dest: 5|2B
+Comp L: 0|0B
+Comp R: 2|2B
+
+OpMov
+Dest: 0|2B
+Comp L: 0|0B
+Comp R: 0|2B
+
+OpValueByte
+Dest: 6|1B
+Val: 2
+
+OpArray
+Dest: 6|2B
+Comp L: 0|2B
+Comp R: 6|1B
+
+OpLoad
+Dest: 6|2B
+Comp L: 0|0B
+Comp R: 6|2B
+
+OpNegate
+Dest: 6|2B
+Comp L: 0|0B
+Comp R: 6|2B
+
+OpAdd
+Dest: 5|2B
+Comp L: 5|2B
+Comp R: 6|2B
+
+OpMov
+Dest: 3|2B
+Comp L: 0|0B
+Comp R: 3|2B
+
+OpPreInc
+Dest: 6|2B
+Comp L: 0|0B
+Comp R: 3|2B
+
+OpMul_S
+Dest: 5|2B
+Comp L: 5|2B
+Comp R: 6|2B
+
+OpArray
+Dest: 5|2B
+Comp L: 4|2B
+Comp R: 5|2B
+
+OpLoad
+Dest: 5|2B
+Comp L: 0|0B
+Comp R: 5|2B
+
+OpValueByte
+Dest: 6|1B
+Val: 4
+
+OpAdd
+Dest: 2|2B
+Comp L: 5|2B
+Comp R: 6|1B
+
+OpMov
+Dest: 2|2B
+Comp L: 0|0B
+Comp R: 2|2B
+
+OpValueByte
+Dest: 5|1B
+Val: 7
+
+OpMov
+Dest: 3|1B
+Comp L: 0|0B
+Comp R: 3|2B
+
+OpAdd
+Dest: 5|1B
+Comp L: 5|1B
+Comp R: 3|1B
+
+OpValueByte
+Dest: 5|1B
+Val: 1282
+
