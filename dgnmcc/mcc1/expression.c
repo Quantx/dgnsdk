@@ -535,13 +535,13 @@ struct, union: (In addition to pointers above)
             {
                 if ( !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is not integer type");
                 n->type = n->left->type;
-                n->flag |= CPL_LVAL;
+//                n->flag |= CPL_LVAL;
             }
             else if ( isPointer(n->right->type) )
             {
                 if ( !isInteger(n->left->type) ) mccfail("rhs is pointer, lhs is not integer type");
                 n->type = n->right->type;
-                n->flag |= CPL_LVAL;
+//                n->flag |= CPL_LVAL;
             }
             else
             {
@@ -555,7 +555,7 @@ struct, union: (In addition to pointers above)
             if ( isPointer(n->left->type) )
             {
                 if ( isPointer(n->right->type) ) n->type = &type_int;
-                else if ( isInteger(n->right->type) ) n->type = n->left->type, n->flag = CPL_LVAL;
+                else if ( isInteger(n->right->type) ) n->type = n->left->type;//, n->flag = CPL_LVAL;
                 else mccfail("lhs is pointer, rhs is neither pointer nor integer");
             }
             else
