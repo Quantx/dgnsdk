@@ -65,13 +65,11 @@ void statement( struct mccstmt * st )
             break;
         case Allocate:
             locsize += st->val;
-            // Ensure at least MAX_EVAL_STK is available
-//            if ( locsize < (0xFF - MAX_EVAL_STK) ) zerosize = locsize;
             brk(st);
             break;
         case Unallocate:
             locsize -= st->val;
-//            if ( locsize < zerosize ) zerosize = locsize;
+            // !!!TODO!!! remove stack variables from function list 
             brk(st);
             break;
         case If:
@@ -117,6 +115,7 @@ void statement( struct mccstmt * st )
             generate(expr(ce = node())); // Process return statement's expression
             
             optr->op = OpReturn;
+            optr->s.id = 0;
             optr++;
             
             emitOpBuffer();

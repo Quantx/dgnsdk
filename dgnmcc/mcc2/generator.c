@@ -8,52 +8,56 @@ void printOper( struct mccoper * prop )
     while ( opn[opl] ) opl++;
 
     write( fd_dbg, opn, opl );
+    write( fd_dbg, "\n", 1 );
     
-    // Output dest register
-    write( fd_dbg, "\nDest: ", 7 );
-    decwrite( fd_dbg, prop->reg );
-    write( fd_dbg, "|", 1 );
-    decwrite( fd_dbg, prop->size );
-    write( fd_dbg, "B\n", 2 );
-
-    if ( prop->op >= OpValueByte && prop->op <= OpValueLong )
+    if ( prop->op >= OpEnd && prop->op <= OpReturn )
     {
-        write( fd_dbg, "Val: ", 5 );
-        if ( prop->op == OpValueLong ) octwrite( fd_dbg, prop->v.valLong );
-        else decwrite( fd_dbg, prop->v.val );
-        write( fd_dbg, "\n", 1 );
-    }
-    else if ( prop->op == OpAddrGlb )
-    {
-        write( fd_dbg, "Global Addr: ", 13 );
-        write( fd_dbg, prop->a.name, prop->a.val );
-        write( fd_dbg, "\n", 1 );
-    }
-    else if ( prop->op == OpAddrLoc )
-    {
-        write( fd_dbg, "Local Addr: ", 12 );
-        decwrite( fd_dbg, prop->a.val );
-        write( fd_dbg, "\n", 1 );
-    }
-    else if ( prop->op >= OpEnd && prop->op <= OpReturn )
-    {
-        write( fd_dbg, "Statement: ", 12 );
+        write( fd_dbg, "Statement: ", 11 );
         decwrite( fd_dbg, prop->s.id );
         write( fd_dbg, "\n", 1 );
     }
     else
     {
-        write( fd_dbg, "Comp L: ", 8 );
-        decwrite( fd_dbg, prop->c.l_arg );
+        // Output dest register
+        write( fd_dbg, "Dest: ", 6 );
+        decwrite( fd_dbg, prop->reg );
         write( fd_dbg, "|", 1 );
-        decwrite( fd_dbg, prop->c.l_size );
+        decwrite( fd_dbg, prop->size );
         write( fd_dbg, "B\n", 2 );
-        
-        write( fd_dbg, "Comp R: ", 8 );
-        decwrite( fd_dbg, prop->c.r_arg );
-        write( fd_dbg, "|", 1 );
-        decwrite( fd_dbg, prop->c.r_size );
-        write( fd_dbg, "B\n", 2 );
+
+        if ( prop->op >= OpValueByte && prop->op <= OpValueLong )
+        {
+            write( fd_dbg, "Val: ", 5 );
+            if ( prop->op == OpValueLong ) octwrite( fd_dbg, prop->v.valLong );
+            else decwrite( fd_dbg, prop->v.val );
+            write( fd_dbg, "\n", 1 );
+        }
+        else if ( prop->op == OpAddrGlb )
+        {
+            write( fd_dbg, "Global Addr: ", 13 );
+            write( fd_dbg, prop->a.name, prop->a.val );
+            write( fd_dbg, "\n", 1 );
+        }
+        else if ( prop->op == OpAddrLoc )
+        {
+            write( fd_dbg, "Local Addr: ", 12 );
+            decwrite( fd_dbg, prop->a.val );
+            write( fd_dbg, "\n", 1 );
+        }
+        else
+        {
+            write( fd_dbg, "Comp L: ", 8 );
+            decwrite( fd_dbg, prop->c.l_arg );
+            write( fd_dbg, "|", 1 );
+            decwrite( fd_dbg, prop->c.l_size );
+            write( fd_dbg, "B\n", 2 );
+            
+            write( fd_dbg, "Comp R: ", 8 );
+            decwrite( fd_dbg, prop->c.r_arg );
+            write( fd_dbg, "|", 1 );
+            decwrite( fd_dbg, prop->c.r_size );
+            write( fd_dbg, "B\n", 2 );
+        }
     }
     
     write( fd_dbg, "\n", 1 );
@@ -208,15 +212,15 @@ void generate(struct mcceval * cn)
                         if ( op == Ass )
                         {
                             optr--; // Last instruction should be a LOAD
-#ifdef DEBUG_GEN                                
+#ifdef DEBUG_GEN
                             if ( optr->op != OpLoad ) mccfail( "Last op before assignment was not LOAD!" );
 #endif
                             stkadj( -optr->size ); // Unallocate space from load op
 
                             optr->op = OpStore;
-                            
-                            optr->c.r_arg = r_op->reg;
-                            optr->c.r_size = ev->right->st->size;
+
+                            optr->reg = l_op->reg;
+                            optr->size = ev->st->size;
                         }
                         else // Resultant type is always the same as the left-hand-side
                         {                            
@@ -308,6 +312,7 @@ void generate(struct mcceval * cn)
                     // *** Binary Operators ***
                         // case Ass: // Handled above
                         case Comma:
+                            stkadj( -optr->size );
                             optr--; // Don't emit an operation
                             break;
                         case LogOr:
@@ -421,19 +426,22 @@ void generate(struct mcceval * cn)
                     case PreDec:
                         optr->op = ev->st->type & IR_LVAL ? OpPreDecLoad  : OpPreDec;
                         break;
-                  //case Plus: // Does nothing
                     case Minus:
                         optr->op = OpNegate;
                         break;
-                    case Deref:
-                        optr->op = OpLoad;
-                        break;
-                  //case Inder: // Does nothing
                     case LogNot:
                         optr->op = OpLogNot;
                         break;
                     case Not:
                         optr->op = OpNot;
+                        break;
+                    case Plus:
+                        optr->op = OpMov; // Preform byte promotion to word
+                        break;
+                    case Deref: // Handled by l-value load
+                    case Inder: // Does nothing
+                        stkadj( -optr->size );
+                        optr--;
                         break;
 #ifdef DEBUG_GEN
                     default: mccfail("no such unary operator");
@@ -538,6 +546,9 @@ void generate(struct mcceval * cn)
             }
         }
 
+        // Inderection (Address-of) strips l-value
+        if ( pv && pv->st->oper == Inder ) ev->st->type &= ~IR_LVAL;
+
         // Preform l-to-r value conversion
         if ( ev->st->type & IR_LVAL )
         {
@@ -547,11 +558,19 @@ void generate(struct mcceval * cn)
             optr->c.r_arg = optr->reg = (optr-1)->reg;
             optr->c.r_size = optr->size = ev->st->size; // This should be the actual size in bytes
             
-            unsigned int8_t sz = optr->size;
-            if ( sz < 2 ) sz = 2;
-            
-            // Update eval stack size with loaded type's size
-            stkadj( sz - IR_PTR_SIZE );
+            if ( optr->reg < curfunc->z_size ) // Can't load into zero page, allocate room on the stack
+            {
+                optr->reg = evlstk;
+                stkadj( optr->size );
+            }
+            else
+            {
+                unsigned int8_t sz = optr->size;
+                if ( sz < 2 ) sz = 2;
+                
+                // Update eval stack size with loaded type's size
+                stkadj( sz - IR_PTR_SIZE );
+            }
         }
         
         /* Handle implicit conversion between floats & ints which happens durring:

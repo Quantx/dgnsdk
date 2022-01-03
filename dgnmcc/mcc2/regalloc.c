@@ -155,6 +155,7 @@ void regalloc(struct mcceval * cn)
                 #ifdef DEBUG_ALLOC
                 write( 2, "DA Var: ", 8 );
                 writeVar( 2, av );
+                write( 2, "\n", 1 );
                 #endif
             
                 spill(av, curfunc->z_size);
