@@ -66,6 +66,8 @@ struct mccfunc
     unsigned int8_t len;
     unsigned int8_t z_size; // Number of registers currently in use
     
+    unsigned int8_t z_max;
+    
     unsigned int16_t s_size; // Stack size
     
     unsigned int16_t vac; // Variable access count

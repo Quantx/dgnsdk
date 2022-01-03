@@ -1,10 +1,8 @@
-void emit( struct mccoper * emop )
-{
-    write( fd, emop, sizeof(struct mccoper CAST_NAME) );
-    
 #ifdef DEBUG
+void printOper( struct mccoper * prop )
+{
     // Output op name
-    int8_t * opn = opNames[emop->op];
+    int8_t * opn = opNames[prop->op];
     int16_t opl = 0;
     
     while ( opn[opl] ) opl++;
@@ -13,57 +11,72 @@ void emit( struct mccoper * emop )
     
     // Output dest register
     write( fd_dbg, "\nDest: ", 7 );
-    decwrite( fd_dbg, emop->reg );
+    decwrite( fd_dbg, prop->reg );
     write( fd_dbg, "|", 1 );
-    decwrite( fd_dbg, emop->size );
+    decwrite( fd_dbg, prop->size );
     write( fd_dbg, "B\n", 2 );
 
-    if ( emop->op >= OpValueByte && emop->op <= OpValueLong )
+    if ( prop->op >= OpValueByte && prop->op <= OpValueLong )
     {
         write( fd_dbg, "Val: ", 5 );
-        if ( emop->op == OpValueLong ) octwrite( fd_dbg, emop->v.valLong );
-        else decwrite( fd_dbg, emop->v.val );
+        if ( prop->op == OpValueLong ) octwrite( fd_dbg, prop->v.valLong );
+        else decwrite( fd_dbg, prop->v.val );
         write( fd_dbg, "\n", 1 );
     }
-    else if ( emop->op == OpAddrGlb )
+    else if ( prop->op == OpAddrGlb )
     {
         write( fd_dbg, "Global Addr: ", 13 );
-        write( fd_dbg, emop->a.name, emop->a.val );
+        write( fd_dbg, prop->a.name, prop->a.val );
         write( fd_dbg, "\n", 1 );
     }
-    else if ( emop->op == OpAddrLoc )
+    else if ( prop->op == OpAddrLoc )
     {
         write( fd_dbg, "Local Addr: ", 12 );
-        decwrite( fd_dbg, emop->a.val );
+        decwrite( fd_dbg, prop->a.val );
         write( fd_dbg, "\n", 1 );
     }
-    else if ( emop->op >= OpEnd && emop->op <= OpReturn )
+    else if ( prop->op >= OpEnd && prop->op <= OpReturn )
     {
         write( fd_dbg, "Statement: ", 12 );
-        decwrite( fd_dbg, emop->s.id );
+        decwrite( fd_dbg, prop->s.id );
         write( fd_dbg, "\n", 1 );
     }
     else
     {
         write( fd_dbg, "Comp L: ", 8 );
-        decwrite( fd_dbg, emop->c.l_arg );
+        decwrite( fd_dbg, prop->c.l_arg );
         write( fd_dbg, "|", 1 );
-        decwrite( fd_dbg, emop->c.l_size );
+        decwrite( fd_dbg, prop->c.l_size );
         write( fd_dbg, "B\n", 2 );
         
         write( fd_dbg, "Comp R: ", 8 );
-        decwrite( fd_dbg, emop->c.r_arg );
+        decwrite( fd_dbg, prop->c.r_arg );
         write( fd_dbg, "|", 1 );
-        decwrite( fd_dbg, emop->c.r_size );
+        decwrite( fd_dbg, prop->c.r_size );
         write( fd_dbg, "B\n", 2 );
     }
     
     write( fd_dbg, "\n", 1 );
+}
+
+#endif
+
+void emit( struct mccoper * emop )
+{
+    // Don't emit no-ops
+    if ( emop->op == OpMov && emop->reg == emop->c.r_arg ) return;
+
+    write( fd, emop, sizeof(struct mccoper CAST_NAME) );
+#ifdef DEBUG
+    printOper(emop);
 #endif
 }
 
 void emitOpBuffer()
 {
+#if DEBUG
+    write( fd_dbg, "*** Start of Emit ***\n", 22 );
+#endif
     struct mccoper * opout;
     for ( opout = obuf; opout != optr; opout++ )
     {
@@ -83,6 +96,8 @@ int16_t stkadj( int16_t bytes )
 
     if ( evlstk < curfunc->z_size ) mccfail("stack underflow");
     if ( evlstk >= MAX_ZEROPAGE   ) mccfail("stack overflow");
+    
+    if ( evlstk > curfunc->z_max ) curfunc->z_max = evlstk;
     
     return evlstk;
 }
@@ -276,8 +291,8 @@ void generate(struct mcceval * cn)
                 }
                 else
                 {
-                    if ( l_op->reg > curfunc->z_size ) stkadj( -l_op->size );
-                    if ( r_op->reg > curfunc->z_size ) stkadj( -r_op->size );
+                    if ( l_op->reg >= curfunc->z_size ) stkadj( -l_op->size );
+                    if ( r_op->reg >= curfunc->z_size ) stkadj( -r_op->size );
                     
                     optr->reg = evlstk;
                     stkadj( optr->size = ev->st->size );
@@ -291,8 +306,10 @@ void generate(struct mcceval * cn)
                     switch ( op )
                     {
                     // *** Binary Operators ***
-                        // case Comma: // Handled by left child
                         // case Ass: // Handled above
+                        case Comma:
+                            optr--; // Don't emit an operation
+                            break;
                         case LogOr:
                             optr->op = OpLogOr;
                             break;
@@ -356,7 +373,7 @@ void generate(struct mcceval * cn)
                             optr->op = OpDot;
                             break;
                         case Square_L:
-                            optr->op = OpArray;
+                            optr->op = OpAdd_P;
                             break;
                         case FnCallArgs:
                             optr->op = OpCall;
@@ -365,7 +382,6 @@ void generate(struct mcceval * cn)
                             optr->op = OpPush;
                             break;
 #ifdef DEBUG_GEN
-                        case Comma: break; // Don't let comma trigger this error
                         default: mccfail("no such binary operator");
 #endif
                     }
@@ -373,7 +389,7 @@ void generate(struct mcceval * cn)
             }
             else
             {
-                if ( r_op->reg > curfunc->z_size ) stkadj( -r_op->size );
+                if ( r_op->reg >= curfunc->z_size ) stkadj( -r_op->size );
                 
                 // Move the result to the eval stack if needed
                 optr->reg = evlstk;
@@ -430,8 +446,11 @@ void generate(struct mcceval * cn)
             switch ( op )
             {
                 case StartOfArgs: // Not an operand, just tells us that we're about to start pushing arguments for a function call
-                    // TODO set reg/size to associated call pointer
                     optr->op = OpArg;
+                    
+                    // Last operation should be loading the function pointer, store a reference to that
+                    optr->c.r_arg = (optr - 1)->reg;
+                    optr->c.r_size = (optr - 1)->size;
                     break;
 
                 case String: // Strings constant
@@ -569,9 +588,10 @@ void generate(struct mcceval * cn)
                 }
             }
         }
-
-        // Handle case where the parent node is an assignment expression to a variable in zeropage
-        // TODO
+        
+#ifdef DEBUG
+        if ( optr->op == OpValueByte && optr->v.val > 0xFF ) mccfail( "OpValueByte had value greater than 0xFF" );
+#endif
 
         // Increment current operation pointer
         ev->op = optr++;

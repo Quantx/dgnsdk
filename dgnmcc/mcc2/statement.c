@@ -32,6 +32,7 @@ void statement( struct mccstmt * st )
             for ( i = 0; i < st->val; i++ ) curfunc->name[i] = st->name[i];
             
             curfunc->vac = 0;
+            curfunc->z_max = 0;
             curfunc->z_size = 0;
             curfunc->s_size = 0;
             

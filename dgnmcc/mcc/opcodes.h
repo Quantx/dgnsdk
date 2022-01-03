@@ -88,7 +88,7 @@ enum
     OpFloat2Float, // Used for converting between floats and doubles
 
     // Structure Operators
-    OpArrow, OpDot, OpArray
+    OpArrow, OpDot
 #ifdef DEBUG
     , _OpListCount
 #endif
@@ -157,7 +157,7 @@ int8_t * opNames[] = {
     "OpFloat2Int", "OpInt2Float",
     "OpFloat2Float",
 
-    "OpArrow", "OpDot", "OpArray"
+    "OpArrow", "OpDot"
 };
 #endif
 

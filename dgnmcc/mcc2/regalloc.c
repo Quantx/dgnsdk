@@ -27,9 +27,6 @@ void spill(struct mccvar * sv, unsigned int8_t spr)
 {
     if ( (sv->flags & VAR_ALC_MASK) != VAR_ALC_ZP ) return;
 
-    unsigned int8_t z_size = sv->size >> 1;
-    if ( !z_size) z_size++;
-
     if ( sv->len ) // Global variable
     {
         // Generate spill instruction
@@ -46,11 +43,8 @@ void spill(struct mccvar * sv, unsigned int8_t spr)
             for ( cv = curfunc->vartbl; cv; cv = cv->next )
             {
                 unsigned int8_t cf = cv->flags & VAR_ALC_MASK;
-                unsigned int8_t cvzs = cv->size >> 1;
-                if (!cvzs) cvzs++;
-                
                 if ( !cv->len && (cf == VAR_ALC_MM || cf == VAR_ALC_DA) // Stack resident variables
-                &&   sv->s_addr <= cv->s_addr + cvzs && cv->s_addr <= sv->s_addr + z_size ) // Conflicting address
+                &&   sv->s_addr <= cv->s_addr + cv->size && cv->s_addr <= sv->s_addr + sv->size ) // Conflicting address
                 {
                    break; // This address won't work, try another one
                 }
@@ -68,7 +62,7 @@ void spill(struct mccvar * sv, unsigned int8_t spr)
     optr->reg = spr;
     optr->size = IR_PTR_SIZE;
 
-    optr++;
+    optr++; 
 
     optr->op = OpStore;
     optr->reg = sv->z_addr;
@@ -174,6 +168,7 @@ void regalloc(struct mcceval * cn)
                 {
                     av->z_addr = curfunc->z_size;
                     curfunc->z_size += z_size;
+                    if ( curfunc->z_size > curfunc->z_max ) curfunc->z_max = curfunc->z_size;
                 }
                 // We're full, make some room
                 else

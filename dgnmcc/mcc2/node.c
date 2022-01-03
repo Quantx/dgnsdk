@@ -55,7 +55,7 @@ struct mccstmt * node()
     if ( out == SBRKFAIL ) mccfail( "unable to allocate room for new statement node" );
 
     int16_t rv = read(0, out, sizeof(struct mccstmt CAST_NAME));
-    if ( rv < sizeof(struct mccstmt CAST_NAME) )
+    if ( rv < sizeof(struct mccstmt CAST_NAME) || out->oper == EndOfFile )
     {
 #ifdef DEBUG_NODE
         if ( rv < 0 ) write( 2, "ERROR", 5 );
