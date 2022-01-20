@@ -69,7 +69,21 @@ void statement( struct mccstmt * st )
             break;
         case Unallocate:
             locsize -= st->val;
-            // !!!TODO!!! remove stack variables from function list 
+            
+            // Can't actually unallocate anything as it might also unallocate a global variable
+            struct mccvar ** dv;
+            for ( dv = &curfunc->vartbl; *dv; dv = &(*dv)->next )
+            {
+                struct mccvar * cv = *dv;
+                // Ignore global variables and local variables that are still in scope
+                if ( !cv->len || cv->addr < locsize ) continue;
+                
+                *dv = cv->next; // Drop from list
+                
+                // Update tail if it points to a node being dropped
+                if ( curfunc->vartail == &cv->next ) curfunc->vartail = dv;
+            }
+            
             brk(st);
             break;
         case If:

@@ -1,4 +1,6 @@
 #ifdef DEBUG
+unsigned int16_t emitnum;
+
 void printOper( struct mccoper * prop )
 {
     // Output op name
@@ -79,7 +81,16 @@ void emit( struct mccoper * emop )
 void emitOpBuffer()
 {
 #if DEBUG
-    write( fd_dbg, "*** Start of Emit ***\n", 22 );
+    write( fd_dbg, "*** Emit ", 9 );
+    write(      2, "*** Emit ", 9 );
+    
+    decwrite( fd_dbg, emitnum );
+    decwrite(      2, emitnum );
+    
+    emitnum++;
+    
+    write( fd_dbg, "\n", 1 );
+    write(      2, "\n", 1 );
 #endif
     struct mccoper * opout;
     for ( opout = obuf; opout != optr; opout++ )
@@ -87,7 +98,7 @@ void emitOpBuffer()
         emit( opout );
     }
     
-    optr = NULL;
+    optr = obuf; // Reset optr
 }
 
 int16_t evlstk;
@@ -440,7 +451,8 @@ void generate(struct mcceval * cn)
                         break;
                     case Deref: // Handled by l-value load
                     case Inder: // Does nothing
-                        stkadj( -optr->size );
+                        if ( r_op->reg >= curfunc->z_size ) stkadj( r_op->size - optr->size );
+                        else stkadj( -optr->size );
                         optr--;
                         break;
 #ifdef DEBUG_GEN

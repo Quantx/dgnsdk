@@ -191,16 +191,16 @@ struct mccoper_computational
     // Destination register
     unsigned int8_t r_arg;
     // Size of source register
-    unsigned int16_t l_size;
+    int16_t l_size;
     // Size of destination register
-    unsigned int16_t r_size;
+    int16_t r_size;
 };
 
 struct mccoper
 {
     unsigned int8_t op;
     unsigned int8_t reg;
-    unsigned int16_t size;
+    int16_t size;
 
     union {
         struct mccoper_value v;
