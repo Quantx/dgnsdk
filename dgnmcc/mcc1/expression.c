@@ -731,7 +731,8 @@ struct, union: (In addition to pointers above)
             fsn->oper = StartOfArgs;
             fsn->flag = 0;
             fsn->type = n->type;
-            fsn->left = fan->right = NULL;
+            fsn->sym = n->sym;
+            fsn->left = fsn->right = NULL;
             
             for ( cursym = s->ftype->symtbl; cursym; cursym = cursym->next, fsn = fan )
             {
@@ -886,7 +887,7 @@ void emitStatement(unsigned int8_t op, unsigned int32_t val)
 
     stn.oper = op;
     stn.val = val;
-    stn.type = IR_VOID;
+    stn.type = op == SmolNumber ? IR_UCHR : IR_VOID;
 
     write( segs[SEG_TEXT], &stn, sizeof(struct mccstmt CAST_NAME) );
 }

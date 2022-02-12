@@ -18,11 +18,11 @@ enum
     OpAddrLoc,
 
 // *** Statements ***
-    OpEnd,
+    OpStart, OpEnd,
     // Conditional
     OpIf, OpElse,
     // Loop
-    OpDo, OpWhile, OpFor,
+    OpFor, OpWhile, OpDo,
     // Switch
     OpSwitch, OpCase, OpDefault,
     // Flow
@@ -104,11 +104,11 @@ int8_t * opNames[] = {
 
     "OpAddrLoc",
 
-    "OpEnd",
+    "OpStart", "OpEnd",
 
     "OpIf", "OpElse",
 
-    "OpDo", "OpWhile", "OpFor",
+    "OpFor", "OpWhile", "OpDo",
 
     "OpSwitch", "OpCase", "OpDefault",
 

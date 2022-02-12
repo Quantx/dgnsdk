@@ -197,40 +197,49 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         struct mccnode * root;
 
         // Init expression
+        if ( tk != SemiColon )
+        {
+            erbp = sbrk(0);
 
-        erbp = sbrk(0);
+            root = expr( curnsp, SemiColon );
 
-        root = expr( curnsp, SemiColon );
+            if ( tk != SemiColon ) mccfail( "missing first semicolon in for statement" );
 
-        if ( tk != SemiColon ) mccfail( "missing first semicolon in for statement" );
+            emit(root);
+            brk(erbp);
+        }
+        else emitStatement( SmolNumber, 0 ); // Do nothing
         ntok();
-
-        emit(root);
-        brk(erbp);
 
         // Eval expression
+        if ( tk != SemiColon )
+        {
+            erbp = sbrk(0);
 
-        erbp = sbrk(0);
+            root = expr( curnsp, SemiColon );
 
-        root = expr( curnsp, SemiColon );
+            if ( tk != SemiColon ) mccfail( "missing second semicolon in for statement" );
 
-        if ( tk != SemiColon ) mccfail( "missing second semicolon in for statement" );
+            emit(root);
+            brk(erbp);
+        }
+        else emitStatement( SmolNumber, 1 ); // Loop forever
         ntok();
-
-        emit(root);
-        brk(erbp);
 
         // Iterator expression
+        if ( tk != Paren_R )
+        {
+            erbp = sbrk(0);
 
-        erbp = sbrk(0);
+            root = expr( curnsp, Paren_R );
 
-        root = expr( curnsp, Paren_R );
+            if ( tk != Paren_R ) mccfail( "missing closing parenthasis in for statement" );
 
-        if ( tk != Paren_R ) mccfail( "missing closing parenthasis in for statement" );
+            emit(root);
+            brk(erbp);
+        }
+        else emitStatement( SmolNumber, 0 ); // Do nothing
         ntok();
-
-        emit(root);
-        brk(erbp);
 
         // Statement
 
@@ -256,15 +265,16 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
         ntok();
         statement(func, curnsp, sws);
 
-        emitStatement( End, 1 );
-
-        if ( tk != While ) mccfail( "missing while in do-while statement" );
+        if ( tk != While ) mccfail( "missing while in do-while statement" );        
+        emitStatement( While, 1 );
 
         ntok();
         parenthesizedExpr(curnsp);
 
         if ( tk != SemiColon ) mccfail( "missing final semicolon in do-while statement" );
         ntok();
+        
+        emitStatement( End, 0 );
     }
     else
     {

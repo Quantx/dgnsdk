@@ -1,17 +1,20 @@
 unsigned int16_t stmtid; // Current statement ID
 
 int16_t stmttop;
-struct mccstmt * stmtstk[MAX_STATEMENT_STK];
+struct mccfcst * stmtstk[MAX_STATEMENT_STK];
 
 void statement( struct mccstmt * st )
 {
     struct mccstmt * ce;
-    struct mccstmt * stop = stmtstk[stmttop - 1];
+    // Technically an underflow if the stack is empty, but who gives a shit
+    struct mccstmt * stop = stmtstk[stmttop - 1]->st;
+    struct mcceval * ev;
 
     switch ( st->oper )
     {
         case Label:
         case LabelExtern: // Function declaration
+        {
             locsize = 0; // Reset local allocation size
             
             if ( curfunc ) brk2( curfunc );
@@ -28,7 +31,7 @@ void statement( struct mccstmt * st )
             if ( curfunc->name == SBRKFAIL ) mccfail( "cannot allocate room for new function name" );
             curfunc->len = st->val;
 
-            unsigned int16_t i;
+            int16_t i;
             for ( i = 0; i < st->val; i++ ) curfunc->name[i] = st->name[i];
             
             curfunc->vac = 0;
@@ -63,11 +66,13 @@ void statement( struct mccstmt * st )
 
             brk(st);
             break;
+        }
         case Allocate:
             locsize += st->val;
             brk(st);
             break;
         case Unallocate:
+        {
             locsize -= st->val;
             
             // Can't actually unallocate anything as it might also unallocate a global variable
@@ -86,16 +91,24 @@ void statement( struct mccstmt * st )
             
             brk(st);
             break;
+        }
         case If:
             st->val = stmtid++;
-            stmtstk[stmttop++] = st;
+            stmtstk[stmttop  ]->st = st;
+            stmtstk[stmttop++]->ev = NULL;
             
-            generate(expr(ce = node())); // Process if statement's expression
-            brk(ce);
+            generate(ev = expr(ce = node())); // Process if statement's expression
             
             optr->op = OpIf;
             optr->s.id = st->val;
+            
+            // Location of the result to evaluate
+            optr->reg  = ev->op->reg;
+            optr->size = ev->op->size;
+            
             optr++;
+            
+            brk(ce);
             
             emitOpBuffer();
             break;
@@ -109,27 +122,116 @@ void statement( struct mccstmt * st )
             emitOpBuffer();
             brk(st);
             break;
-        case For: // Basically just syntactic sugar for while loops
-
+        case For:
+            generate(expr(ce = node())); // Process initial statement
+            brk(ce);
+            // break; This intentionally feeds into the While block
         case While:
+        {   
+            unsigned int16_t csi;
+            unsigned int16_t isDW = st->oper == While && st->val;
+            
+            // This is a do-while loop
+            if (isDW) csi = stop->val;
+            // Normal while (or for) loop
+            else
+            {
+                // Start of loop
+                optr->op = OpStart;
+                optr->s.id = csi = stmtid++;
+                optr++;
+                
+                st->val = csi;
+                stmtstk[stmttop]->st = st;
+            }
+            
+            // Process conditional statement
+            generate(ev = expr(ce = node()));
+            
+            // Evaluate result of loop
+            optr->op = OpWhile;
+            optr->s.id = csi;
+            
+            // Location of the result to evaluate
+            optr->reg  = ev->op->reg;
+            optr->size = ev->op->size;
+            
+            optr++;
+            
+            brk(ce);
+            
+            // Store incremental statement for later (will be executed at the corresponding End statement)
+            // Since this node is allocated after the current statement, unallocating the current statement handles cleanup of this too
+            if (!isDW) stmtstk[stmttop++]->ev = st->oper == For ? expr(node()) : NULL;
+            
+            emitOpBuffer();
             break;
+        }
         case Do:
+            // Start of loop
+            optr->op = OpStart;
+            optr->s.id = stmtid;
+            optr++;
+            
+            st->val = stmtid++;
+            
+            stmtstk[stmttop  ]->st = st;
+            stmtstk[stmttop++]->ev = NULL;
+            
+            // The rest of this statement is handled by the following While statement
+            emitOpBuffer();
             break;
         case Switch:
+            // TODO switch statements
+        
             break;
         case Case:
+        
             break;
         case Default:
+        
             break;
         case Break:
-            break;
         case Continue:
+        {
+            int16_t i;
+            struct mccfcst * cl;
+        
+            // Find most recent loop in stack
+            for ( i = stmttop - 1, cl = NULL; i >= 0; i-- )
+            {
+                unsigned int8_t csop = stmtstk[i]->st->oper;
+                // Loop statements
+                if ( (csop >= For && csop <= Do)
+                // Switch statement
+                || (st->oper == Break && csop == Switch) )
+                {
+                    cl = stmtstk[i];
+                    break;
+                }
+            }
+            
+            if ( !cl ) mccfail("Break or Continue outside of loop");
+        
+            optr->op = st->oper == Break ? OpBreak : OpContinue;
+            optr->s.id = cl->st->val;
+            optr++;
+            
+            emitOpBuffer();
+            
+            brk(st);
             break;
+        }
         case Return:
-            generate(expr(ce = node())); // Process return statement's expression
+            generate(ev = expr(ce = node())); // Process return statement's expression
             
             optr->op = OpReturn;
             optr->s.id = 0;
+            
+            // Location of the result to evaluate
+            optr->reg  = ev->op->reg;
+            optr->size = ev->op->size;
+            
             optr++;
             
             emitOpBuffer();
@@ -137,14 +239,8 @@ void statement( struct mccstmt * st )
             brk(st);
             break;
         case End:
+            if ( !stmttop ) mccfail("statement stack underflow");
             stmttop--;
-            
-            if ( stmttop == -1 ) mccfail("statement stack underflow");
-            
-            if ( st->val == 1 ) // End of do-while loop
-            {
-                // TODO
-            }
             
             optr->op = OpEnd;
             optr->s.id = stop->val;
@@ -156,7 +252,6 @@ void statement( struct mccstmt * st )
         default: // Expression (NOTE: might be a "Void" expression)
             generate(expr(st));
             emitOpBuffer();
-            
             brk(st);
             break;
     }

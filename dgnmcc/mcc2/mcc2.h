@@ -33,6 +33,14 @@ struct mcceval
     struct mcceval * left, * right, * parent;
 };
 
+
+// Used to store information about flow control statements
+struct mccfcst
+{
+    struct mccstmt * st;
+    struct mcceval * ev;
+};
+
 #define VAR_ALC_ZP 0 // Currently allocated in zero page
 #define VAR_ALC_MM 1 // Currently allocated in main memory
 #define VAR_ALC_DA 2 // Don't allocate (used for arrays, structs, and functions), also used when the address of a variable is taken
