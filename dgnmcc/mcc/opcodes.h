@@ -182,6 +182,8 @@ struct mccoper_statement
 {
     // Unique statment id used for generating things like unique jmp labels
     unsigned int16_t id;
+    // Sub-id used for case statements
+    unsigned int16_t sid;
 };
 
 struct mccoper_computational

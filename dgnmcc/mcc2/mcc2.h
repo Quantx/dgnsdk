@@ -33,12 +33,12 @@ struct mcceval
     struct mcceval * left, * right, * parent;
 };
 
-
 // Used to store information about flow control statements
 struct mccfcst
 {
     struct mccstmt * st;
     struct mcceval * ev;
+    unsigned int16_t val;
 };
 
 #define VAR_ALC_ZP 0 // Currently allocated in zero page

@@ -182,15 +182,56 @@ void statement( struct mccstmt * st )
             emitOpBuffer();
             break;
         case Switch:
-            // TODO switch statements
-        
+            st->val = stmtid++;
+            stmtstk[stmttop  ]->st = st;
+            stmtstk[stmttop  ]->val = 0;
+            stmtstk[stmttop++]->ev = NULL;
+            
+            generate(ev = expr(ce = node())); // Process switch statement's expression
+            
+            optr->op = OpSwitch;
+            optr->s.id = st->val;
+            
+            // Location of the result to evaluate
+            optr->reg  = ev->op->reg;
+            optr->size = ev->op->size;
+            
+            optr++;
+            
+            brk(ce);
+            
+            emitOpBuffer();
             break;
         case Case:
-        
-            break;
         case Default:
+        {
+            int16_t i;
+            struct mccfcst * cs;
         
+            // Find most recent switch in stack
+            for ( i = stmttop - 1, cs = NULL; i >= 0; i-- )
+            {
+                if ( stmtstk[i]->st->oper == Switch )
+                {
+                    cs = stmtstk[i];
+                    break;
+                }
+            }
+            
+            if ( !cs ) mccfail("Case or Default outside of switch");
+        
+            optr->op = st->oper == Case ? OpCase : OpDefault;
+            optr->s.id = cs->st->val;
+            optr->s.sid = cs->val++;
+            
+            optr->size = st->val;
+            
+            optr++;
+            
+            emitOpBuffer();
+            brk(st);
             break;
+        }
         case Break:
         case Continue:
         {
