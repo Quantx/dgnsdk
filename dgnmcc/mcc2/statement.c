@@ -6,8 +6,7 @@ struct mccfcst * stmtstk[MAX_STATEMENT_STK];
 void statement( struct mccstmt * st )
 {
     struct mccstmt * ce;
-    // Technically an underflow if the stack is empty, but who gives a shit
-    struct mccstmt * stop = stmtstk[stmttop - 1]->st;
+    struct mccstmt * stop = stmttop ? stmtstk[stmttop - 1]->st : NULL;
     struct mcceval * ev;
 
     switch ( st->oper )
