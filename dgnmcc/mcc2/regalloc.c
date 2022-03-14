@@ -1,3 +1,5 @@
+int16_t stmttop;
+
 #ifdef DEBUG_ALLOC
 void writeVar(int16_t fd, struct mccvar * wv)
 {
@@ -9,9 +11,9 @@ void writeVar(int16_t fd, struct mccvar * wv)
     switch ( wv->flags & VAR_ALC_MASK )
     {
         case VAR_ALC_ZP: write( fd, "zeropage", 9 ); break;
-        case VAR_ALC_MM: write( fd, "main mem", 9 ); break;
+        case VAR_ALC_MM: write( fd, "main_mem", 9 ); break;
         case VAR_ALC_DA: write( fd, "dontaloc", 9 ); break;
-        case VAR_ALC_NA: write( fd, "not aloc", 9 ); break;
+        case VAR_ALC_NA: write( fd, "not_aloc", 9 ); break;
     }
     
     write( fd, ":z_addr:", 8 );
@@ -23,12 +25,17 @@ void writeVar(int16_t fd, struct mccvar * wv)
 }
 #endif
 
+// sv = variable to spill
+// spr = temp register used to store spill address
 void spill(struct mccvar * sv, unsigned int8_t spr)
 {
     if ( (sv->flags & VAR_ALC_MASK) != VAR_ALC_ZP ) return;
 
     if ( sv->len ) // Global variable
     {
+        write( 2, "Spilled global: ", 16 );
+        write( 2, sv->name, sv->len );
+    
         // Generate spill instruction
         optr->op = OpAddrGlb;
         optr->a.name = sv->name;
@@ -36,6 +43,9 @@ void spill(struct mccvar * sv, unsigned int8_t spr)
     }
     else // Local variable
     {
+        write( 2, "Spilled local: ", 15 );
+        decwrite( 2, sv->addr );
+    
         // Find room on stack for this variable
         for ( sv->s_addr = 0; 1; sv->s_addr++ )
         {
@@ -57,6 +67,8 @@ void spill(struct mccvar * sv, unsigned int8_t spr)
         optr->op = OpAddrLoc;
         optr->a.val = sv->s_addr;
     }
+    
+    write( 2, "\n", 1 );
 
     // Generate rest of spill instruction
     optr->reg = spr;
@@ -74,6 +86,30 @@ void spill(struct mccvar * sv, unsigned int8_t spr)
     optr++;
     
     sv->flags = VAR_ALC_MM;
+}
+
+// Spill all variables allocated within the last block
+void spillBlock(int16_t level, unsigned int8_t spr)
+{
+    struct mccvar * cv;
+    for ( cv = curfunc->vartbl; cv; cv = cv->next )
+    {
+        // Check if the variable is above the current level and allocated in zp
+        // Spill does this for us, but we do it here to save us from having to do an uneccisary function call
+        if ( cv->stmt >= level && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) spill(cv, spr);
+    }
+}
+
+// Spill all allocated global variables
+void spillGlobals(unsigned int8_t spr)
+{
+    struct mccvar * cv;
+    for ( cv = curfunc->vartbl; cv; cv = cv->next )
+    {
+        // Check if the variable is global and allocated in zp
+        // Spill does this for us, but we do it here to save us from having to do an uneccisary function call
+        if ( cv->len && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) spill(cv, spr);
+    }
 }
 
 void regalloc(struct mcceval * cn)
@@ -150,7 +186,7 @@ void regalloc(struct mcceval * cn)
             if ( !z_size ) z_size++;
 
             
-            if ( pv->st->oper == Inder ) // Address-of, spill this variable
+            if ( pv && pv->st->oper == Inder ) // Address-of, spill this variable
             {
                 #ifdef DEBUG_ALLOC
                 write( 2, "DA Var: ", 8 );
@@ -225,6 +261,7 @@ void regalloc(struct mcceval * cn)
                     }
                 }
 
+                av->stmt = stmttop - 1;
                 av->flags = VAR_ALC_ZP; // Make sure to spill all conflicting variables, before marking this as no longer in the stack
                 
                 if ( af == VAR_ALC_MM )

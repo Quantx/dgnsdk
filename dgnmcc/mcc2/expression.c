@@ -6,7 +6,7 @@ struct mcceval * estk[MAX_EXPR_NODE];
 
 struct mcceval * expr(struct mccstmt * nd)
 {
-    if ( nd && nd->oper == Void ) nd = NULL; // Nothing to do here, this is a void expression
+    if ( nd && nd->oper == Void ) return NULL; // Nothing to do here, this is a void expression
 
     // Deserialize and reconstruct expression tree
     struct mcceval * ev = sbrk(sizeof(struct mcceval CAST_NAME));

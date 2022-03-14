@@ -4,7 +4,8 @@ unsigned int16_t emitnum;
 void printOper( struct mccoper * prop )
 {
     // Output op name
-    int8_t * opn = opNames[prop->op];
+    unsigned int8_t op = prop->op;
+    int8_t * opn = opNames[op];
     int16_t opl = 0;
     
     while ( opn[opl] ) opl++;
@@ -12,11 +13,21 @@ void printOper( struct mccoper * prop )
     write( fd_dbg, opn, opl );
     write( fd_dbg, "\n", 1 );
     
-    if ( prop->op >= OpEnd && prop->op <= OpReturn )
+    if ( op >= OpStart && op <= OpReturn )
     {
         write( fd_dbg, "Statement: ", 11 );
         decwrite( fd_dbg, prop->s.id );
         write( fd_dbg, "\n", 1 );
+        
+        if ( op == OpIf || op == OpWhile || op == OpSwitch || op == OpReturn )
+        {
+            // Output dest register
+            write( fd_dbg, "Dest: ", 6 );
+            decwrite( fd_dbg, prop->reg );
+            write( fd_dbg, "|", 1 );
+            decwrite( fd_dbg, prop->size );
+            write( fd_dbg, "B\n", 2 );
+        }
     }
     else
     {
@@ -27,37 +38,37 @@ void printOper( struct mccoper * prop )
         decwrite( fd_dbg, prop->size );
         write( fd_dbg, "B\n", 2 );
 
-        if ( prop->op >= OpValueByte && prop->op <= OpValueLong )
+        if ( op >= OpValueByte && op <= OpValueLong )
         {
             write( fd_dbg, "Val: ", 5 );
-            if ( prop->op == OpValueLong ) octwrite( fd_dbg, prop->v.valLong );
+            if ( op == OpValueLong ) octwrite( fd_dbg, prop->v.valLong );
             else decwrite( fd_dbg, prop->v.val );
             write( fd_dbg, "\n", 1 );
         }
-        else if ( prop->op == OpAddrGlb )
+        else if ( op == OpAddrGlb )
         {
             write( fd_dbg, "Global Addr: ", 13 );
             write( fd_dbg, prop->a.name, prop->a.val );
             write( fd_dbg, "\n", 1 );
         }
-        else if ( prop->op == OpAddrLoc )
+        else if ( op == OpAddrLoc )
         {
             write( fd_dbg, "Local Addr: ", 12 );
             decwrite( fd_dbg, prop->a.val );
             write( fd_dbg, "\n", 1 );
         }
         else
-        {
-            write( fd_dbg, "Comp L: ", 8 );
-            decwrite( fd_dbg, prop->c.l_arg );
-            write( fd_dbg, "|", 1 );
-            decwrite( fd_dbg, prop->c.l_size );
-            write( fd_dbg, "B\n", 2 );
-            
+        {            
             write( fd_dbg, "Comp R: ", 8 );
             decwrite( fd_dbg, prop->c.r_arg );
             write( fd_dbg, "|", 1 );
             decwrite( fd_dbg, prop->c.r_size );
+            write( fd_dbg, "B\n", 2 );
+            
+            write( fd_dbg, "Comp L: ", 8 );
+            decwrite( fd_dbg, prop->c.l_arg );
+            write( fd_dbg, "|", 1 );
+            decwrite( fd_dbg, prop->c.l_size );
             write( fd_dbg, "B\n", 2 );
         }
     }
@@ -109,8 +120,8 @@ int16_t stkadj( int16_t bytes )
 
     evlstk += bytes;
 
-    if ( evlstk < curfunc->z_size ) mccfail("stack underflow");
-    if ( evlstk >= MAX_ZEROPAGE   ) mccfail("stack overflow");
+    if ( evlstk < curfunc->z_size ) mccfail("eval stack underflow");
+    if ( evlstk >= MAX_ZEROPAGE   ) mccfail("eval stack overflow");
     
     if ( evlstk > curfunc->z_max ) curfunc->z_max = evlstk;
     
@@ -119,6 +130,14 @@ int16_t stkadj( int16_t bytes )
 
 void generate(struct mcceval * cn)
 {
+    if (!cn)
+    {
+#ifdef DEBUG_GEN
+        write( 2, "Void gen\n", 9 );
+#endif
+        return; // This can happen when a void expression is present
+    }
+
     if ( !optr ) optr = obuf;
     
     regalloc(cn); // Spill and allocate the needed registers, returns how much of zero page was used to do this
@@ -306,6 +325,9 @@ void generate(struct mcceval * cn)
                 }
                 else
                 {
+                    // Spill globals BEFORE calling the function
+                    if ( op == FnCallArgs ) spillGlobals(evlstk);
+                
                     if ( l_op->reg >= curfunc->z_size ) stkadj( -l_op->size );
                     if ( r_op->reg >= curfunc->z_size ) stkadj( -r_op->size );
                     
@@ -405,6 +427,9 @@ void generate(struct mcceval * cn)
             }
             else
             {
+                // Spill globals BEFORE calling the function
+                if ( op == FnCall ) spillGlobals(evlstk);
+
                 if ( r_op->reg >= curfunc->z_size ) stkadj( -r_op->size );
                 
                 // Move the result to the eval stack if needed
@@ -418,6 +443,7 @@ void generate(struct mcceval * cn)
                 {
                 // *** Unary Operators ***
                     case FnCall:
+                        // Emit OpArg followed by OpCall
                         optr->op = OpCall;
                         optr[1] = *optr;
                         
@@ -467,6 +493,9 @@ void generate(struct mcceval * cn)
             {
                 case StartOfArgs: // Not an operand, just tells us that we're about to start pushing arguments for a function call
                     optr->op = OpArg;
+                    
+                    optr->reg = 0;
+                    optr->size = 0;
                     
                     // Last operation should be loading the function pointer, store a reference to that
                     optr->c.r_arg = (optr - 1)->reg;

@@ -28,7 +28,7 @@ enum
     // Flow
     OpBreak, OpContinue,
     // Function
-    OpArg, OpCall, OpReturn,
+    OpReturn,
 
 // *** Memory instructions (use same format as computational instructions)
     // [r_arg] -> reg
@@ -49,6 +49,8 @@ enum
     OpPop,
     
 // *** Computational operations ( S:signed, U:unsigned, F:float, P:pointer )
+    // Function operations
+    OpArg, OpCall,
     // r_arg -> reg (If r_arg == reg then this is a no-op)
     OpMov,
     // Logical operations
@@ -114,7 +116,7 @@ int8_t * opNames[] = {
 
     "OpBreak", "OpContinue",
 
-    "OpArg", "OpCall", "OpReturn",
+    "OpReturn",
 
     "OpLoad",
 
@@ -123,6 +125,8 @@ int8_t * opNames[] = {
     "OpPush",
     
     "OpPop",
+    
+    "OpArg", "OpCall",
     
     "OpMov",
     

@@ -15,6 +15,9 @@ void mccfail( int8_t * msg )
     write( 2, ":", 1 );
 
 #ifdef DEBUG
+    int16_t i = 0;
+    while(msg[i])i++;
+    write( 2, msg, i );
     int * a = 0, b = *a;
 #endif    
 
@@ -23,8 +26,7 @@ void mccfail( int8_t * msg )
 
 int16_t opClass( struct mccstmt * st )
 {
-    unsigned int8_t t = st->type & IR_TYPE_MASK;
-    switch (t)
+    switch (st->type & IR_TYPE_MASK)
     {
         case IR_VOID:
             return OP_CLASS_VOID;

@@ -208,7 +208,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
             emit(root);
             brk(erbp);
         }
-        else emitStatement( SmolNumber, 0 ); // Do nothing
+        else emitStatement( Void, 0 ); // No-op statement
         ntok();
 
         // Eval expression
@@ -238,7 +238,7 @@ void statement( struct mccsym * func, struct mccnsp * curnsp, int sws )
             emit(root);
             brk(erbp);
         }
-        else emitStatement( SmolNumber, 0 ); // Do nothing
+        else emitStatement( Void, 0 ); // No-op statement
         ntok();
 
         // Statement

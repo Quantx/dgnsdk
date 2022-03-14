@@ -64,6 +64,7 @@ struct mccvar
     unsigned int16_t size;
     
     unsigned int16_t lac; // Last access count
+    int16_t stmt; // The top most element of the statement stack at time of allocation
     
     struct mccvar * next;
 };
