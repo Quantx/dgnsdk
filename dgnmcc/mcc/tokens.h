@@ -9,7 +9,7 @@ enum
     Void, Int, Short, Char, Float, Long, Double, // Storage types
     Enum, Struct, Union, // Data structures
     Signed, Unsigned, // Storage Qualifiers
-    Extern,
+    Extern, Volatile,
     Auto, Static, Register, Const, // Storage classes
     // *** Program structure ***
     If, Else, Switch, Case, Default, // Branch

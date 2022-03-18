@@ -14,11 +14,11 @@ int32_t tkLong;
 int8_t tkStr[MAX_STR];
 
 // Reserved words (MUST MATCH ORDER IN TOKEN ENUM)
-int8_t * res_words[30] = {
+int8_t * res_words[31] = {
     "void", "int", "short", "char", "float", "long", "double",
     "enum", "struct", "union",
     "signed", "unsigned",
-    "extern",
+    "extern", "volatile",
     "auto", "static", "register", "const",
     "if", "else", "switch", "case", "default",
     "break", "continue", "return",
@@ -83,7 +83,7 @@ void ntok()
             {
                 for ( i = 0; res_words[tk - Void][i] == pp[i]; i++ );
 
-                if ( !res_words[tk - Void][i] && tkVal == i ) // Match
+                if ( tkVal == i && !res_words[tk - Void][i] ) // Match
                 {
                      if ( tk == Short ) tk = Int; // Shorts are always Ints
                      if ( tk == SizeofRes ) tk = Sizeof; // Sizeof is located in a weird spot
