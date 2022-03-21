@@ -95,7 +95,7 @@ struct instruct insts[] = {
     { "ETRP", 4, DGN_CT, 0b0111111001000001, CPU_F9445 | CPU_NOEMU, 0 },
     { "DTRP", 4, DGN_CT, 0b0111111011000001, CPU_F9445 | CPU_NOEMU, 0 }, // Disabling traps will break instruction ewmulation
     { "E64K", 4, DGN_CT, 0b0110111001000001, CPU_F9445 | CPU_NOEMU, 0 },
-    { "D64K", 4, DGN_CT, 0b0110111011000001, CPU_F9445 | CPU_NOEMU, 0 },
+    { "D64K", 4, DGN_CT, 0b0110111010000001, CPU_F9445 | CPU_NOEMU, 0 },
     // Assembler directives (8)
     { ".TEXT", 5, ASM_TEXT, 0, CPU_BASE, 0 },
     { ".DATA", 5, ASM_DATA, 0, CPU_BASE, 0 },
