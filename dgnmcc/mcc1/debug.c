@@ -80,7 +80,7 @@ void writeType( int16_t fd, struct mcctype * t, int8_t * name, int16_t len )
 
 void writeToken( int16_t fd, unsigned int8_t tokn )
 {
-     int8_t * opn = tokenNames[tokn];
+     int8_t * opn = mccTokenNames[tokn];
      int16_t opl = 0;
      while ( opn[opl] ) opl++;
 

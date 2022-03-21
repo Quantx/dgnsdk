@@ -53,7 +53,7 @@ enum
 };
 
 #ifdef DEBUG
-int8_t * tokenNames[] = {
+int8_t * mccTokenNames[] = {
     "EOF",
     "void", "int", "short", "char", "float", "long", "double",
     "enum", "struct", "union",

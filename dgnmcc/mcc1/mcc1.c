@@ -26,7 +26,7 @@ int16_t main( int16_t argc, int8_t ** argv )
     // Sanity check to make sure we can store all constants in a char
     if ( FnCall > 0xFF ) mccfail("too many constants!");
 
-    int16_t tnc = (sizeof(tokenNames)/sizeof(*tokenNames));
+    int16_t tnc = (sizeof(mccTokenNames)/sizeof(*mccTokenNames));
     int16_t tkc = (FnCall - Void) + 1;
     if ( tnc != tkc )
     {

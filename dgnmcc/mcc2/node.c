@@ -72,7 +72,7 @@ struct mccstmt * node()
 
     write( 2, "Node: ", 6 );
 
-    int8_t * nn = tokenNames[out->oper];
+    int8_t * nn = mccTokenNames[out->oper];
     int16_t i;
     for ( i = 0; nn[i]; i++ );
     write( 2, nn, i );

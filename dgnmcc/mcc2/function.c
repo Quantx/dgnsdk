@@ -76,7 +76,7 @@ struct mccvar * getVarFunc( struct mccstmt * st, struct mccfunc * fn )
     {
         write( 2, "Non-variable type in getVar: ", 29 );
 
-        int8_t * nn = tokenNames[st->oper];
+        int8_t * nn = mccTokenNames[st->oper];
         int16_t i;
         for ( i = 0; nn[i]; i++ );
         write( 2, nn, i );
