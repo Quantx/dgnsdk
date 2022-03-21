@@ -64,10 +64,13 @@ ST AC#, [IO#, 6-Bit Device Code], <(NOTHING)|SET|CLR|PLS>
 ```
 
 ## Load/Store Long (uses AC0|AC1 as a 32bit value)
+The provided `<8-Bit Absolute Address>` must not be 0xFF
 ```
 LD ACL, [ZP, <8-Bit Absolute Address>]
 ST ACL, [ZP, <8-Bit Absolute Address>]
-
+```
+The provided `<Signed 8-Bit Offset>` must not be 0x7F
+```
 LD ACL, [PC, <Signed 8-Bit Offset>]
 ST ACL, [PC, <Signed 8-Bit Offset>]
 
@@ -136,6 +139,7 @@ SWP : Swap the upper and lower byte of the result (Carry unaffected)
 ```
 ## Skip Condition
 If `#` is L (load) : Place result in destination then preform skip
+
 If `#` is T (test) : DO NOT Place result in destination then preform skip
 
 ```
