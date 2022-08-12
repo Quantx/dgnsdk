@@ -161,74 +161,75 @@ void ntok()
                 if ( *p == '=' ) { p++; tk = DivAss; return; }
                 tk = Div;
                 return;
-            // Character constant
-            case '\'':;
-                int8_t out = *p;
-
-                // Escape character
-                if ( *p++ == '\\' )
-                {
-                    if      ( *p == 'a'  ) { out = '\a'; p++; }
-                    else if ( *p == 'b'  ) { out = '\b'; p++; }
-                    else if ( *p == 'e'  ) { out = '\e'; p++; }
-                    else if ( *p == 'f'  ) { out = '\f'; p++; }
-                    else if ( *p == 'n'  ) { out = '\n'; p++; }
-                    else if ( *p == 'r'  ) { out = '\r'; p++; }
-                    else if ( *p == 't'  ) { out = '\t'; p++; }
-                    else if ( *p == 'v'  ) { out = '\v'; p++; }
-                    else if ( *p == '\\' ) { out = '\\'; p++; }
-                    else if ( *p == '\'' ) { out = '\''; p++; }
-                    else if ( *p == '"'  ) { out = '"';  p++; }
-                    else if ( *p == 'x' )
-                    {
-                        if ( *++p >= '0' && *p <= '9'
-                            || *p >= 'a' && *p <= 'f'
-                            || *p >= 'A' && *p <= 'F' )
-                            // Convert first digit
-                            out = (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
-                        else mccfail("expected two hex digits following a \\x escape");
-
-                        // Convert possible second digit
-                        if ( *p >= '0' && *p <= '9'
-                          || *p >= 'a' && *p <= 'f'
-                          || *p >= 'A' && *p <= 'F' )
-                            out = (out << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
-                    }
-                    else if ( *p >= '0' && *p <= '7' )
-                    {
-                        out = *p++ - '0'; // First digit
-
-                        if ( *p >= '0' && *p <= '7' ) // Second digit
-                            out = (out << 3) + *p++ - '0';
-
-                        if ( *p >= '0' && *p <= '7' ) // Last digit
-                            out = (out << 3) + *p++ - '0';
-                    }
-                    else mccfail("unknown escape sequence");
-                }
-
-                if ( *p++ != '\'' ) mccfail("missing end quote on character constant");
-
-                // Record character constant
-                tk = SmolNumber;
-                tkVal = out;
-                return;
-            // String constant
+            // Character constant or string
             case '"':
+            case '\'':;
+                int8_t isChar = tk == '\'';
+                
                 for ( tkVal = 0; *p || readline(); tkVal++ ) // Continuous read
                 {
-                    tkStr[tkVal] = *p;
+                    int8_t out = *p;
+                
+                    // Escape character
+                    if ( *p++ == '\\' )
+                    {
+                        if      ( *p == 'a'  ) { out = '\a'; p++; }
+                        else if ( *p == 'b'  ) { out = '\b'; p++; }
+                        else if ( *p == 'e'  ) { out = '\e'; p++; }
+                        else if ( *p == 'f'  ) { out = '\f'; p++; }
+                        else if ( *p == 'n'  ) { out = '\n'; p++; }
+                        else if ( *p == 'r'  ) { out = '\r'; p++; }
+                        else if ( *p == 't'  ) { out = '\t'; p++; }
+                        else if ( *p == 'v'  ) { out = '\v'; p++; }
+                        else if ( *p == '\\' ) { out = '\\'; p++; }
+                        else if ( *p == '\'' ) { out = '\''; p++; }
+                        else if ( *p == '"'  ) { out = '"';  p++; }
+                        else if ( *p == 'x'  )
+                        {
+                            if ( *++p >= '0' && *p <= '9'
+                                || *p >= 'a' && *p <= 'f'
+                                || *p >= 'A' && *p <= 'F' )
+                                // Convert first digit
+                                out = (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
+                            else mccfail("expected two hex digits following a \\x escape");
 
-//	            write( 2, p, 1 );
+                            // Convert possible second digit
+                            if ( *p >= '0' && *p <= '9'
+                              || *p >= 'a' && *p <= 'f'
+                              || *p >= 'A' && *p <= 'F' )
+                                out = (out << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
+                        }
+                        else if ( *p >= '0' && *p <= '7' )
+                        {
+                            out = *p++ - '0'; // First digit
 
-                    if ( *p == '"' && tk != '\\' )
+                            if ( *p >= '0' && *p <= '7' ) // Second digit
+                                out = (out << 3) + *p++ - '0';
+
+                            if ( *p >= '0' && *p <= '7' ) // Last digit
+                                out = (out << 3) + *p++ - '0';
+                        }
+                        else mccfail("unknown escape sequence");
+                    }
+                    
+                    if (isChar)
+                    {
+                        if ( *p++ != '\'' ) mccfail("missing end quote on character constant");
+
+                        // Record character constant
+                        tk = SmolNumber;
+                        tkVal = out;
+                        return;
+                    }
+                    
+                    tkStr[tkVal] = out;
+
+                    if ( *p == '"' )
                     {
                         p++;
                         tk = String;
                         return;
                     }
-
-                    tk = *p++;
                 }
 
                 mccfail("missing closing quote on string constant");
