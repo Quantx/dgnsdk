@@ -1,4 +1,4 @@
-#include "mcc0.h"
+//#include "mcc0.h"
 
 // Line into
 unsigned int32_t ctn;
@@ -161,75 +161,74 @@ void ntok()
                 if ( *p == '=' ) { p++; tk = DivAss; return; }
                 tk = Div;
                 return;
-            // Character constant or string
-            case '"':
+            // Character constant
             case '\'':;
-                int8_t isChar = tk == '\'';
-                
+                int8_t out = *p;
+
+                // Escape character
+                if ( *p++ == '\\' )
+                {
+                    if      ( *p == 'a'  ) { out = '\a'; p++; }
+                    else if ( *p == 'b'  ) { out = '\b'; p++; }
+                    else if ( *p == 'e'  ) { out = '\e'; p++; }
+                    else if ( *p == 'f'  ) { out = '\f'; p++; }
+                    else if ( *p == 'n'  ) { out = '\n'; p++; }
+                    else if ( *p == 'r'  ) { out = '\r'; p++; }
+                    else if ( *p == 't'  ) { out = '\t'; p++; }
+                    else if ( *p == 'v'  ) { out = '\v'; p++; }
+                    else if ( *p == '\\' ) { out = '\\'; p++; }
+                    else if ( *p == '\'' ) { out = '\''; p++; }
+                    else if ( *p == '"'  ) { out = '"';  p++; }
+                    else if ( *p == 'x' )
+                    {
+                        if ( *++p >= '0' && *p <= '9'
+                            || *p >= 'a' && *p <= 'f'
+                            || *p >= 'A' && *p <= 'F' )
+                            // Convert first digit
+                            out = (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
+                        else mccfail("expected two hex digits following a \\x escape");
+
+                        // Convert possible second digit
+                        if ( *p >= '0' && *p <= '9'
+                          || *p >= 'a' && *p <= 'f'
+                          || *p >= 'A' && *p <= 'F' )
+                            out = (out << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
+                    }
+                    else if ( *p >= '0' && *p <= '7' )
+                    {
+                        out = *p++ - '0'; // First digit
+
+                        if ( *p >= '0' && *p <= '7' ) // Second digit
+                            out = (out << 3) + *p++ - '0';
+
+                        if ( *p >= '0' && *p <= '7' ) // Last digit
+                            out = (out << 3) + *p++ - '0';
+                    }
+                    else mccfail("unknown escape sequence");
+                }
+
+                if ( *p++ != '\'' ) mccfail("missing end quote on character constant");
+
+                // Record character constant
+                tk = SmolNumber;
+                tkVal = out;
+                return;
+            // String constant
+            case '"':
                 for ( tkVal = 0; *p || readline(); tkVal++ ) // Continuous read
                 {
-                    int8_t out = *p;
-                
-                    // Escape character
-                    if ( *p++ == '\\' )
-                    {
-                        if      ( *p == 'a'  ) { out = '\a'; p++; }
-                        else if ( *p == 'b'  ) { out = '\b'; p++; }
-                        else if ( *p == 'e'  ) { out = '\e'; p++; }
-                        else if ( *p == 'f'  ) { out = '\f'; p++; }
-                        else if ( *p == 'n'  ) { out = '\n'; p++; }
-                        else if ( *p == 'r'  ) { out = '\r'; p++; }
-                        else if ( *p == 't'  ) { out = '\t'; p++; }
-                        else if ( *p == 'v'  ) { out = '\v'; p++; }
-                        else if ( *p == '\\' ) { out = '\\'; p++; }
-                        else if ( *p == '\'' ) { out = '\''; p++; }
-                        else if ( *p == '"'  ) { out = '"';  p++; }
-                        else if ( *p == 'x'  )
-                        {
-                            if ( *++p >= '0' && *p <= '9'
-                                || *p >= 'a' && *p <= 'f'
-                                || *p >= 'A' && *p <= 'F' )
-                                // Convert first digit
-                                out = (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
-                            else mccfail("expected two hex digits following a \\x escape");
+                    // Ignore escape characters, and pass them verbatim
+                    // String escape characters will be processed by the assembler
+                    tkStr[tkVal] = *p;
 
-                            // Convert possible second digit
-                            if ( *p >= '0' && *p <= '9'
-                              || *p >= 'a' && *p <= 'f'
-                              || *p >= 'A' && *p <= 'F' )
-                                out = (out << 4) + (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
-                        }
-                        else if ( *p >= '0' && *p <= '7' )
-                        {
-                            out = *p++ - '0'; // First digit
-
-                            if ( *p >= '0' && *p <= '7' ) // Second digit
-                                out = (out << 3) + *p++ - '0';
-
-                            if ( *p >= '0' && *p <= '7' ) // Last digit
-                                out = (out << 3) + *p++ - '0';
-                        }
-                        else mccfail("unknown escape sequence");
-                    }
-                    
-                    if (isChar)
-                    {
-                        if ( *p++ != '\'' ) mccfail("missing end quote on character constant");
-
-                        // Record character constant
-                        tk = SmolNumber;
-                        tkVal = out;
-                        return;
-                    }
-                    
-                    tkStr[tkVal] = out;
-
-                    if ( *p == '"' )
+                    if ( *p == '"' && tk != '\\' )
                     {
                         p++;
                         tk = String;
                         return;
                     }
+
+                    tk = *p++;
                 }
 
                 mccfail("missing closing quote on string constant");
@@ -303,14 +302,18 @@ int main( int argc, char ** argv )
 
     if ( argc == 3 )
     {
-        char * ttns = argv[1];
+        int16_t i;
+        int8_t * ttns = argv[1];
         while ( *ttns >= '0' && *ttns <= '7' ) ttn = (ttn << 3) + *ttns++ - '0';
         while ( ctn < ttn )
         {
             ntok();
             if ( !tk )
             {
-                write( 2, "mcc0: unexpected eof\n", 21 );
+                int8_t * prgn = *argv;
+                for ( i = 0; prgn[i]; i++ );
+                write( 2, prgn, i );
+                write( 2, ": unexpected eof\n", 17 );
                 return 1;
             }
 
@@ -325,7 +328,6 @@ int main( int argc, char ** argv )
         write( 2, ": ", 2 );
 
         int8_t * msg = argv[2];
-        int16_t i;
         for ( i = 0; msg[i]; i++ );
         write( 2, msg, i );
         write( 2, "\r\n", 2 );
