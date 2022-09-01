@@ -4,7 +4,6 @@ Unless stated otherwise, the left most argument is almost always the destination
 # Registers
 ## Common
 ```
-ZP : Zero page
 PC : Program counter
 AC[0-3] : Accumulators
 ACL : The 32bit union of AC0 & AC1 with AC0 forming the high order bits
@@ -45,56 +44,55 @@ STB AC#, [AC#]
 ```
 
 ## Load/Store Word
-The `@` is optional and implies that indirection should occur
 ```
-LD AC#, @[ZP, <(Nothing)|8-Bit Absolute Address>]
-ST AC#, @[ZP, <(Nothing)|8-Bit Absolute Address>]
+LDA AC#, [<8-Bit Absolute Address>]
+STA AC#, [<8-Bit Absolute Address>]
 
-LD AC#, @[PC, <(Nothing)|Signed 8-Bit Offset>]
-ST AC#, @[PC, <(Nothing)|Signed 8-Bit Offset>]
+LDA AC#, @[PC, <(Nothing)|Signed 8-Bit Offset>]
+STA AC#, @[PC, <(Nothing)|Signed 8-Bit Offset>]
 
-LD AC#, @[AC2, <(Nothing)|Signed 8-Bit Offset>]
-ST AC#, @[AC2, <(Nothing)|Signed 8-Bit Offset>]
+LDA AC#, @[AC2, <(Nothing)|Signed 8-Bit Offset>]
+STA AC#, @[AC2, <(Nothing)|Signed 8-Bit Offset>]
 
-LD AC#, @[AC3, <(Nothing)|Signed 8-Bit Offset>]
-ST AC#, @[AC3, <(Nothing)|Signed 8-Bit Offset>]
+LDA AC#, @[AC3, <(Nothing)|Signed 8-Bit Offset>]
+STA AC#, @[AC3, <(Nothing)|Signed 8-Bit Offset>]
 
-LD AC#, [IO#, 6-Bit Device Code], <(NOTHING)|SET|CLR|PLS>
-ST AC#, [IO#, 6-Bit Device Code], <(NOTHING)|SET|CLR|PLS>
+LDA AC#, [IO#, 6-Bit Device Code], <(NOTHING)|SET|CLR|PLS>
+STA AC#, [IO#, 6-Bit Device Code], <(NOTHING)|SET|CLR|PLS>
 ```
 
 ## Load/Store Long (uses AC0|AC1 as a 32bit value)
 The provided `<8-Bit Absolute Address>` must not be 0xFF
 ```
-LD ACL, [ZP, <8-Bit Absolute Address>]
-ST ACL, [ZP, <8-Bit Absolute Address>]
+LDA ACL, [<8-Bit Absolute Address>]
+STA ACL, [<8-Bit Absolute Address>]
 ```
 The provided `<Signed 8-Bit Offset>` must not be 0x7F
 ```
-LD ACL, [PC, <Signed 8-Bit Offset>]
-ST ACL, [PC, <Signed 8-Bit Offset>]
+LDA ACL, [PC, <Signed 8-Bit Offset>]
+STA ACL, [PC, <Signed 8-Bit Offset>]
 
-LD ACL, [AC2, <Signed 8-Bit Offset>]
-ST ACL, [AC2, <Signed 8-Bit Offset>]
+LDA ACL, [AC2, <Signed 8-Bit Offset>]
+STA ACL, [AC2, <Signed 8-Bit Offset>]
 
-LD ACL, [AC3, <Signed 8-Bit Offset>]
-ST ACL, [AC3, <Signed 8-Bit Offset>]
+LDA ACL, [AC3, <Signed 8-Bit Offset>]
+STA ACL, [AC3, <Signed 8-Bit Offset>]
 ```
 
 ## Load/Store Float
 ```
-LD FPAS, [AC#]
-ST FPAS, [AC#]
+LDA FPAS, [AC#]
+STA FPAS, [AC#]
 
-LD FPAD, [AC#]
-ST FPAD, [AC#]
+LDA FPAD, [AC#]
+STA FPAD, [AC#]
 ```
 
 # Flow Control
 ## Jump
 Unconditional jump
 ```
-JMP @[ZP, <8-Bit Absolute Address>]
+JMP @[<8-Bit Absolute Address>]
 JMP @[PC, <Signed 8-Bit Offset>]
 JMP @[AC2, <Signed 8-Bit Offset>]
 JMP @[AC3, <Signed 8-Bit Offset>]
@@ -102,23 +100,23 @@ JMP @[AC3, <Signed 8-Bit Offset>]
 Jump and link
 Place next address into AC3 then preform an unconditional jump to the specified address
 ```
-JMP @[ZP, <8-Bit Absolute Address>]
-JMP @[PC, <Signed 8-Bit Offset>]
-JMP @[AC2, <Signed 8-Bit Offset>]
-JMP @[AC3, <Signed 8-Bit Offset>]
+JSR @[<8-Bit Absolute Address>]
+JSR @[PC, <Signed 8-Bit Offset>]
+JSR @[AC2, <Signed 8-Bit Offset>]
+JSR @[AC3, <Signed 8-Bit Offset>]
 ```
 
 ## Modify and Test
 Increment by 1 and skip next instruction if result is zero
 ```
-ISZ @[ZP, <8-Bit Absolute Address>]
+ISZ @[<8-Bit Absolute Address>]
 ISZ @[PC, <Signed 8-Bit Offset>]
 ISZ @[AC2, <Signed 8-Bit Offset>]
 ISZ @[AC3, <Signed 8-Bit Offset>]
 ```
 Decrement by 1 and skip next instruction if result is zero
 ```
-DSZ @[ZP, <8-Bit Absolute Address>]
+DSZ @[<8-Bit Absolute Address>]
 DSZ @[PC, <Signed 8-Bit Offset>]
 DSZ @[AC2, <Signed 8-Bit Offset>]
 DSZ @[AC3, <Signed 8-Bit Offset>]
@@ -129,7 +127,7 @@ DSZ @[AC3, <Signed 8-Bit Offset>]
 ```
 SET : Set Carry to one before operation
 CLR : Set Carry to zero before operation
-FLP : Invert Carry before operation
+INV : Invert Carry before operation
 ```
 ## Shift Control
 ```
@@ -160,7 +158,7 @@ This operation does not affect the carry bit.
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 
 ```
-MOV <(NOTHING)|SET|CLR|FLP>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+MOV <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 ## Accumulator to/from Stack Pointer
@@ -214,18 +212,37 @@ MOV FPTD, FPAD
 MOV AC#, FPST
 MOV FPST, AC#
 ```
-# Clear
-## Accumulator 
+# Empty
+## Accumulator
+Set all bits of AC# to zero
+
 This operation does not affect the carry bit.
 
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 ```
-CLR <(NOTHING)|SET|CLR|FLP>, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+EMT <(NOTHING)|SET|CLR|INV>, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+
+Decodes as (invert cary selection behavior as this will toggle the carry bit):
+SUB <(NOTHING)|SET|CLR|INV>, AC#, AC# <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 ## FP Accumulator
+Set all bits of FPAD to zero
 ```
-CLR FPAD
+EMT FPAD
+```
+# Fill
+## Accumulator
+Set all bits of AC# to one
+
+This operation does not affect the carry bit.
+
+Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+```
+FIL <(NOTHING)|SET|CLR|INV>, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+
+Decodes as (invert cary selection behavior as this will toggle the carry bit):
+ADC <(NOTHING)|SET|CLR|INV>, AC#, AC# <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 # Addition
 ## Add Accumulator to Accumulator
@@ -233,7 +250,7 @@ Add the unsigned value of source to destination. If this operation produces a ca
 
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 ```
-ADD <(NOTHING)|SET|CLR|FLP>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+ADD <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 ## Add value in memory to FP Accumulator
@@ -259,7 +276,7 @@ Subtract the unsigned value of the source from the destination. If this operatio
 
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 ```
-SUB <(NOTHING)|SET|CLR|FLP>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+SUB <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 ## Subtract value in memory from FP Accumulator
@@ -339,7 +356,7 @@ Take the value of the source register as two's compliment and negate it. If the 
 
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 ```
-NEG <(NOTHING)|SET|CLR|FLP>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+NEG <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 ## Negate FP Accumulator
@@ -385,7 +402,7 @@ Invert all the bits in source. Does not affect the carry bit.
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 
 ```
-NOT <(NOTHING)|SET|CLR|FLP>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+NOT <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 ## And
 Compute the bitwise and of the source and destination. Does not affect the carry bit.
@@ -393,7 +410,7 @@ Compute the bitwise and of the source and destination. Does not affect the carry
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 
 ```
-AND <(NOTHING)|SET|CLR|FLP>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+AND <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 ## Or
@@ -403,6 +420,12 @@ Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Eva
 
 ```
 OR AC#, AC#
+
+Decodes as:
+INV ACS, ACS
+AND ACD, ACS
+ADC ACD, ACS // Compliments carry bit if ACS < ACD
+INV ACS, ACS
 ```
 ## Xor
 Compute the bitwise xor of the source and destination. Does not affect the carry bit.
@@ -411,6 +434,12 @@ Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Eva
 
 ```
 XOR AC#, AC#
+
+Decodes as:
+MOV ACT, ACD
+AND CLR, ACT, ACS, SHL // Destroys carry
+ADD ACD, ACS
+SUB ACD, ACT
 ```
 
 # Increment
@@ -420,7 +449,21 @@ Add one to the source. If the value in source was 0xFFFF, invert the carry bit.
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 
 ```
-INC <(NOTHING)|SET|CLR|FLP>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+INC <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+```
+
+# Decrement
+## Decrement Accumulator
+Subtract one from the source. If the value in source was 0xFFFF, invert the carry bit.
+
+Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+
+```
+DEC <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+
+Decodes as:
+NEG <(NOTHING)|SET|CLR|INV>, ACD, ACS
+INV ACD, ACD, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 # Add Complement
@@ -429,24 +472,23 @@ Invert all the bits in source and add to destination. If the value in source is 
 Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
 
 ```
-INC <(NOTHING)|SET|CLR|FLP>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+ADC <(NOTHING)|SET|CLR|INV>, AC#, AC#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|SKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 # I/O Instructions
 ## Control
 Set the Busy Flag & Clear the Done Flag
 ```
-IOSET <6-Bit Device Code>
+IO SET <6-Bit Device Code>
 ```
 Clear both Busy & Done flags
 ```
-IOCLR <6-Bit Device Code>
+IO CLR <6-Bit Device Code>
 ```
 Send an Pulse to the device
 ```
-IOPLS <6-Bit Device Code>
+IO PLS <6-Bit Device Code>
 ```
-
 ## Conditional
 Skip conditions
 ```
@@ -457,9 +499,13 @@ DN : Skip if the done flag is non-zero
 ```
 Skip next instruction if condition is true
 ```
-IOSKP <6-Bit Device Code>, <BZ|BN|DZ|DN>
+IO SKP <6-Bit Device Code>, <BZ|BN|DZ|DN>
 ```
-
+## Reset
+Reset all I/O devices to their power-on state
+```
+IO RST
+```
 # CPU Control
 ## I/O Control
 Enable Interrupt
@@ -470,10 +516,7 @@ Disable Interrupt
 ```
 INTDS
 ```
-I/O Reset
-```
-IORST
-```
+
 ## Flow Control
 Stop execution until resumed by the system console
 ```
