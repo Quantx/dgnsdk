@@ -51,6 +51,15 @@ void die( int8_t * msg )
     exit(1);
 }
 
+// Output the current token followed by a message
+unsigned int32_t ctn; // Current token
+void fail( int8_t * msg )
+{
+    octwrite( 2, ctn );
+    write( 2, " ", 1 );
+    die( msg );
+}
+
 /*
 // We need to do this to fix ASLR with sbrk
 #ifdef LINUX_COMPAT
