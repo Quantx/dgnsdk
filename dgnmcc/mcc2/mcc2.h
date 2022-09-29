@@ -41,8 +41,8 @@ struct mccfcst
     unsigned int16_t val;
 };
 
-#define VAR_ALC_ZP 0 // Currently allocated in zero page
-#define VAR_ALC_MM 1 // Currently allocated in main memory
+#define VAR_ALC_ZP 0 // Allocated in main memory with a pointer to it in zero page
+#define VAR_ALC_MM 1 // Only allocated in main memory
 #define VAR_ALC_DA 2 // Don't allocate (used for arrays, structs, and functions), also used when the address of a variable is taken
 #define VAR_ALC_NA 3 // Not allocated anywhere
 #define VAR_ALC_MASK 0b11
@@ -58,10 +58,10 @@ struct mccvar
     unsigned int16_t len;
 
     unsigned int8_t flags;
-    unsigned int8_t z_addr; // Zero page address
+    unsigned int8_t reg; // Zero page address
     
-    unsigned int16_t s_addr; // Spill address
-    unsigned int16_t size;
+//    unsigned int16_t s_addr; // Spill address
+    unsigned int16_t size; // Size in bytes of this variable
     
     unsigned int16_t lac; // Last access count
     int16_t stmt; // The top most element of the statement stack at time of allocation
@@ -74,8 +74,6 @@ struct mccfunc
     int8_t * name;
     unsigned int8_t len;
     unsigned int8_t z_size; // Number of registers currently in use
-    
-    unsigned int8_t z_max;
     
     unsigned int16_t s_size; // Stack size
     

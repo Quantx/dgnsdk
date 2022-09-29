@@ -34,6 +34,7 @@ void printOper( struct mccoper * prop )
         // Output dest register
         write( fd_dbg, "Dest: ", 6 );
         decwrite( fd_dbg, prop->reg );
+        if (prop->flags & REG_INDER) write( fd_dbg, "I", 1 );
         write( fd_dbg, "|", 1 );
         decwrite( fd_dbg, prop->size );
         write( fd_dbg, "B\n", 2 );
@@ -58,17 +59,19 @@ void printOper( struct mccoper * prop )
             write( fd_dbg, "\n", 1 );
         }
         else
-        {            
-            write( fd_dbg, "Comp R: ", 8 );
-            decwrite( fd_dbg, prop->c.r_arg );
-            write( fd_dbg, "|", 1 );
-            decwrite( fd_dbg, prop->c.r_size );
-            write( fd_dbg, "B\n", 2 );
-            
+        {
             write( fd_dbg, "Comp L: ", 8 );
             decwrite( fd_dbg, prop->c.l_arg );
+            if (prop->flags & L_ARG_INDER) write( fd_dbg, "I", 1 );
             write( fd_dbg, "|", 1 );
             decwrite( fd_dbg, prop->c.l_size );
+            write( fd_dbg, "B\n", 2 );
+        
+            write( fd_dbg, "Comp R: ", 8 );
+            decwrite( fd_dbg, prop->c.r_arg );
+            if (prop->flags & R_ARG_INDER) write( fd_dbg, "I", 1 );
+            write( fd_dbg, "|", 1 );
+            decwrite( fd_dbg, prop->c.r_size );
             write( fd_dbg, "B\n", 2 );
         }
     }
@@ -81,7 +84,7 @@ void printOper( struct mccoper * prop )
 void emit( struct mccoper * emop )
 {
     // Don't emit no-ops
-    if ( emop->op == OpMov && emop->reg == emop->c.r_arg ) return;
+    if ( emop->op == OpNop ) return;
 
     write( fd, emop, sizeof(struct mccoper CAST_NAME) );
 #ifdef DEBUG
@@ -123,7 +126,7 @@ int16_t stkadj( int16_t bytes )
     if ( evlstk < curfunc->z_size ) mccfail("eval stack underflow");
     if ( evlstk >= MAX_ZEROPAGE   ) mccfail("eval stack overflow");
     
-    if ( evlstk > curfunc->z_max ) curfunc->z_max = evlstk;
+//    if ( evlstk > curfunc->z_max ) curfunc->z_max = evlstk;
     
     return evlstk;
 }
@@ -180,165 +183,83 @@ void generate(struct mcceval * cn)
             
                 if ( op >= Ass && op <= OrAss ) // Handle assignments
                 {
-                    if ( r_op->reg < curfunc->z_size ) // Right argument (left-hand-side of assignment) is currently allocated inside a register
+                    if ( op == Ass )
                     {
-                        if ( op == Ass )
-                        {
-                            // Alter previous MOV instruction to copy old value
-                            l_op->reg = r_op->reg;
-                            l_op->size = r_op->size;
-                            
-                            optr--; // Don't generate a new instruction (this should be harmless)
-                        }
-                        else
-                        {
-                            // Preform modification
-                            optr->reg = r_op->reg;
-                            optr->size = r_op->size;
-                            
-                            optr->c.l_arg = l_op->reg;
-                            optr->c.l_size = l_op->size;
-                            
-                            optr->c.r_arg = r_op->reg;
-                            optr->c.r_size = r_op->size;
-                            
-                            switch ( op )
-                            {
-                                case AddAss:
-                                    optr->op = opc == OP_CLASS_POINTER ? OpAdd_P : OpAdd;
-                                    break;
-                                case SubAss:
-                                    optr->op = opc == OP_CLASS_POINTER ? OpSub_P : OpSub;
-                                    break;
-                                case Mul:
-                                    optr->op = opc == OP_CLASS_SIGNED ? OpMul_S : OpMul_U;
-                                    break;
-                                case Div:
-                                    optr->op = opc == OP_CLASS_SIGNED ? OpDiv_S : OpDiv_U;
-                                    break;
-                                case Mod:
-                                    optr->op = opc == OP_CLASS_SIGNED ? OpMod_S : OpMod_S;
-                                    break;
-                                case ShlAss:
-                                    optr->op = OpShl;
-                                    break;
-                                case ShrAss:
-                                    optr->op = opc == OP_CLASS_SIGNED ? OpShr_S : OpShr_U;
-                                    break;
-                                case AndAss:
-                                    optr->op = OpAnd;
-                                    break;
-                                case XorAss:
-                                    optr->op = OpXor;
-                                    break;
-                                case OrAss:
-                                    optr->op = OpOr;
-                                    break;
-                            }
-                        }
+                        // Overwrite destination register of computed value (lhs) with a pointer to the computed destination (rhs)
+                        l_op->reg = r_op->reg;
+                        l_op->size = r_op->size;
+                        l_op->flags |= REG_INDER;
+                        
+                        optr--; // Don't generate a new instruction (this should be harmless)
                     }
-                    else // Right argument (left-hand-side of assignment) is currently allocated in main memory
+                    else
                     {
-                        if ( op == Ass )
+                        // Preform modification
+                        optr->reg = r_op->reg;
+                        optr->size = r_op->size;
+                        optr->flags = REG_INDER | R_ARG_INDER;
+                        
+                        optr->c.l_arg = l_op->reg;
+                        optr->c.l_size = l_op->size;
+                        if ( l_op->flags & REG_INDER ) optr->flags |= L_ARG_INDER;
+                        
+                        optr->c.r_arg = r_op->reg;
+                        optr->c.r_size = r_op->size;
+                        
+                        switch ( op )
                         {
-                            optr--; // Last instruction should be a LOAD
-#ifdef DEBUG_GEN
-                            if ( optr->op != OpLoad ) mccfail( "Last op before assignment was not LOAD!" );
-#endif
-                            stkadj( -optr->size ); // Unallocate space from load op
-
-                            optr->op = OpStore;
-
-                            optr->reg = l_op->reg;
-                            optr->size = ev->st->size;
-                        }
-                        else // Resultant type is always the same as the left-hand-side
-                        {                            
-                            // Store location of pointer
-                            unsigned int8_t ptrreg = r_op->reg;
-
-                            // Update last load instruction to keep the original pointer intact
-                            stkadj( IR_PTR_SIZE );
-                            r_op->reg += IR_PTR_SIZE >> 1;
-#ifdef DEBUG_GEN
-                            if ( l_op->size != ev->st->size ) mccfail("modify-assignment l_op->size != st->size");
-#endif                               
-                            // Move the result to the eval stack if needed
-                            optr->reg = l_op->reg;
-                            optr->size = l_op->size;
-                            
-                            optr->c.l_arg = l_op->reg;
-                            optr->c.l_size = l_op->size;
-                            
-                            optr->c.r_arg = r_op->reg;
-                            optr->c.r_size = r_op->size;
-                    
-                            switch ( op )
-                            {
-                                case AddAss:
-                                    optr->op = opc == OP_CLASS_POINTER ? OpAdd_P : OpAdd;
-                                    break;
-                                case SubAss:
-                                    optr->op = opc == OP_CLASS_POINTER ? OpSub_P : OpSub;
-                                    break;
-                                case Mul:
-                                    optr->op = opc == OP_CLASS_SIGNED ? OpMul_S : OpMul_U;
-                                    break;
-                                case Div:
-                                    optr->op = opc == OP_CLASS_SIGNED ? OpDiv_S : OpDiv_U;
-                                    break;
-                                case Mod:
-                                    optr->op = opc == OP_CLASS_SIGNED ? OpMod_S : OpMod_S;
-                                    break;
-                                case ShlAss:
-                                    optr->op = OpShl;
-                                    break;
-                                case ShrAss:
-                                    optr->op = opc == OP_CLASS_SIGNED ? OpShr_S : OpShr_U;
-                                    break;
-                                case AndAss:
-                                    optr->op = OpAnd;
-                                    break;
-                                case XorAss:
-                                    optr->op = OpXor;
-                                    break;
-                                case OrAss:
-                                    optr->op = OpOr;
-                                    break;
-                            }
-                            
-                            optr++;
-                            
-                            // Store final result
-                            optr->op = OpStore;
-                            
-                            optr->reg = l_op->reg;
-                            optr->size = ev->st->size;
-                            
-                            optr->c.r_arg = r_op->reg;
-                            optr->c.r_size = r_op->size;
-                            
-                            // Cleanup eval stack
-                            stkadj( -(r_op->size + IR_PTR_SIZE) );
+                            case AddAss:
+                                optr->op = opc == OP_CLASS_POINTER ? OpAdd_P : OpAdd;
+                                break;
+                            case SubAss:
+                                optr->op = opc == OP_CLASS_POINTER ? OpSub_P : OpSub;
+                                break;
+                            case Mul:
+                                optr->op = opc == OP_CLASS_SIGNED ? OpMul_S : OpMul_U;
+                                break;
+                            case Div:
+                                optr->op = opc == OP_CLASS_SIGNED ? OpDiv_S : OpDiv_U;
+                                break;
+                            case Mod:
+                                optr->op = opc == OP_CLASS_SIGNED ? OpMod_S : OpMod_S;
+                                break;
+                            case ShlAss:
+                                optr->op = OpShl;
+                                break;
+                            case ShrAss:
+                                optr->op = opc == OP_CLASS_SIGNED ? OpShr_S : OpShr_U;
+                                break;
+                            case AndAss:
+                                optr->op = OpAnd;
+                                break;
+                            case XorAss:
+                                optr->op = OpXor;
+                                break;
+                            case OrAss:
+                                optr->op = OpOr;
+                                break;
                         }
                     }
                 }
                 else
                 {
                     // Spill globals BEFORE calling the function
-                    if ( op == FnCallArgs ) spillGlobals(evlstk);
+//                    if ( op == FnCallArgs ) spillGlobals(evlstk);
                 
                     if ( l_op->reg >= curfunc->z_size ) stkadj( -l_op->size );
                     if ( r_op->reg >= curfunc->z_size ) stkadj( -r_op->size );
                     
                     optr->reg = evlstk;
+                    optr->flags = ev->st->type & IR_LVAL ? REG_INDER : 0;
                     stkadj( optr->size = ev->st->size );
                     
                     optr->c.l_arg = l_op->reg;
                     optr->c.l_size = l_op->size;
+                    if ( l_op->flags & REG_INDER ) optr->flags |= L_ARG_INDER;
                     
                     optr->c.r_arg = r_op->reg;
                     optr->c.r_size = r_op->size;
+                    if ( r_op->flags & REG_INDER ) optr->flags |= R_ARG_INDER;
                     
                     switch ( op )
                     {
@@ -428,17 +349,19 @@ void generate(struct mcceval * cn)
             else
             {
                 // Spill globals BEFORE calling the function
-                if ( op == FnCall ) spillGlobals(evlstk);
+//                if ( op == FnCall ) spillGlobals(evlstk);
 
                 if ( r_op->reg >= curfunc->z_size ) stkadj( -r_op->size );
                 
                 // Move the result to the eval stack if needed
                 optr->reg = evlstk;
+                optr->flags = ev->st->type & IR_LVAL ? REG_INDER : 0;
                 stkadj( optr->size = ev->st->size );
                 
                 optr->c.r_arg = r_op->reg;
                 optr->c.r_size = r_op->size;
-                 
+                if ( r_op->flags & REG_INDER ) optr->flags |= R_ARG_INDER;
+
                 switch ( op )
                 {
                 // *** Unary Operators ***
@@ -452,16 +375,16 @@ void generate(struct mcceval * cn)
 
                         break;
                     case PostInc:
-                        optr->op = ev->st->type & IR_LVAL ? OpPostIncLoad : OpPostInc;
+                        optr->op = OpPostInc;
                         break;
                     case PostDec:
-                        optr->op = ev->st->type & IR_LVAL ? OpPostDecLoad : OpPostDec;
+                        optr->op = OpPostDec;
                         break;
                     case PreInc:
-                        optr->op = ev->st->type & IR_LVAL ? OpPreIncLoad  : OpPreInc;
+                        optr->op = OpPreInc;
                         break;
                     case PreDec:
-                        optr->op = ev->st->type & IR_LVAL ? OpPreDecLoad  : OpPreDec;
+                        optr->op = OpPreDec;
                         break;
                     case Minus:
                         optr->op = OpNegate;
@@ -476,7 +399,7 @@ void generate(struct mcceval * cn)
                         optr->op = OpMov; // Preform byte promotion to word
                         break;
                     case Deref: // Handled by l-value load
-                    case Inder: // Does nothing
+                    case Inder: // Does nothing (undo the allocations, and operation created above)
                         if ( r_op->reg >= curfunc->z_size ) stkadj( r_op->size - optr->size );
                         else stkadj( -optr->size );
                         optr--;
@@ -489,6 +412,9 @@ void generate(struct mcceval * cn)
         }
         else // *** Operands ***
         {
+            // Make sure to clear the flag register here as it's not used by most operands
+            optr->flags = 0;
+            
             switch ( op )
             {
                 case StartOfArgs: // Not an operand, just tells us that we're about to start pushing arguments for a function call
@@ -519,16 +445,16 @@ void generate(struct mcceval * cn)
 #endif
                     if ( (ev->var->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) // Allocated in zero page
                     {
-                        // Use a no-op MOV to pass along the address
+                        // Use a Nop to pass along the address
                         // This MOV instruction can be repurpoused by an assignment
-                        optr->op = OpMov;
-                        optr->reg = ev->var->z_addr;
-                        optr->size = ev->st->size;
+                        optr->op = OpNop;
+                        optr->reg = ev->var->reg;
+                        // The size of the pointer is implicit, based on the size of the type we're looking up
+                        // E.g. 1 byte = byte pointer, 2 byte = word pointer, >2 byte = word pointer + offsets (w. multiple loads)
+                        optr->size = ev->var->size;
+                        optr->flags = REG_INDER;
                         
-                        optr->c.r_arg = optr->reg;
-                        optr->c.r_size = ev->var->size;
-                        
-                        ev->st->type &= ~IR_LVAL; // This is not an l-value
+//                        ev->st->type &= ~IR_LVAL; // This is not an l-value
                     }
                     else // Allocated in main memory, we'll have to load it ourselves
                     {
@@ -545,13 +471,14 @@ void generate(struct mcceval * cn)
                         optr->a.val = ev->st->val;
 
                         optr->reg = evlstk;
+                        optr->flags = REG_INDER;
                         
                         stkadj( optr->size = IR_PTR_SIZE );
 
-                        // Mark complex types as non l-values as they cannot be dereferenced
-                        unsigned int8_t type = ev->st->type & IR_TYPE_MASK;
-                        
-                        if ( type >= IR_STRUC && type <= IR_FUNC ) ev->st->type &= ~IR_LVAL;
+//                        unsigned int8_t type = ev->st->type & IR_TYPE_MASK;
+
+                        // Mark complex types as non l-values as they cannot be dereferenced                        
+//                        if ( type >= IR_STRUC && type <= IR_FUNC ) ev->st->type &= ~IR_LVAL;
                     }
                     break;
 
@@ -588,8 +515,13 @@ void generate(struct mcceval * cn)
         }
 
         // Inderection (Address-of) strips l-value
-        if ( pv && pv->st->oper == Inder ) ev->st->type &= ~IR_LVAL;
+        if ( pv && pv->st->oper == Inder )
+        {
+            optr->flags &= ~REG_INDER;
+            ev->st->type &= ~IR_LVAL;
+        }
 
+/* This is handled implicitly by the REG_INDER flag now
         // Preform l-to-r value conversion
         if ( ev->st->type & IR_LVAL )
         {
@@ -598,7 +530,7 @@ void generate(struct mcceval * cn)
             
             optr->c.r_arg = optr->reg = (optr-1)->reg;
             optr->c.r_size = optr->size = ev->st->size; // This should be the actual size in bytes
-            
+
             if ( optr->reg < curfunc->z_size ) // Can't load into zero page, allocate room on the stack
             {
                 optr->reg = evlstk;
@@ -613,7 +545,7 @@ void generate(struct mcceval * cn)
                 stkadj( sz - IR_PTR_SIZE );
             }
         }
-        
+*/
         /* Handle implicit conversion between floats & ints which happens durring:
         
             Casting (Obviously)

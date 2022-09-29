@@ -16,19 +16,21 @@ void writeVar(int16_t fd, struct mccvar * wv)
         case VAR_ALC_NA: write( fd, "not_aloc", 9 ); break;
     }
     
-    write( fd, ":z_addr:", 8 );
-    decwrite( fd, wv->z_addr );
-    write( fd, ":s_addr:", 8 );
-    decwrite( fd, wv->s_addr );
+    write( fd, ":reg:", 5 );
+    decwrite( fd, wv->reg );
+//    write( fd, ":addr:", 6 );
+//    decwrite( fd, wv->addr );
     write( fd, ":size:", 6 );
     decwrite( fd, wv->size );
 }
 #endif
 
+/*
 // sv = variable to spill
 // spr = temp register used to store spill address
 void spill(struct mccvar * sv, unsigned int8_t spr)
 {
+    // Can only spill a variable that's allocated to zero page
     if ( (sv->flags & VAR_ALC_MASK) != VAR_ALC_ZP ) return;
 
     if ( sv->len ) // Global variable
@@ -87,6 +89,7 @@ void spill(struct mccvar * sv, unsigned int8_t spr)
     
     sv->flags = VAR_ALC_MM;
 }
+*/
 
 // Spill all variables allocated within the last block
 void spillBlock(int16_t level, unsigned int8_t spr)
@@ -95,10 +98,11 @@ void spillBlock(int16_t level, unsigned int8_t spr)
     for ( cv = curfunc->vartbl; cv; cv = cv->next )
     {
         // Check if the variable is above the current level and allocated in zp
-        // Spill does this for us, but we do it here to save us from having to do an uneccisary function call
-        if ( cv->stmt >= level && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) spill(cv, spr);
+        if ( cv->stmt >= level && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) cv->flags = VAR_ALC_MM;
     }
 }
+
+/* No need to spill globals, since the we're using indirection for everything now which solves the aliasing problem
 
 // Spill all allocated global variables
 void spillGlobals(unsigned int8_t spr)
@@ -107,10 +111,10 @@ void spillGlobals(unsigned int8_t spr)
     for ( cv = curfunc->vartbl; cv; cv = cv->next )
     {
         // Check if the variable is global and allocated in zp
-        // Spill does this for us, but we do it here to save us from having to do an uneccisary function call
-        if ( cv->len && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) spill(cv, spr);
+        if ( cv->len && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) cv->flags = VAR_ALC_MM;
     }
 }
+*/
 
 void regalloc(struct mcceval * cn)
 {
@@ -138,7 +142,7 @@ void regalloc(struct mcceval * cn)
         struct mcceval * pv = ev->parent;
 
         unsigned int8_t op = ev->st->oper;
-        unsigned int8_t opc = opClass(ev->st);
+        //unsigned int8_t opc = opClass(ev->st);
         
         if ( op == Variable || op == VariableLocal )
         {
@@ -169,11 +173,13 @@ void regalloc(struct mcceval * cn)
                 }
                 
                 av->size = ev->st->size;
-
+                av->flags = VAR_ALC_NA;
+/*
                 // Don't allocate constant, or large types
                 unsigned int8_t tf = ev->st->type & IR_TYPE_MASK;
                 if ( tf >= IR_STRUC && tf <= IR_FUNC ) av->flags = VAR_ALC_DA;
                 else av->flags = VAR_ALC_NA;
+*/
             }
             
             ev->var = av;
@@ -181,118 +187,57 @@ void regalloc(struct mcceval * cn)
             av->lac = curfunc->vac++;
             
             unsigned int8_t af = av->flags & VAR_ALC_MASK;
-            // Number of registers occupied by this variable
-            unsigned int8_t z_size = av->size >> 1;
-            if ( !z_size ) z_size++;
-
-            
-            if ( pv && pv->st->oper == Inder ) // Address-of, spill this variable
-            {
-                #ifdef DEBUG_ALLOC
-                write( 2, "DA Var: ", 8 );
-                writeVar( 2, av );
-                write( 2, "\n", 1 );
-                #endif
-            
-                spill(av, curfunc->z_size);
-                av->flags = VAR_ALC_DA; // Mark as "do not allocate"
-            }
-            // Variable is in need of allocation
-            else if ( af == VAR_ALC_MM || af == VAR_ALC_NA )
+            if ( af == VAR_ALC_MM || af == VAR_ALC_NA )
             {
                 // There is room left so allocate variable to end of current zero page region
-                if ( curfunc->z_size + z_size <= MAX_REG )
+                if ( curfunc->z_size + 1 <= MAX_REG )
                 {
-                    av->z_addr = curfunc->z_size;
-                    curfunc->z_size += z_size;
-                    if ( curfunc->z_size > curfunc->z_max ) curfunc->z_max = curfunc->z_size;
+                    av->reg = curfunc->z_size;
+                    curfunc->z_size++;// += z_size;
+//                    if ( curfunc->z_size > curfunc->z_max ) curfunc->z_max = curfunc->z_size;
                 }
-                // We're full, make some room
+                // We're full, find the register which was accessed the longest ago
                 else
                 {
-                    unsigned int16_t aac = -1; // Average access count
-                    unsigned int16_t aap = 0; // Avearage access position
-
-                    for ( av->z_addr = 0; av->z_addr <= MAX_REG - z_size; av->z_addr++ )
+                    struct mccvar * cv, * oav;
+                
+                    for ( cv = curfunc->vartbl; cv; cv = cv->next )
                     {
-                        unsigned int16_t cac = 0; // Current access count
-                        unsigned int16_t ncv = 0; // Number of conflicting variables
-                    
-                        struct mccvar * cv;
-                        for ( cv = curfunc->vartbl; cv; cv = cv->next )
-                        {
-                            // Check if this variable is allocated to zero page and that the current av address lies inside this variable's allocation range
-                            unsigned int8_t cvzs = cv->size >> 1;
-                            if (!cvzs) cvzs++;
-                            
-                            if ( (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP // Zero page resident variables only
-                            &&   av->z_addr <= cv->z_addr + cvzs && cv->z_addr <= av->z_addr + z_size ) // Conflicting address range
-                            {
-                                cac += cv->lac;
-                                ncv++;
-                            }
-                        }
-                        
-                        cac /= ncv;
-                        if ( cac < aac ) // Update aac & aap
-                        {
-                            aac = cac;
-                            aap = av->z_addr;
-                        }
+                        // Only look at variables which are currently held in zero page
+                        if ( (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP
+                        // Check if this variable was last accessed longer ago
+                        && (cv == curfunc->vartbl || cv->lac < oav->lac) ) oav = cv;
                     }
                     
-                    av->z_addr = aap;
+                    if (!oav) mccfail("Failed make room for new variable in zero page, vartbl was empty");
                     
-                    // Update zero page size if needed
-                    if ( av->z_addr + z_size > curfunc->z_size ) curfunc->z_size = av->z_addr + z_size;
+                    // Spill oldest variable
+                    oav->flags = VAR_ALC_MM;
                     
-                    // Spill conflicting variables
-                    struct mccvar * sv;
-                    for ( sv = curfunc->vartbl; sv; sv = sv->next )
-                    {
-                        unsigned int8_t svzs = sv->size >> 1;
-                        if (!svzs) svzs++;
-                    
-                        if ( (sv->flags & VAR_ALC_MASK) == VAR_ALC_ZP // Zero page resident variables only
-                        &&   av->z_addr <= sv->z_addr + svzs && sv->z_addr <= av->z_addr + z_size ) // Conflicting address range
-                        {
-                            spill(sv, curfunc->z_size);
-                        }
-                    }
+                    av->reg = oav->reg;
                 }
 
                 av->stmt = stmttop - 1;
                 av->flags = VAR_ALC_ZP; // Make sure to spill all conflicting variables, before marking this as no longer in the stack
                 
-                if ( af == VAR_ALC_MM )
+                // Load the address of this new variable into the allocated register
+                if ( av->len ) // Global variable
                 {
-                    // Generate allocation instruction
-                    if ( av->len ) // Global variable
-                    {
-                        optr->op = OpAddrGlb;
-                        optr->a.name = av->name;
-                        optr->a.val = av->len;
-                    }
-                    else // Local variable
-                    {
-                        optr->op = OpAddrLoc;
-                        optr->a.val = av->s_addr;
-                    }
-
-                    optr->reg = curfunc->z_size;
-                    optr->size = IR_PTR_SIZE;
-
-                    optr++;
-
-                    optr->op = OpLoad;
-                    optr->reg = av->z_addr;
-                    optr->size = av->size;
-                    
-                    optr->c.r_arg = curfunc->z_size;
-                    optr->c.r_size = av->size;
-                    
-                    optr++;
+                    optr->op = OpAddrGlb;
+                    optr->a.name = av->name;
+                    optr->a.val = av->len;
                 }
+                else // Local variable
+                {
+                    optr->op = OpAddrLoc;
+                    optr->a.val = av->addr;
+                }
+
+                optr->reg = av->reg;
+                optr->size = IR_PTR_SIZE;
+                optr->flags = 0;
+
+                optr++;
             }
         }
     }

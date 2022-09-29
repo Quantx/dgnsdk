@@ -215,7 +215,7 @@ struct mccnode
 void define(struct mccnsp * curnsp);
 
 // Compiler fail function
-void mccfail(int8_t * msg);
+void fail(int8_t * msg);
 
 #ifdef DEBUG
 void dumpNamespace( int16_t fd, struct mccnsp * dmpnsp );

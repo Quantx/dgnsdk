@@ -14,8 +14,6 @@ void statement( struct mccstmt * st )
         case Label:
         case LabelExtern: // Function declaration
         {
-            locsize = 0; // Reset local allocation size
-            
             if ( curfunc ) brk2( curfunc ); // Effectively nuke break region 2
 
             curfunc = sbrk2(sizeof(struct mccfunc CAST_NAME));
@@ -35,7 +33,7 @@ void statement( struct mccstmt * st )
             for ( i = 0; i < st->val; i++ ) curfunc->name[i] = st->name[i];
             
             curfunc->vac = 0;
-            curfunc->z_max = 0;
+//            curfunc->z_max = 0;
             curfunc->z_size = 0;
             curfunc->s_size = 0;
             
@@ -72,7 +70,7 @@ void statement( struct mccstmt * st )
             break;
         }
         case Allocate:
-            locsize += st->val;
+            curfunc->s_size += st->val;
             brk(st);
             break;
         case Unallocate:
@@ -83,15 +81,15 @@ void statement( struct mccstmt * st )
                 break;
             }
             
-            locsize -= st->val;
+            curfunc->s_size -= st->val;
             
-            // Can't actually unallocate anything as it might also unallocate a global variable
+            // Can't actually unallocate anything from vartbl as it might also unallocate a global variable
             struct mccvar ** dv;
             for ( dv = &curfunc->vartbl; *dv; dv = &(*dv)->next )
             {
                 struct mccvar * cv = *dv;
                 // Ignore global variables and local variables that are still in scope
-                if ( cv->len || cv->addr < locsize ) continue;
+                if ( cv->len || cv->addr < curfunc->s_size ) continue;
                 
                 *dv = cv->next; // Drop from list
                 

@@ -88,8 +88,3 @@ struct mccvar * getVarFunc( struct mccstmt * st, struct mccfunc * fn )
 }
 
 struct mccvar * getVar( struct mccstmt * st ) { return getVarFunc( st, curfunc ); }
-
-int16_t regAlloc( struct mccvar * v )
-{
-
-}

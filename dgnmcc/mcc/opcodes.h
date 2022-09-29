@@ -6,6 +6,7 @@
 
 enum
 {
+    OpNop, // No-operation, should be first in this list
 // *** Immediate Values ***
     // Load a immediate value (value is embeded into opcode)
     OpValueByte,
@@ -34,13 +35,13 @@ enum
     // [r_arg] -> reg
     // r_size = Maximum number of bytes to read from memory
     // size = Number of registers to fill (number of bytes to actually read)
-    OpLoad,
+//    OpLoad,
 
     // reg -> [r_arg]
     // Reg must be the source register because the value may be referenced by additional statements
     // r_size = Maximum number of bytes to write to memory
     // size = Number of registers to write (number of bytes to actually write)
-    OpStore,
+//    OpStore,
     
     // reg -> [stack_top]
     OpPush,
@@ -74,11 +75,12 @@ enum
     OpNegate, OpNegate_F,
 
     // Indirect Pre/Pos Inc/Dec
+/*
     OpPreIncLoad,    OpPreDecLoad,
     OpPreIncLoad_F,  OpPreDecLoad_F,
     OpPostIncLoad,   OpPostDecLoad,
     OpPostIncLoad_F, OpPostDecLoad_F,
-
+*/
     // Direct Pre/Pos Inc/Dec
     OpPreInc,    OpPreDec,
     OpPreInc_F,  OpPreDec_F,
@@ -86,8 +88,8 @@ enum
     OpPostInc_F, OpPostDec_F,
     
     // Floating point and int conversion 
-    OpFloat2Int, OpInt2Float,
-    OpFloat2Float, // Used for converting between floats and doubles
+    OpFloatToInt, OpIntToFloat,
+    OpFloatToFloat, // Used for converting between floats and doubles
 
     // Structure Operators
     OpArrow, OpDot
@@ -98,6 +100,8 @@ enum
 
 #ifdef DEBUG
 int8_t * opNames[] = {
+    "OpNop",
+
     "OpValueByte",
     "OpValueWord",
     "OpValueLong",
@@ -118,9 +122,9 @@ int8_t * opNames[] = {
 
     "OpReturn",
 
-    "OpLoad",
+//    "OpLoad",
 
-    "OpStore",
+//    "OpStore",
     
     "OpPush",
     
@@ -147,19 +151,19 @@ int8_t * opNames[] = {
     "OpMul_F", "OpDiv_F",
 
     "OpNegate", "OpNegate_F",
-
+/*
     "OpPreIncLoad", "OpPreDecLoad",
     "OpPreIncLoad_F", "OpPreDecLoad_F",
     "OpPostIncLoad", "OpPostDecLoad",
     "OpPostIncLoad_F", "OpPostDecLoad_F",
-    
+*/
     "OpPreInc", "OpPreDec",
     "OpPreInc_F", "OpPreDec_F",
     "OpPostInc", "OpPostDec",
     "OpPostInc_F", "OpPostDec_F",
 
-    "OpFloat2Int", "OpInt2Float",
-    "OpFloat2Float",
+    "OpFloatToInt", "OpIntToFloat",
+    "OpFloatToFloat",
 
     "OpArrow", "OpDot"
 };
@@ -202,10 +206,16 @@ struct mccoper_computational
     int16_t r_size;
 };
 
+// Inderection flags indicate that the desired register contains a pointer to desired data, not the data itself
+#define REG_INDER   0b001
+#define R_ARG_INDER 0b010
+#define L_ARG_INDER 0b100
+
 struct mccoper
 {
     unsigned int8_t op;
     unsigned int8_t reg;
+    unsigned int16_t flags;
     int16_t size;
 
     union {

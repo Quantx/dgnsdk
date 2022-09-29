@@ -93,7 +93,7 @@ void dumpTree( struct mccnode * n, int8_t * fname )
     int16_t nspos = 0;
 
     int16_t fexp;
-    if ( (fexp = creat(fname, 0666)) < 0 ) mccfail( "unable to create tree dump file" );
+    if ( (fexp = creat(fname, 0666)) < 0 ) fail( "unable to create tree dump file" );
 
     write( fexp, "graph expression_tree {\n", 24 );
 
@@ -205,7 +205,7 @@ void dumpNamespace( int16_t fd, struct mccnsp * dmpnsp )
 void dumpGlbnsp( int8_t * fname )
 {
     int16_t fnsp;
-    if ( (fnsp = creat(fname, 0666)) < 0 ) mccfail( "unable to create namespace dump file" );
+    if ( (fnsp = creat(fname, 0666)) < 0 ) fail( "unable to create namespace dump file" );
 
     dumpNamespace( fnsp, &glbnsp );
 

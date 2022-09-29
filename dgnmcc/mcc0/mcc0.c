@@ -27,7 +27,7 @@ int8_t * res_words[31] = {
     "sizeof"
 };
 
-void mccfail( int8_t * msg )
+void fail( int8_t * msg )
 {
     decwrite( 2, ln );
     write( 2, ":", 1 );
@@ -43,7 +43,7 @@ int16_t readline()
 
     // Read data in and scan for newline
     while ( i < MAX_LINE - 1 && read( 0, lp + i, 1 ) && lp[i++] != '\n' );
-    if ( i == MAX_LINE - 1 ) mccfail("readline overflow");
+    if ( i == MAX_LINE - 1 ) fail("readline overflow");
 
     // Null terminate a line if needed
     lp[i] = 0;
@@ -75,7 +75,7 @@ void ntok()
                  || *p == '_' ) p++;
 
             // This MUST be 255 because that's the maximum var name size
-            if ( p - pp > 255 ) mccfail("named token exceedes max character length");
+            if ( p - pp > 255 ) fail("named token exceedes max character length");
             tkVal = p - pp;
 
             // Check for reserved word
@@ -152,7 +152,7 @@ void ntok()
                     // Multi-line comment, hunt end
                     while ( *p != '*' || p[1] != '/' )
                         if ( !*p++ && !readline() )
-                            mccfail("expected block comment terminator, got end of file");
+                            fail("expected block comment terminator, got end of file");
 
                     p += 2;
                     continue;
@@ -186,7 +186,7 @@ void ntok()
                             || *p >= 'A' && *p <= 'F' )
                             // Convert first digit
                             out = (*p & 0xF) + (*p++ >= 'A' ? 9 : 0);
-                        else mccfail("expected two hex digits following a \\x escape");
+                        else fail("expected two hex digits following a \\x escape");
 
                         // Convert possible second digit
                         if ( *p >= '0' && *p <= '9'
@@ -204,10 +204,10 @@ void ntok()
                         if ( *p >= '0' && *p <= '7' ) // Last digit
                             out = (out << 3) + *p++ - '0';
                     }
-                    else mccfail("unknown escape sequence");
+                    else fail("unknown escape sequence");
                 }
 
-                if ( *p++ != '\'' ) mccfail("missing end quote on character constant");
+                if ( *p++ != '\'' ) fail("missing end quote on character constant");
 
                 // Record character constant
                 tk = SmolNumber;
@@ -231,7 +231,7 @@ void ntok()
                     tk = *p++;
                 }
 
-                mccfail("missing closing quote on string constant");
+                fail("missing closing quote on string constant");
             case '.': if ( *p == '.' && p[1] == '.' ) { p += 2; tk = Variadic; return; } tk = Dot; return;
             case '=': if ( *p == '=' ) { p++; tk = Eq; return; } tk = Ass; return;
             case '+':

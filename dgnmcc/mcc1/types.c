@@ -39,7 +39,7 @@ struct mcctype type_string = {
 struct mcctype * typeClone( struct mcctype * t )
 {
     struct mcctype * out = sbrk(sizeof(struct mcctype CAST_NAME));
-    if ( out == SBRKFAIL ) mccfail("unable to allocate new type");
+    if ( out == SBRKFAIL ) fail("unable to allocate new type");
 
     out->ptype = t->ptype;
     out->stype = t->stype;
@@ -48,13 +48,13 @@ struct mcctype * typeClone( struct mcctype * t )
     for ( s = t->sub; s; s = s->sub )
     {
         *os = sbrk(sizeof(struct mccsubtype CAST_NAME));
-        if ( *os == SBRKFAIL ) mccfail("unable to allocate new subtype");
+        if ( *os == SBRKFAIL ) fail("unable to allocate new subtype");
 
         (*os)->inder = s->inder;
         (*os)->arrays = s->arrays;
 
         (*os)->sizes = sbrk(s->arrays * sizeof(unsigned int16_t CAST_NAME));
-        if ( (*os)->sizes == SBRKFAIL ) mccfail("unable to allocate new size list");
+        if ( (*os)->sizes == SBRKFAIL ) fail("unable to allocate new size list");
 
         int16_t i;
         for ( i = 0; i < s->arrays; i++ ) (*os)->sizes[i] = s->sizes[i];
@@ -81,7 +81,7 @@ struct mcctype * typeInder( struct mcctype * t )
     if ( s->arrays || s->ftype )
     {
         s = s->sub = sbrk(sizeof(struct mccsubtype CAST_NAME));
-        if ( s == SBRKFAIL ) mccfail("unable to allocate new subtype");
+        if ( s == SBRKFAIL ) fail("unable to allocate new subtype");
 
         s->inder = 1;
         s->arrays = 0;
@@ -102,7 +102,7 @@ struct mcctype * typeDeref( struct mcctype * t )
     struct mccsubtype * s, * ls = NULL;
     for ( s = out->sub; s->sub; s = s->sub ) ls = s;
 
-    if ( s->ftype ) mccfail("tried to dereference a function");
+    if ( s->ftype ) fail("tried to dereference a function");
     else if ( s->arrays )
     {
         s->arrays--;
@@ -111,7 +111,7 @@ struct mcctype * typeDeref( struct mcctype * t )
         for ( i = 0; i < s->arrays; i++ ) s->sizes[i] = s->sizes[i+1];
     }
     else if ( s->inder ) s->inder--;
-    else mccfail("tried to dereference non-pointer");
+    else fail("tried to dereference non-pointer");
 
     // Reduce type if needed
     if ( ls && !s->inder && !s->arrays && !s->ftype ) ls->sub = NULL;
@@ -126,13 +126,13 @@ int16_t typeSize( struct mcctype * t )
     struct mccsubtype * s;
     for ( s = t->sub; s->sub; s = s->sub );
 
-    if ( s->ftype ) mccfail("cannot get sizeof function");
+    if ( s->ftype ) fail("cannot get sizeof function");
 
     // Check if this is an array
     int16_t i, j;
     for ( i = 0, j = 1; i < s->arrays; i++ )
     {
-        if ( !s->sizes[i] ) mccfail("cannot get sizeof unknown dimension in array");
+        if ( !s->sizes[i] ) fail("cannot get sizeof unknown dimension in array");
         j *= s->sizes[i];
     }
     if ( i )
@@ -156,7 +156,7 @@ int16_t typeSize( struct mcctype * t )
     // Check if this is a struct
     if ( t->stype )
     {
-        if ( ~t->stype->type & CPL_DEFN ) mccfail("cannot get sizeof incomplete type");
+        if ( ~t->stype->type & CPL_DEFN ) fail("cannot get sizeof incomplete type");
         return t->stype->size;
     }
 
@@ -164,7 +164,7 @@ int16_t typeSize( struct mcctype * t )
     int8_t ptype = t->ptype & CPL_DTYPE_MASK;
 
     // Cannot get sizeof void
-    if ( ptype == CPL_VOID ) mccfail("tried to get sizeof void");
+    if ( ptype == CPL_VOID ) fail("tried to get sizeof void");
 
     if ( ptype <= CPL_UCHR ) return 1;
     if ( ptype <= CPL_UINT ) return 2;
@@ -288,7 +288,7 @@ int16_t isCompatible( struct mcctype * tl, struct mcctype * tr )
         if ( tl->stype != tr->stype || (!tl->stype && pl != pr) ) return 0;
 
         // Struct must be complete
-        if ( tl->stype && (~tl->stype->type & CPL_DEFN) ) mccfail("incomplete type is incompatible");
+        if ( tl->stype && (~tl->stype->type & CPL_DEFN) ) fail("incomplete type is incompatible");
 
         struct mccsubtype * sl, * sr;
         for ( sl = tl->sub, sr = tr->sub; sl && sr; sl = sl->sub, sr = sr->sub )
@@ -299,15 +299,15 @@ int16_t isCompatible( struct mcctype * tl, struct mcctype * tr )
             {
                 if ( !sr->ftype ) return 0;
 
-                if ( (sl->ftype->type & CPL_NSPACE_MASK) != (sr->ftype->type & CPL_NSPACE_MASK) ) mccfail("variadic function incompatible with non-variadic function");
+                if ( (sl->ftype->type & CPL_NSPACE_MASK) != (sr->ftype->type & CPL_NSPACE_MASK) ) fail("variadic function incompatible with non-variadic function");
 
                 struct mccsym * asym, * bsym;
                 for ( asym = sl->ftype->symtbl, bsym = sr->ftype->symtbl; asym && bsym; asym = asym->next, bsym = bsym->next )
                 {
-                    if ( !isCompatible( &asym->type, &bsym->type ) ) mccfail("incompatible argument types");
+                    if ( !isCompatible( &asym->type, &bsym->type ) ) fail("incompatible argument types");
                 }
 
-                if ( asym || bsym ) mccfail("incompatile number of arguments");
+                if ( asym || bsym ) fail("incompatile number of arguments");
             }
         }
 
@@ -324,7 +324,7 @@ int16_t isCompatible( struct mcctype * tl, struct mcctype * tr )
     // Both types are structs and match
     if ( tl->stype )
     {
-        if ( ~tl->stype->type & CPL_DEFN ) mccfail("incomplete type is incompatible");
+        if ( ~tl->stype->type & CPL_DEFN ) fail("incomplete type is incompatible");
         return 1;
     }
 

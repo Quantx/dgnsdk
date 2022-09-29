@@ -10,7 +10,7 @@ int8_t tkStr[256];
 // Current string constant
 unsigned int16_t csc;
 
-void mccfail( int8_t * msg )
+void fail( int8_t * msg )
 {
     octwrite( 2, ctn );
     write( 2, " ", 1 );
@@ -31,12 +31,12 @@ void ntok()
     switch ( tk )
     {
         case Named:
-            if ( read( 0, &tkVal, 2 ) < 2 ) mccfail( "expected 16 bit value" );
-            if ( read( 0, tkStr, tkVal ) < tkVal ) mccfail( "not enough characters in string");
+            if ( read( 0, &tkVal, 2 ) < 2 ) fail( "expected 16 bit value" );
+            if ( read( 0, tkStr, tkVal ) < tkVal ) fail( "not enough characters in string");
             break;
         case String:
 
-            if ( read( 0, &tkVal, 2 ) < 2 ) mccfail( "expected 16 bit value" );
+            if ( read( 0, &tkVal, 2 ) < 2 ) fail( "expected 16 bit value" );
 
             write( segs[SEG_CNST], "~SC", 3 );
             decwrite( segs[SEG_CNST], csc );
@@ -56,10 +56,10 @@ void ntok()
             break;
         case Number:
         case SmolNumber:
-            if ( read( 0, &tkVal, 2 ) < 2 ) mccfail( "expected 16 bit value" );
+            if ( read( 0, &tkVal, 2 ) < 2 ) fail( "expected 16 bit value" );
             break;
         case LongNumber:
-            if ( read( 0, &tkLong, 4 ) < 4 ) mccfail( "expected 32 bit value" );
+            if ( read( 0, &tkLong, 4 ) < 4 ) fail( "expected 32 bit value" );
             break;
     }
 }

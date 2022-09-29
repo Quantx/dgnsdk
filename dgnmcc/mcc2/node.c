@@ -78,7 +78,7 @@ struct mccstmt * node()
     write( 2, nn, i );
 #endif
 
-    // Injest name
+    // Ingest name
     if ( out->oper == Variable
     ||   out->oper == Label
     ||   out->oper == LabelExtern )

@@ -46,10 +46,10 @@ void reduce()
 
     // This should never happen
     if ( ostk[otop] == Paren_L || ostk[otop] == Square_L || ostk[otop] == Q_Mark )
-        mccfail("wrong matched parenthasis or bracket in expression");
+        fail("wrong matched parenthasis or bracket in expression");
 
     struct mccnode * n = sbrk(sizeof(struct mccnode CAST_NAME));
-    if ( n == SBRKFAIL ) mccfail("unable to allocate expression node");
+    if ( n == SBRKFAIL ) fail("unable to allocate expression node");
 
     n->oper = ostk[otop];
     n->flag = 0;
@@ -64,22 +64,22 @@ void reduce()
     ||   n->oper == Sizeof  || n->oper == Cast
     ||   n->oper == FnCall )
     {
-        if ( ntop < 1 ) mccfail("not enough nodes for unary operator");
+        if ( ntop < 1 ) fail("not enough nodes for unary operator");
         n->right = nstk[--ntop];
         n->left  = NULL;
 
         if ( n->oper == Cast )
         {
-            if (!ctop) mccfail("no type for cast");
+            if (!ctop) fail("no type for cast");
             n->type = cstk[--ctop];
         }
     }
     // Ternary operator
     else if ( n->oper == Tern )
     {
-        if ( ntop < 3 ) mccfail("not enough nodes for ternary operator");
+        if ( ntop < 3 ) fail("not enough nodes for ternary operator");
         struct mccnode * resn = sbrk(sizeof(struct mccnode CAST_NAME));
-        if ( resn == SBRKFAIL ) mccfail("unable to allocate node for ternary operator");
+        if ( resn == SBRKFAIL ) fail("unable to allocate node for ternary operator");
 
         resn->oper = Colon;
         resn->flag = 0;
@@ -91,7 +91,7 @@ void reduce()
     }
     else
     {
-        if ( ntop < 2 ) mccfail("not enough nodes for operator");
+        if ( ntop < 2 ) fail("not enough nodes for operator");
         n->right = nstk[--ntop];
         n->left  = nstk[--ntop];
     }
@@ -104,7 +104,7 @@ void makeCast(struct mccnsp * curnsp)
     castnsp.parent = curnsp;
     define(&castnsp);
 
-    if ( tk != Paren_R ) mccfail("expected closing parenthasis in cast");
+    if ( tk != Paren_R ) fail("expected closing parenthasis in cast");
     ntok();
 
     cstk[ctop++] = &castnsp.symtbl->type;
@@ -152,7 +152,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
         if ( tk == Named || (tk >= Number && tk <= DblNumber) || tk == String )
         {
             nstk[ntop] = sbrk(sizeof(struct mccnode CAST_NAME));
-            if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new node");
+            if ( nstk[ntop] == SBRKFAIL ) fail("unable to allocate space for new node");
 
             nstk[ntop]->left = nstk[ntop]->right = NULL;
             nstk[ntop]->oper = tk;
@@ -184,7 +184,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
                 else // Probably struct or union member
                 {
                     nstk[ntop]->name = sbrk(tkVal);
-                    if ( nstk[ntop]->name == SBRKFAIL ) mccfail("unable to allocate space for node name");
+                    if ( nstk[ntop]->name == SBRKFAIL ) fail("unable to allocate space for node name");
                     nstk[ntop]->type = NULL; // No type
 
                     int16_t i;
@@ -225,7 +225,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
             if ( !otop )
             {
                 if ( stk == tk ) break;
-                mccfail("no matching open parenthasis or bracket in expression");
+                fail("no matching open parenthasis or bracket in expression");
             }
 
             otop--;
@@ -233,12 +233,12 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
             if ( ostk[otop] == Square_L )
             {
                 n = sbrk(sizeof(struct mccnode CAST_NAME));
-                if ( n == SBRKFAIL ) mccfail("unable to allocate array node");
+                if ( n == SBRKFAIL ) fail("unable to allocate array node");
                 n->oper = Square_L;
                 n->flag = 0;
                 n->type = NULL;
 
-                if ( ntop < 2 ) mccfail("not enough nodes for array operator");
+                if ( ntop < 2 ) fail("not enough nodes for array operator");
                 n->right = nstk[--ntop];
                 n->left  = nstk[--ntop];
                 nstk[ntop++] = n;
@@ -299,7 +299,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
                     makeCast(curnsp);
 
                     nstk[ntop] = sbrk(sizeof(struct mccnode CAST_NAME));
-                    if ( nstk[ntop] == SBRKFAIL ) mccfail("unable to allocate space for new sizeof node");
+                    if ( nstk[ntop] == SBRKFAIL ) fail("unable to allocate space for new sizeof node");
 
                     nstk[ntop]->oper = Sizeof;
                     nstk[ntop]->flag = 0;
@@ -307,7 +307,7 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
                     nstk[ntop]->left = NULL;
 
                     struct mccnode * cn = nstk[ntop++]->right = sbrk(sizeof(struct mccnode CAST_NAME));
-                    if ( cn == SBRKFAIL ) mccfail("unable to allocate space for new sizeof-cast node");
+                    if ( cn == SBRKFAIL ) fail("unable to allocate space for new sizeof-cast node");
 
                     cn->oper = Cast;
                     cn->flag = 0;
@@ -349,15 +349,15 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
         }
 
         // Check for overflows
-        if ( otop > MAX_EXPR_OPER ) mccfail( "operator stack full" );
-        if ( ntop > MAX_EXPR_NODE ) mccfail( "node stack full" );
-        if ( ctop > MAX_EXPR_CAST ) mccfail( "cast stack full" );
+        if ( otop > MAX_EXPR_OPER ) fail( "operator stack full" );
+        if ( ntop > MAX_EXPR_NODE ) fail( "node stack full" );
+        if ( ctop > MAX_EXPR_CAST ) fail( "cast stack full" );
     }
 
     while ( otop ) reduce(); // Final reduction
 
-    if ( !ntop ) mccfail("Empty expression stack");
-    else if ( ntop > 1 ) mccfail("Not enough operators in expression");
+    if ( !ntop ) fail("Empty expression stack");
+    else if ( ntop > 1 ) fail("Not enough operators in expression");
 
     root = n = *nstk;
 
@@ -449,83 +449,83 @@ struct, union: (In addition to pointers above)
         // TODO-OPTIMIZE typechecking/promotion
         if ( n->oper >= Ass && n->oper <= OrAss )
         {
-            if ( ~n->left->flag & CPL_LVAL ) mccfail("lhs of assignment is not an l-value");
+            if ( ~n->left->flag & CPL_LVAL ) fail("lhs of assignment is not an l-value");
 
             if ( n->oper == Ass ) // Any compatible type
             {
-                if ( isArray(n->left->type) ) mccfail("lhs of assignment is array");
-                if ( !isCompatible( n->left->type, n->right->type ) ) mccfail("incompatible types");
+                if ( isArray(n->left->type) ) fail("lhs of assignment is array");
+                if ( !isCompatible( n->left->type, n->right->type ) ) fail("incompatible types");
             }
             else if ( n->oper == AddAss )
             {
-                if      ( isPointer(n->left->type)  ) if ( !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is not integer type");
-                else if ( isPointer(n->right->type) ) if ( !isInteger(n->left->type)  ) mccfail("rhs is pointer, lhs is not integer type");
+                if      ( isPointer(n->left->type)  ) if ( !isInteger(n->right->type) ) fail("lhs is pointer, rhs is not integer type");
+                else if ( isPointer(n->right->type) ) if ( !isInteger(n->left->type)  ) fail("rhs is pointer, lhs is not integer type");
                 else
                 {
-                    if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
-                    if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+                    if ( !isArith(n->left->type ) ) fail("lhs is not an arithmetic type");
+                    if ( !isArith(n->right->type) ) fail("rhs is not an arithmetic type");
                 }
             }
             else if ( n->oper == SubAss )
             {
-                if ( isPointer(n->left->type) && !isPointer(n->right->type) && !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is neither pointer nor integer");
+                if ( isPointer(n->left->type) && !isPointer(n->right->type) && !isInteger(n->right->type) ) fail("lhs is pointer, rhs is neither pointer nor integer");
 
-                if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
-                if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+                if ( !isArith(n->left->type ) ) fail("lhs is not an arithmetic type");
+                if ( !isArith(n->right->type) ) fail("rhs is not an arithmetic type");
             }
             else if ( n->oper > SubAss ) // Arithmetic Type
             {
-                if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
-                if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+                if ( !isArith(n->left->type ) ) fail("lhs is not an arithmetic type");
+                if ( !isArith(n->right->type) ) fail("rhs is not an arithmetic type");
             }
             else if ( n->oper >= ModAss ) // Integer Type
             {
-                if ( !isInteger(n->left->type ) ) mccfail("lhs is not an integer type");
-                if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+                if ( !isInteger(n->left->type ) ) fail("lhs is not an integer type");
+                if ( !isInteger(n->right->type) ) fail("rhs is not an integer type");
             }
             else // Scalar type (AddAss, SubAss)
             {
-                if ( !isScalar(n->left->type ) ) mccfail("lhs is not a scalar type");
-                if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
+                if ( !isScalar(n->left->type ) ) fail("lhs is not a scalar type");
+                if ( !isScalar(n->right->type) ) fail("rhs is not a scalar type");
             }
 
             n->type = n->left->type;
         }
         else if ( n->oper == Tern )
         {
-            if ( !isScalar(n->left->type) ) mccfail("lhs is not a scalar type");
+            if ( !isScalar(n->left->type) ) fail("lhs is not a scalar type");
             n->type = n->right->type;
             n->flag = n->right->flag;
         }
         else if ( n->oper == Colon ) // Always results in an r-value
         {
-            if ( !isCompatible( n->left->type, n->right->type ) ) mccfail("incompatible types");
+            if ( !isCompatible( n->left->type, n->right->type ) ) fail("incompatible types");
             // Promote if needed
             if ( isArith(n->left->type) ) n->type = typePromote( n->left->type, n->right->type );
             else n->type = n->left->type;
         }
         else if ( n->oper == LogOr || n->oper == LogAnd )
         {
-            if ( !isScalar(n->left->type ) ) mccfail("lhs is not a scalar type");
-            if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
+            if ( !isScalar(n->left->type ) ) fail("lhs is not a scalar type");
+            if ( !isScalar(n->right->type) ) fail("rhs is not a scalar type");
             n->type = &type_int; // Always int
         }
         else if ( n->oper >= Or && n->oper <= And )
         {
-            if ( !isInteger(n->left->type ) ) mccfail("lhs is not an integer type");
-            if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+            if ( !isInteger(n->left->type ) ) fail("lhs is not an integer type");
+            if ( !isInteger(n->right->type) ) fail("rhs is not an integer type");
             n->type = typePromote(n->left->type, n->right->type);
         }
         else if ( n->oper >= Eq && n->oper <= GreatEq )
         {
-            if ( !isScalar(n->left->type ) ) mccfail("lhs is not a scalar type");
-            if ( !isScalar(n->right->type) ) mccfail("rhs is not a scalar type");
+            if ( !isScalar(n->left->type ) ) fail("lhs is not a scalar type");
+            if ( !isScalar(n->right->type) ) fail("rhs is not a scalar type");
             n->type = &type_int;
         }
         else if ( n->oper == Shl || n->oper == Shr )
         {
-            if ( !isInteger(n->left->type ) ) mccfail("lhs is not an integer type");
-            if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+            if ( !isInteger(n->left->type ) ) fail("lhs is not an integer type");
+            if ( !isInteger(n->right->type) ) fail("rhs is not an integer type");
             n->type = typePromote(n->left->type, n->right->type);
             if ( (n->type->ptype & CPL_DTYPE_MASK) < CPL_INT ) n->type = &type_int;
         }
@@ -533,20 +533,20 @@ struct, union: (In addition to pointers above)
         {
             if ( isPointer(n->left->type) )
             {
-                if ( !isInteger(n->right->type) ) mccfail("lhs is pointer, rhs is not integer type");
+                if ( !isInteger(n->right->type) ) fail("lhs is pointer, rhs is not integer type");
                 n->type = n->left->type;
 //                n->flag |= CPL_LVAL;
             }
             else if ( isPointer(n->right->type) )
             {
-                if ( !isInteger(n->left->type) ) mccfail("rhs is pointer, lhs is not integer type");
+                if ( !isInteger(n->left->type) ) fail("rhs is pointer, lhs is not integer type");
                 n->type = n->right->type;
 //                n->flag |= CPL_LVAL;
             }
             else
             {
-                if ( !isArith(n->left->type ) ) mccfail("lhs is not a arithmetic type");
-                if ( !isArith(n->right->type) ) mccfail("rhs is not a arithmetic type");
+                if ( !isArith(n->left->type ) ) fail("lhs is not a arithmetic type");
+                if ( !isArith(n->right->type) ) fail("rhs is not a arithmetic type");
                 n->type = typePromote(n->left->type, n->right->type);
             }
         }
@@ -556,84 +556,84 @@ struct, union: (In addition to pointers above)
             {
                 if ( isPointer(n->right->type) ) n->type = &type_int;
                 else if ( isInteger(n->right->type) ) n->type = n->left->type;//, n->flag = CPL_LVAL;
-                else mccfail("lhs is pointer, rhs is neither pointer nor integer");
+                else fail("lhs is pointer, rhs is neither pointer nor integer");
             }
             else
             {
-                if ( !isArith(n->left->type ) ) mccfail("lhs is not a arithmetic type");
-                if ( !isArith(n->right->type) ) mccfail("rhs is not a arithmetic type");
+                if ( !isArith(n->left->type ) ) fail("lhs is not a arithmetic type");
+                if ( !isArith(n->right->type) ) fail("rhs is not a arithmetic type");
                 n->type = typePromote(n->left->type, n->right->type);
             }
         }
         else if ( n->oper == Mul || n->oper == Div )
         {
-            if ( !isArith(n->left->type ) ) mccfail("lhs is not an arithmetic type");
-            if ( !isArith(n->right->type) ) mccfail("rhs is not an arithmetic type");
+            if ( !isArith(n->left->type ) ) fail("lhs is not an arithmetic type");
+            if ( !isArith(n->right->type) ) fail("rhs is not an arithmetic type");
             n->type = typePromote(n->left->type, n->right->type);
         }
         else if ( n->oper == Mod )
         {
-            if ( !isInteger(n->left->type ) ) mccfail("lhs is not an integer type");
-            if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+            if ( !isInteger(n->left->type ) ) fail("lhs is not an integer type");
+            if ( !isInteger(n->right->type) ) fail("rhs is not an integer type");
             n->type = typePromote(n->left->type, n->right->type);
         }
         else if ( n->oper == Sizeof )
         {
-            if ( isFunction(n->right->type) ) mccfail("sizeof can not be used on a function");
+            if ( isFunction(n->right->type) ) fail("sizeof can not be used on a function");
             n->type = &type_int;
         }
         else if ( n->oper == LogNot )
         {
-            if ( !isScalar(n->right->type) ) mccfail("not a scalar type");
+            if ( !isScalar(n->right->type) ) fail("not a scalar type");
             n->type = &type_int;
         }
         else if ( n->oper == Not )
         {
-            if ( !isInteger(n->right->type) ) mccfail("not an integer type");
+            if ( !isInteger(n->right->type) ) fail("not an integer type");
             n->type = n->right->type;
             if ( (n->type->ptype & CPL_DTYPE_MASK) < CPL_INT ) n->type = &type_int;
         }
         else if ( n->oper == Plus || n->oper == Minus )
         {
-            if ( !isArith(n->right->type) ) mccfail("not an arithmetic type");
+            if ( !isArith(n->right->type) ) fail("not an arithmetic type");
             n->type = n->right->type;
             if ( (n->type->ptype & CPL_DTYPE_MASK) < CPL_INT ) n->type = &type_int;
         }
         else if ( n->oper == Inder )
         {
-            if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
+            if ( ~n->right->flag & CPL_LVAL ) fail("not an l-value");
             n->type = typeInder(n->right->type);
         }
         else if ( n->oper == Deref )
         {
-            if ( !isPointer(n->right->type) ) mccfail("not a pointer");
+            if ( !isPointer(n->right->type) ) fail("not a pointer");
             n->type = typeDeref(n->right->type);
 
             n->flag |= CPL_LVAL;
         }
         else if ( n->oper == PreInc || n->oper == PreDec || n->oper == PostInc || n->oper == PostDec )
         {
-            if ( ~n->right->flag & CPL_LVAL ) mccfail("not an l-value");
-            if ( !isScalar(n->right->type) ) mccfail("not a scalar type");
+            if ( ~n->right->flag & CPL_LVAL ) fail("not an l-value");
+            if ( !isScalar(n->right->type) ) fail("not a scalar type");
             n->type = n->right->type;
 
             // According to cppreference.com, these operators never result in an l-value
         }
         else if ( n->oper == Dot )
         {
-            if ( !isStruct(n->left->type) ) mccfail("lhs is not a struct");
-            if ( isPointer(n->left->type) ) mccfail("lhs is a pointer");
+            if ( !isStruct(n->left->type) ) fail("lhs is not a struct");
+            if ( isPointer(n->left->type) ) fail("lhs is a pointer");
 
             int8_t * name = n->right->name;
             int16_t len = n->right->val;
 
             if ( n->right->oper == Variable ) name = n->right->sym->name, len = n->right->sym->len;
-            else if ( n->right->oper != Named ) mccfail("rhs is not named symbol");
+            else if ( n->right->oper != Named ) fail("rhs is not named symbol");
 
             struct mccsym * ms = getSymbol( n->left->type->stype, name, len );
 
 //            dumpNamespace( 2, n->left->type->stype );
-            if ( !ms ) mccfail("rhs is not a member of lhs");
+            if ( !ms ) fail("rhs is not a member of lhs");
 
             n->type = &ms->type;
             n->flag |= CPL_LVAL;
@@ -645,21 +645,21 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Arrow )
         {
-            if ( !isStruct(n->left->type ) ) mccfail("lhs is not a struct type");
-            if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
+            if ( !isStruct(n->left->type ) ) fail("lhs is not a struct type");
+            if ( !isPointer(n->left->type) ) fail("lhs is not a pointer");
 
             struct mccsubtype * s = n->left->type->sub;
-            if ( s->sub || s->inder + s->arrays != 1 ) mccfail("lhs not a pointer to struct");
+            if ( s->sub || s->inder + s->arrays != 1 ) fail("lhs not a pointer to struct");
 
             int8_t * name = n->right->name;
             int16_t len = n->right->val;
 
             if ( n->right->oper == Variable ) name = n->right->sym->name, len = n->right->sym->len;
-            else if ( n->right->oper != Named ) mccfail("rhs is not named symbol");
+            else if ( n->right->oper != Named ) fail("rhs is not named symbol");
 
             struct mccsym * ms = getSymbol( n->left->type->stype, name, len );
 
-            if ( !ms ) mccfail("rhs is not a member of lhs");
+            if ( !ms ) fail("rhs is not a member of lhs");
 
             n->type = &ms->type;
             n->flag |= CPL_LVAL;
@@ -671,14 +671,14 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Square_L )
         {
-            if ( !isPointer(n->left->type) ) mccfail("lhs is not a pointer");
-            if ( !isInteger(n->right->type) ) mccfail("rhs is not an integer type");
+            if ( !isPointer(n->left->type) ) fail("lhs is not a pointer");
+            if ( !isInteger(n->right->type) ) fail("rhs is not an integer type");
             n->type = typeDeref(n->left->type);
             n->flag |= CPL_LVAL;
         }
         else if ( n->oper == Cast )
         {
-            if ( n->right && !isScalar(n->right->type) ) mccfail("rhs of cast is not a scalar");
+            if ( n->right && !isScalar(n->right->type) ) fail("rhs of cast is not a scalar");
 
             // Type of cast is pre-defined
 
@@ -690,9 +690,9 @@ struct, union: (In addition to pointers above)
             struct mccsubtype * s;
             for ( s = n->type->sub; s->sub; s = s->sub );
 
-            if ( !s->ftype ) mccfail("lhs is not a function");
+            if ( !s->ftype ) fail("lhs is not a function");
 
-            if ( s->ftype->symtbl ) mccfail("function expects arguments");
+            if ( s->ftype->symtbl ) fail("function expects arguments");
 
             s->ftype = NULL;
 
@@ -704,7 +704,7 @@ struct, union: (In addition to pointers above)
             struct mccsubtype * s;
             for ( s = n->type->sub; s->sub; s = s->sub );
 
-            if ( !s->ftype ) mccfail("lhs is not a function");
+            if ( !s->ftype ) fail("lhs is not a function");
 
             struct mccnode * fan, * fsn;
             struct mccsym * cursym;
@@ -716,7 +716,7 @@ struct, union: (In addition to pointers above)
             fan = fsn->left;
             // Insert last Arg node
             fsn->left = sbrk(sizeof(struct mccnode CAST_NAME));
-            if ( fsn->left == SBRKFAIL ) mccfail( "unable to allocate room for new argument node");
+            if ( fsn->left == SBRKFAIL ) fail( "unable to allocate room for new argument node");
             fsn = fsn->left;
             
             fsn->oper = Arg;
@@ -725,7 +725,7 @@ struct, union: (In addition to pointers above)
             fsn->right = fan; // Place first arg in correct spot
             
             fsn->left = sbrk(sizeof(struct mccnode CAST_NAME));
-            if ( fsn->left == SBRKFAIL ) mccfail( "unable to allocate room for new StartOfArgs node");
+            if ( fsn->left == SBRKFAIL ) fail( "unable to allocate room for new StartOfArgs node");
             fsn = fsn->left;
             
             fsn->oper = StartOfArgs;
@@ -747,7 +747,7 @@ struct, union: (In addition to pointers above)
                     writeType( 2, fan->type, NULL, 0 );
                     write( 2, "\n", 1 );
 #endif
-                    mccfail("incompatible argument");
+                    fail("incompatible argument");
                 }
 #ifdef DEBUG_TYPECHECK
                 else
@@ -759,8 +759,8 @@ struct, union: (In addition to pointers above)
                 if ( fan == n->right ) { cursym = cursym->next; break; }
             }
 
-            if ( cursym ) mccfail("not enough arguments");
-            if ( fan != n->right && (s->ftype->type & CPL_NSPACE_MASK) != CPL_VFUNC ) mccfail("too many arguments");
+            if ( cursym ) fail("not enough arguments");
+            if ( fan != n->right && (s->ftype->type & CPL_NSPACE_MASK) != CPL_VFUNC ) fail("too many arguments");
 
             // Just drop the function namespace to get the return type
             s->ftype = NULL;
@@ -769,9 +769,9 @@ struct, union: (In addition to pointers above)
         }
         else if ( n->oper == Comma ) n->type = n->right->type, n->flag = n->right->flag; // No rules for ,
 #ifdef DEBUG_TYPECHECK
-        else mccfail("no typecheck rule for operator");
+        else fail("no typecheck rule for operator");
 
-        if (!n->type) mccfail("no promotion rule for operator");
+        if (!n->type) fail("no promotion rule for operator");
 #endif
 
         if ( n->oper == Colon || n->oper == Comma );
@@ -829,7 +829,7 @@ struct, union: (In addition to pointers above)
                     default:
                         writeToken( 2, n->oper );
                         write( 2, "\n", 1 );
-                        mccfail("unknown constant expr operator");
+                        fail("unknown constant expr operator");
 #endif
                 }
 

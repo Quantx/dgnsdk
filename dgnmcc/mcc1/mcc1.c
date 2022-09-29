@@ -24,7 +24,7 @@ int16_t main( int16_t argc, int8_t ** argv )
 /*
 #if DEBUG
     // Sanity check to make sure we can store all constants in a char
-    if ( FnCall > 0xFF ) mccfail("too many constants!");
+    if ( FnCall > 0xFF ) fail("too many constants!");
 
     int16_t tnc = (sizeof(mccTokenNames)/sizeof(*mccTokenNames));
     int16_t tkc = (FnCall - Void) + 1;
@@ -34,18 +34,18 @@ int16_t main( int16_t argc, int8_t ** argv )
         write(2, "\n", 1);
         decwrite(2, tkc);
         write(2, "\n", 1);
-        mccfail("debug token count missmatch");
+        fail("debug token count missmatch");
     }
 
 #endif
 */
     // Open output files
-    if ( (segs[SEG_ZERO] = creat( "zero.seg", 0666 )) < 0 ) mccfail("failed to create zero segment");
-//    if ( (segs[SEG_TEXT] = creat( "text.seg", 0666 )) < 0 ) mccfail("failed to create text segment");
+    if ( (segs[SEG_ZERO] = creat( "zero.seg", 0666 )) < 0 ) fail("failed to create zero segment");
+//    if ( (segs[SEG_TEXT] = creat( "text.seg", 0666 )) < 0 ) fail("failed to create text segment");
     segs[SEG_TEXT] = 1; // Use stdout for text segment
-    if ( (segs[SEG_CNST] = creat( "cnst.seg", 0666 )) < 0 ) mccfail("failed to create cnst segment");
-    if ( (segs[SEG_DATA] = creat( "data.seg", 0666 )) < 0 ) mccfail("failed to create data segment");
-    if ( (segs[SEG_BSS ] = creat(  "bss.seg", 0666 )) < 0 ) mccfail("failed to create bss segment");
+    if ( (segs[SEG_CNST] = creat( "cnst.seg", 0666 )) < 0 ) fail("failed to create cnst segment");
+    if ( (segs[SEG_DATA] = creat( "data.seg", 0666 )) < 0 ) fail("failed to create data segment");
+    if ( (segs[SEG_BSS ] = creat(  "bss.seg", 0666 )) < 0 ) fail("failed to create bss segment");
 
     // Process all argument options
     while ( argc && **argv == '-' )
