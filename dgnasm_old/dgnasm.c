@@ -373,10 +373,11 @@ int16_t main( int16_t argc, int8_t ** argv )
         // Output start block
         header[0] = 1;
         header[1] = (stksize ? stksize << 10 : 256) + entrypos;
-        header[2] = -1 - header[1];
 
         // Should we enable auto-start
         if ( flags & FLG_SMHA ) header[1] |= 0x8000;
+
+        header[2] = -1 - header[1];
 
         write( ofd, header, 6 );
     }
