@@ -60,12 +60,16 @@ void printOper( struct mccoper * prop )
         }
         else
         {
-            write( fd_dbg, "Comp L: ", 8 );
-            decwrite( fd_dbg, prop->c.l_arg );
-            if (prop->flags & L_ARG_INDER) write( fd_dbg, "I", 1 );
-            write( fd_dbg, "|", 1 );
-            decwrite( fd_dbg, prop->c.l_size );
-            write( fd_dbg, "B\n", 2 );
+            // Don't print Comp L of Unary Operators
+            if (!((op > OpPush && op < OpLogNot) || op == OpNot || (op > OpNegate && op < OpFloatToFloat)))
+            {
+                write( fd_dbg, "Comp L: ", 8 );
+                decwrite( fd_dbg, prop->c.l_arg );
+                if (prop->flags & L_ARG_INDER) write( fd_dbg, "I", 1 );
+                write( fd_dbg, "|", 1 );
+                decwrite( fd_dbg, prop->c.l_size );
+                write( fd_dbg, "B\n", 2 );
+            }
         
             write( fd_dbg, "Comp R: ", 8 );
             decwrite( fd_dbg, prop->c.r_arg );

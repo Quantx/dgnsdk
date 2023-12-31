@@ -60,8 +60,8 @@ struct mccstmt * node()
     if ( rv < sizeof(struct mccstmt CAST_NAME) || out->oper == EndOfFile )
     {
 #ifdef DEBUG_NODE
-        if ( rv < 0 ) write( 2, "ERROR", 5 );
-        else write( 2, "DONE", 4 );
+        if ( rv < 0 ) write( 2, "ERROR\n", 6 );
+        else write( 2, "DONE\n", 5 );
 #endif
         return NULL;
     }

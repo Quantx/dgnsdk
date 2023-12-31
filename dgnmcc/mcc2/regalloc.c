@@ -10,17 +10,20 @@ void writeVar(int16_t fd, struct mccvar * wv)
     
     switch ( wv->flags & VAR_ALC_MASK )
     {
-        case VAR_ALC_ZP: write( fd, "zeropage", 9 ); break;
-        case VAR_ALC_MM: write( fd, "main_mem", 9 ); break;
-        case VAR_ALC_DA: write( fd, "dontaloc", 9 ); break;
-        case VAR_ALC_NA: write( fd, "not_aloc", 9 ); break;
+        case VAR_ALC_ZP: write( fd, "zeropage", 8 ); break;
+        case VAR_ALC_MM: write( fd, "main_mem", 8 ); break;
+        case VAR_ALC_DA: write( fd, "dontaloc", 8 ); break;
+        case VAR_ALC_NA: write( fd, "not_aloc", 8 ); break;
     }
     
-    write( fd, ":reg:", 5 );
-    decwrite( fd, wv->reg );
+    if (wv->flags & VAR_ALC_REG_VALID)
+    {
+        write( fd, ":reg=", 5 );
+        decwrite( fd, wv->reg );
+    }
 //    write( fd, ":addr:", 6 );
 //    decwrite( fd, wv->addr );
-    write( fd, ":size:", 6 );
+    write( fd, ":size=", 6 );
     decwrite( fd, wv->size );
 }
 #endif
@@ -98,7 +101,10 @@ void spillBlock(int16_t level, unsigned int8_t spr)
     for ( cv = curfunc->vartbl; cv; cv = cv->next )
     {
         // Check if the variable is above the current level and allocated in zp
-        if ( cv->stmt >= level && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) cv->flags = VAR_ALC_MM;
+        if ( cv->stmt >= level && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) {
+            cv->flags &= ~VAR_ALC_MASK;
+            cv->flags |= VAR_ALC_MM;
+        }
     }
 }
 
@@ -189,8 +195,25 @@ void regalloc(struct mcceval * cn)
             unsigned int8_t af = av->flags & VAR_ALC_MASK;
             if ( af == VAR_ALC_MM || af == VAR_ALC_NA )
             {
+                struct mccvar * cv, * oav = NULL;
+                unsigned int16_t free_reg = curfunc->z_size + 1;
+
+                for ( cv = curfunc->vartbl; cv; cv = cv->next )
+                {
+                    // Only look at variables who were allocated previously
+                    if ((~cv->flags & VAR_ALC_REG_VALID) || (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP) continue;
+
+                    if (!oav || cv->reg < oav->reg) oav = cv;
+                }
+
+                if (oav)
+                {
+                    // Take over the old allocated variable's register
+                    av->reg = oav->reg;
+                    oav->flags &= ~VAR_ALC_REG_VALID;
+                }
                 // There is room left so allocate variable to end of current zero page region
-                if ( curfunc->z_size + 1 <= MAX_REG )
+                else if ( curfunc->z_size + 1 <= MAX_REG )
                 {
                     av->reg = curfunc->z_size;
                     curfunc->z_size++;// += z_size;
@@ -199,14 +222,12 @@ void regalloc(struct mcceval * cn)
                 // We're full, find the register which was accessed the longest ago
                 else
                 {
-                    struct mccvar * cv, * oav;
-                
                     for ( cv = curfunc->vartbl; cv; cv = cv->next )
                     {
                         // Only look at variables which are currently held in zero page
                         if ( (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP
                         // Check if this variable was last accessed longer ago
-                        && (cv == curfunc->vartbl || cv->lac < oav->lac) ) oav = cv;
+                        && (!oav || cv->lac < oav->lac) ) oav = cv;
                     }
                     
                     if (!oav) mccfail("Failed make room for new variable in zero page, vartbl was empty");
@@ -218,7 +239,7 @@ void regalloc(struct mcceval * cn)
                 }
 
                 av->stmt = stmttop - 1;
-                av->flags = VAR_ALC_ZP; // Make sure to spill all conflicting variables, before marking this as no longer in the stack
+                av->flags = VAR_ALC_REG_VALID | VAR_ALC_ZP; // Make sure to spill all conflicting variables, before marking this as no longer in the stack
                 
                 // Load the address of this new variable into the allocated register
                 if ( av->len ) // Global variable
@@ -245,8 +266,8 @@ void regalloc(struct mcceval * cn)
     struct mccvar * cv;
     for ( cv = curfunc->vartbl; cv; cv = cv->next )
     {
-        writeVar(2, cv);
-        write(2, "\n", 1);
+        writeVar(fd_dbg, cv);
+        write(fd_dbg, "\n", 1);
     }
 #endif
 }

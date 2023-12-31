@@ -46,6 +46,7 @@ struct mccfcst
 #define VAR_ALC_DA 2 // Don't allocate (used for arrays, structs, and functions), also used when the address of a variable is taken
 #define VAR_ALC_NA 3 // Not allocated anywhere
 #define VAR_ALC_MASK 0b11
+#define VAR_ALC_REG_VALID 4 // This is set when the mccvar.reg field is valid. This can remain set even after the var is unallocated.
 
 struct mccvar
 {
