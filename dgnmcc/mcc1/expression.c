@@ -361,8 +361,26 @@ struct mccnode * expr(struct mccnsp * curnsp, unsigned int8_t stk)
 
     root = n = *nstk;
 
+    char path[32];
+    unsigned int32_t ctns;
+    unsigned int16_t path_pos;
+    int16_t i;
+    
 #if DEBUG_EXPR
-    dumpTree( root, "expr_tree.dot" );
+    char * expr_path = "tree/expr0000000000.dot";
+    for (i = 0; expr_path[i]; i++) {
+        path[i] = expr_path[i];
+    }
+    path[i] = '\0';
+    ctns = ctn;
+    path_pos = 18;
+    while (ctns) {
+        path[path_pos] = (ctns & 7) + '0';
+        path_pos--;
+        ctns >>= 3;
+    }
+
+    dumpTree( root, path );
 #endif
 
 
@@ -868,7 +886,20 @@ struct, union: (In addition to pointers above)
     }
 
 #if DEBUG_TYPECHECK
-    dumpTree( root, "type_tree.dot" );
+    char * type_path = "tree/type0000000000.dot";
+    for (i = 0; type_path[i]; i++) {
+        path[i] = type_path[i];
+    }
+    path[i] = '\0';
+    ctns = ctn;
+    path_pos = 18;
+    while (ctns) {
+        path[path_pos] = (ctns & 7) + '0';
+        path_pos--;
+        ctns >>= 3;
+    }
+
+    dumpTree( root, path );
 #endif
 
     return root;

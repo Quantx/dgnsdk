@@ -55,7 +55,7 @@ enum
     // r_arg -> reg (If r_arg == reg then this is a no-op)
     OpMov,
     // Logical operations
-    OpLogOr, OpLogAnd, OpLogNot,
+    OpLogNot, OpLogOr, OpLogAnd,
     OpEq, OpNeq,
     OpLess_S, OpLessEq_S, OpGreat_S, OpGreatEq_S,
     OpLess_U, OpLessEq_U, OpGreat_U, OpGreatEq_U, // Unsigned is also used for pointers

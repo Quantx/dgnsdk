@@ -58,7 +58,7 @@ int8_t * mccTokenNames[] = {
     "void", "int", "short", "char", "float", "long", "double",
     "enum", "struct", "union",
     "signed", "unsigned",
-    "extern",
+    "extern", "volatile",
     "auto", "static", "register", "const",
     "if", "else", "switch", "case", "default",
     "break", "continue", "return",

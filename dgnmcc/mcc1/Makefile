@@ -8,7 +8,7 @@ debug: $(files)
 	gcc -fno-builtin-exit -g -rdynamic -DLINUX_COMPAT=1 -DDEBUG=1 -o mcc1 mcc1.c
 
 preproc: $(files)
-	gcc -E -P mcc1.c -o preproc_mcc1.c
+	gcc -E mcc1.c -o preproc_mcc1.c
 
 clean:
 	rm -f *.o *.seg *.dot mcc1 a.out preproc_mcc1.c
