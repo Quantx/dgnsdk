@@ -524,7 +524,7 @@ void define( struct mccnsp * curnsp )
 #endif
 
             // Anonymous struct, inherit parent offset
-            if ( !decnsp->name ) decnsp->addr = curnsp->size;
+            if ( !decnsp->name ) decnsp->addr = curnsp->addr + curnsp->size;
 
             ntok();
             if ( cnsp == CPL_ENUM )
@@ -752,7 +752,7 @@ void define( struct mccnsp * curnsp )
             else
             {
                 if ( (curnsp->size & 1) && tsz > 1 ) curnsp->size += (pad = 1); // Align to word if needed
-                cursym->addr = curnsp->size;
+                cursym->addr = curnsp->addr + curnsp->size;
                 curnsp->size += tsz;
             }
 
