@@ -8,18 +8,15 @@ void writeVar(int16_t fd, struct mccvar * wv)
     
     write( fd, ":", 1 );
     
-    switch ( wv->flags & VAR_ALC_MASK )
+    switch (wv->flags & VAR_ALC_MASK)
     {
-        case VAR_ALC_ZP: write( fd, "zeropage", 8 ); break;
+        case VAR_ALC_ZP:
+            write( fd, "zeropage:reg=", 13 );
+            decwrite( fd, wv->reg );
+            break;
         case VAR_ALC_MM: write( fd, "main_mem", 8 ); break;
         case VAR_ALC_DA: write( fd, "dontaloc", 8 ); break;
         case VAR_ALC_NA: write( fd, "not_aloc", 8 ); break;
-    }
-    
-    if (wv->flags & VAR_ALC_REG_VALID)
-    {
-        write( fd, ":reg=", 5 );
-        decwrite( fd, wv->reg );
     }
 //    write( fd, ":addr:", 6 );
 //    decwrite( fd, wv->addr );
@@ -95,17 +92,23 @@ void spill(struct mccvar * sv, unsigned int8_t spr)
 */
 
 // Spill all variables allocated within the last block
-void spillBlock(int16_t level, unsigned int8_t spr)
+void spillBlock(int16_t level)
 {
+    unsigned int16_t z_top = 0;
     struct mccvar * cv;
     for ( cv = curfunc->vartbl; cv; cv = cv->next )
     {
-        // Check if the variable is above the current level and allocated in zp
-        if ( cv->stmt >= level && (cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) {
-            cv->flags &= ~VAR_ALC_MASK;
-            cv->flags |= VAR_ALC_MM;
+        if ((cv->flags & VAR_ALC_MASK) == VAR_ALC_ZP) {
+            // Check if the variable is above the current level and allocated in zp
+            if (cv->stmt >= level) {
+                cv->flags &= ~VAR_ALC_MASK;
+                cv->flags |= VAR_ALC_MM;
+            } else if (cv->reg >= z_top) {
+                z_top = cv->reg + 1;
+            }
         }
     }
+    curfunc->z_size = z_top;
 }
 
 /* No need to spill globals, since the we're using indirection for everything now which solves the aliasing problem
@@ -196,8 +199,7 @@ void regalloc(struct mcceval * cn)
             if ( af == VAR_ALC_MM || af == VAR_ALC_NA )
             {
                 struct mccvar * cv, * oav = NULL;
-                unsigned int16_t free_reg = curfunc->z_size + 1;
-
+/*
                 for ( cv = curfunc->vartbl; cv; cv = cv->next )
                 {
                     // Only look at variables who were allocated previously
@@ -212,11 +214,11 @@ void regalloc(struct mcceval * cn)
                     av->reg = oav->reg;
                     oav->flags &= ~VAR_ALC_REG_VALID;
                 }
+*/                
                 // There is room left so allocate variable to end of current zero page region
-                else if ( curfunc->z_size + 1 <= MAX_REG )
+                if ( curfunc->z_size < MAX_REG )
                 {
-                    av->reg = curfunc->z_size;
-                    curfunc->z_size++;// += z_size;
+                    av->reg = curfunc->z_size++;
 //                    if ( curfunc->z_size > curfunc->z_max ) curfunc->z_max = curfunc->z_size;
                 }
                 // We're full, find the register which was accessed the longest ago
@@ -239,7 +241,7 @@ void regalloc(struct mcceval * cn)
                 }
 
                 av->stmt = stmttop - 1;
-                av->flags = VAR_ALC_REG_VALID | VAR_ALC_ZP; // Make sure to spill all conflicting variables, before marking this as no longer in the stack
+                av->flags = VAR_ALC_ZP; // Make sure to spill all conflicting variables, before marking this as no longer in the stack
                 
                 // Load the address of this new variable into the allocated register
                 if ( av->len ) // Global variable
@@ -269,5 +271,9 @@ void regalloc(struct mcceval * cn)
         writeVar(fd_dbg, cv);
         write(fd_dbg, "\n", 1);
     }
+
+    write(fd_dbg, "Z Size: ", 8);
+    decwrite(fd_dbg, curfunc->z_size);
+    write(fd_dbg, "\n", 1);
 #endif
 }

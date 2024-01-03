@@ -124,7 +124,7 @@ void statement( struct mccstmt * st )
             if ( !stop || stop->oper != If ) mccfail("ELSE does not follow IF");
             
             // Spill at the end of a block which may never execute
-            spillBlock( stmttop - 1, curfunc->z_size );
+            spillBlock( stmttop - 1 );
             
             optr->op = OpElse;
             optr->s.id = stop->val;
@@ -234,7 +234,7 @@ void statement( struct mccstmt * st )
             
             if ( !cs ) mccfail("Case or Default outside of switch");
 
-            spillBlock( stmttop, curfunc->z_size );
+            spillBlock( stmttop );
         
             optr->op = st->oper == Case ? OpCase : OpDefault;
             optr->s.id = cs->st->val;
@@ -270,7 +270,7 @@ void statement( struct mccstmt * st )
             
             if ( !cl ) mccfail("Break or Continue outside of loop");
             
-            spillBlock( stmttop - 1, curfunc->z_size );
+            spillBlock( stmttop - 1 );
             
             optr->op = st->oper == Break ? OpBreak : OpContinue;
             optr->s.id = cl->st->val;
@@ -316,7 +316,7 @@ void statement( struct mccstmt * st )
                     generate(stmtstk[stmttop].ev);
                 }
             
-                spillBlock( stmttop, curfunc->z_size );
+                spillBlock( stmttop );
             }
             
             optr->op = OpEnd;

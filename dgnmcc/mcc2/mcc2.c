@@ -2,9 +2,6 @@
 
 #include "../../lib/utils.c"
 
-//int16_t zerosize; // Current size of the zero page resident portion of the local stack
-int16_t locsize; // Current size of the local stack
-
 #include "node.c"
 #include "function.c"
 #include "expression.c"
@@ -14,14 +11,6 @@ int16_t locsize; // Current size of the local stack
 
 int16_t main( int16_t argc, int8_t ** argv )
 {
-    // Process all argument options
-    while ( argc && **argv == '-' )
-    {
-        (*argv)++;
-
-        argv++; argc--;
-    }
-
 #ifdef DEBUG
     if ( (sizeof(opNames) / sizeof(*opNames)) != _OpListCount ) mccfail( "OpNames length doesn't match OpList legnth" );
 #endif

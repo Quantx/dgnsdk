@@ -6,7 +6,7 @@ struct mcceval * estk[MAX_EXPR_NODE];
 
 struct mcceval * expr(struct mccstmt * nd)
 {
-    if ( nd && nd->oper == Void ) return NULL; // Nothing to do here, this is a void expression
+    if ( !nd || nd->oper == Void ) return NULL; // Nothing to do here, this is a void expression
 
     // Deserialize and reconstruct expression tree
     struct mcceval * ev = sbrk(sizeof(struct mcceval CAST_NAME));
@@ -86,6 +86,39 @@ struct mcceval * expr(struct mccstmt * nd)
 #ifdef DEBUG
     write( 2, "Ingest done\n", 12 );
 #endif
+
+    // Reverse function call arguments
+    ev = root;
+    etop = 0;
+    while ( ev || etop ) // Preorder
+    {
+        if (!ev) {
+            ev = estk[--etop]->right;
+            continue;
+        }
+
+        if (ev->st->oper == FnCallArgs) {
+            struct mcceval * fa, * temp;
+            // Reverse each argument node
+            for (fa = ev->right; fa->st->oper != StartOfArgs; fa = fa->parent) {
+                temp = fa->parent;
+                fa->parent = fa->left;
+                fa->left = temp;
+            }
+
+            // Fixup first and last Arg node
+            ev->right->left = fa;
+            fa->parent->parent = ev;
+
+            // Fixup FnCallArgs & StartOfArgs nodes
+            temp = fa->parent;
+            fa->parent = ev->right;
+            ev->right = temp;
+        }
+
+        estk[etop++] = ev;
+        ev = ev->left;
+    }
 
     return root;
 }

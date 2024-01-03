@@ -34,7 +34,7 @@ void printOper( struct mccoper * prop )
         // Output dest register
         write( fd_dbg, "Dest: ", 6 );
         decwrite( fd_dbg, prop->reg );
-        if (prop->flags & REG_INDER) write( fd_dbg, "I", 1 );
+        if (prop->flags & REG_WR_INDER) write( fd_dbg, "I", 1 );
         write( fd_dbg, "|", 1 );
         decwrite( fd_dbg, prop->size );
         write( fd_dbg, "B\n", 2 );
@@ -61,7 +61,7 @@ void printOper( struct mccoper * prop )
         else
         {
             // Don't print Comp L of Unary Operators
-            if (!((op > OpPush && op < OpLogNot) || op == OpNot || (op > OpNegate && op < OpFloatToFloat)))
+            if (!((op >= OpArg && op <= OpLogNot) || op == OpNot || (op >= OpNegate && op <= OpFloatToFloat)))
             {
                 write( fd_dbg, "Comp L: ", 8 );
                 decwrite( fd_dbg, prop->c.l_arg );
@@ -189,23 +189,39 @@ void generate(struct mcceval * cn)
                 {
                     if ( op == Ass )
                     {
-                        // Overwrite destination register of computed value (lhs) with a pointer to the computed destination (rhs)
-                        l_op->reg = r_op->reg;
-                        l_op->size = r_op->size;
-                        l_op->flags |= REG_INDER;
-                        
-                        optr--; // Don't generate a new instruction (this should be harmless)
+                        if (ev->left->st->oper >= Ass && ev->left->st->oper <= OrAss) {
+                            optr->op = OpMov;
+                            optr->reg = r_op->reg;
+                            optr->size = r_op->size;
+                            optr->flags = REG_RD_INDER | REG_WR_INDER;
+
+                            optr->c.r_arg = l_op->reg;
+                            optr->c.r_size = l_op->size;
+                            if ( l_op->flags & REG_RD_INDER ) optr->flags |= R_ARG_INDER;
+                        } else {
+                            /* Quick shortcut if the left operator is not also an assignment
+                                Remember: the left and right hand sides are switched on assigments
+                                so it'll look like this: 4 = myvar;
+                            */
+
+                            // Overwrite destination register of computed value (lhs) with a pointer to the computed destination (rhs)
+                            l_op->reg = r_op->reg;
+                            l_op->size = r_op->size;
+                            l_op->flags |= REG_RD_INDER | REG_WR_INDER;
+                            
+                            optr--; // Don't generate a new instruction (this should be harmless)
+                        }
                     }
                     else
                     {
                         // Preform modification
                         optr->reg = r_op->reg;
                         optr->size = r_op->size;
-                        optr->flags = REG_INDER | R_ARG_INDER;
+                        optr->flags = REG_RD_INDER | REG_WR_INDER | R_ARG_INDER;
                         
                         optr->c.l_arg = l_op->reg;
                         optr->c.l_size = l_op->size;
-                        if ( l_op->flags & REG_INDER ) optr->flags |= L_ARG_INDER;
+                        if ( l_op->flags & REG_RD_INDER ) optr->flags |= L_ARG_INDER;
                         
                         optr->c.r_arg = r_op->reg;
                         optr->c.r_size = r_op->size;
@@ -218,13 +234,13 @@ void generate(struct mcceval * cn)
                             case SubAss:
                                 optr->op = opc == OP_CLASS_POINTER ? OpSub_P : OpSub;
                                 break;
-                            case Mul:
+                            case MulAss:
                                 optr->op = opc == OP_CLASS_SIGNED ? OpMul_S : OpMul_U;
                                 break;
-                            case Div:
+                            case DivAss:
                                 optr->op = opc == OP_CLASS_SIGNED ? OpDiv_S : OpDiv_U;
                                 break;
-                            case Mod:
+                            case ModAss:
                                 optr->op = opc == OP_CLASS_SIGNED ? OpMod_S : OpMod_S;
                                 break;
                             case ShlAss:
@@ -254,16 +270,16 @@ void generate(struct mcceval * cn)
                     if ( r_op->reg >= curfunc->z_size ) stkadj( -r_op->size );
                     
                     optr->reg = evlstk;
-                    optr->flags = ev->st->type & IR_LVAL ? REG_INDER : 0;
+                    optr->flags = ev->st->type & IR_LVAL ? REG_RD_INDER : 0;
                     stkadj( optr->size = ev->st->size );
                     
                     optr->c.l_arg = l_op->reg;
                     optr->c.l_size = l_op->size;
-                    if ( l_op->flags & REG_INDER ) optr->flags |= L_ARG_INDER;
+                    if ( l_op->flags & REG_RD_INDER ) optr->flags |= L_ARG_INDER;
                     
                     optr->c.r_arg = r_op->reg;
                     optr->c.r_size = r_op->size;
-                    if ( r_op->flags & REG_INDER ) optr->flags |= R_ARG_INDER;
+                    if ( r_op->flags & REG_RD_INDER ) optr->flags |= R_ARG_INDER;
                     
                     switch ( op )
                     {
@@ -359,12 +375,12 @@ void generate(struct mcceval * cn)
                 
                 // Move the result to the eval stack if needed
                 optr->reg = evlstk;
-                optr->flags = ev->st->type & IR_LVAL ? REG_INDER : 0;
+                optr->flags = ev->st->type & IR_LVAL ? REG_RD_INDER : 0;
                 stkadj( optr->size = ev->st->size );
                 
                 optr->c.r_arg = r_op->reg;
                 optr->c.r_size = r_op->size;
-                if ( r_op->flags & REG_INDER ) optr->flags |= R_ARG_INDER;
+                if ( r_op->flags & REG_RD_INDER ) optr->flags |= R_ARG_INDER;
 
                 switch ( op )
                 {
@@ -450,13 +466,13 @@ void generate(struct mcceval * cn)
                     if ( (ev->var->flags & VAR_ALC_MASK) == VAR_ALC_ZP ) // Allocated in zero page
                     {
                         // Use a Nop to pass along the address
-                        // This MOV instruction can be repurpoused by an assignment
+                        // This instruction can be repurpoused by an assignment
                         optr->op = OpNop;
                         optr->reg = ev->var->reg;
                         // The size of the pointer is implicit, based on the size of the type we're looking up
                         // E.g. 1 byte = byte pointer, 2 byte = word pointer, >2 byte = word pointer + offsets (w. multiple loads)
                         optr->size = ev->var->size;
-                        optr->flags = REG_INDER;
+                        optr->flags = REG_RD_INDER | REG_WR_INDER;
                         
 //                        ev->st->type &= ~IR_LVAL; // This is not an l-value
                     }
@@ -475,7 +491,7 @@ void generate(struct mcceval * cn)
                         optr->a.val = ev->st->val;
 
                         optr->reg = evlstk;
-                        optr->flags = REG_INDER;
+                        optr->flags = REG_RD_INDER | REG_WR_INDER;
                         
                         stkadj( optr->size = IR_PTR_SIZE );
 
@@ -521,11 +537,11 @@ void generate(struct mcceval * cn)
         // Inderection (Address-of) strips l-value
         if ( pv && pv->st->oper == Inder )
         {
-            optr->flags &= ~REG_INDER;
+            optr->flags &= ~REG_RD_INDER;
             ev->st->type &= ~IR_LVAL;
         }
 
-/* This is handled implicitly by the REG_INDER flag now
+/* This is handled implicitly by the REG_RD_INDER/REG_WR_INDER flag now
         // Preform l-to-r value conversion
         if ( ev->st->type & IR_LVAL )
         {
