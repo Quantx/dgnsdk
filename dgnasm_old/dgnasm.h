@@ -34,6 +34,7 @@ enum {
     ASM_BSS,  // .bss  directive
     ASM_ZERO, // .zero directive
     ASM_GLOB, // .glob directive
+    ASM_FILL, // .fill directive
     ASM_LOC,  // .loc  directive
     ASM_ENT,  // .ent  directive
     ASM_WSTR, // .wstr directive

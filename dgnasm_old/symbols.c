@@ -102,6 +102,7 @@ struct instruct insts[] = {
     { ".BSS",  4, ASM_BSS,  0, CPU_BASE, 0 },
     { ".ZERO", 5, ASM_ZERO, 0, CPU_BASE, 0 },
     { ".GLOB", 5, ASM_GLOB, 0, CPU_BASE, 0 },
+    { ".FILL",  5, ASM_FILL,  0, CPU_BASE, 0 },
     { ".LOC",  4, ASM_LOC,  0, CPU_BASE, 0 },
     { ".ENT",  4, ASM_ENT,  0, CPU_BASE, 0 },
     { ".WSTR", 5, ASM_WSTR, 0, CPU_BASE, 0 },

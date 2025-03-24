@@ -470,19 +470,40 @@ void assemble( int8_t * fpath )
 
             ntok(); // Get comma or next statement
         }
+        // Assembler .fill directive
+        else if ( tk == ASM_FILL )
+        {
+            ntok();
+            if ( tk != TOK_NUM ) asmfail("expected a number");
+            
+            unsigned int16_t size = tkVal;
+            unsigned int16_t fill = 0;
+            
+            ntok();
+            if ( curseg != &bss && tk == TOK_ARG ) { // Fill value specified
+                ntok();
+                if ( tk != TOK_NUM ) asmfail("expected a number");
+                fill = tkVal;
+            }
+            
+            while ( size )
+            {
+                if ( curseg != &bss ) segset( curseg, SYM_ABS, fill );
+                curseg->data.pos++;
+                size--;
+            }
+        }
         // Assembler .loc directive
         else if ( tk == ASM_LOC )
         {
             ntok();
             if ( tk != TOK_NUM ) asmfail("expected a number");
 
-            while ( tkVal )
+            while ( curseg->data.pos < tkVal )
             {
                 // Don't actually write to bss
                 if ( curseg != &bss ) segset( curseg, SYM_ABS, 0 );
                 curseg->data.pos++;
-
-                tkVal--;
             }
 
             ntok();

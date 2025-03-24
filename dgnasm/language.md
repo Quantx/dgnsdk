@@ -6,18 +6,16 @@ This document defines an assembly syntax for the Data General Nova macro assembl
 
 # Registers
 ## Common
-Note that the PC is only 15 bits.
+Note that the PC, SP and FP registers are only 15 bits. When writing to them bit-0 (MSB) will be discarded. When reading from them bit-0 (MSB) will be zero.
+
 ```
 PC : Program counter
-AC0, AC1, AC2, AC3 : Accumulators
-IOA, IOB, IOC : I/O Registers
-```
-
-## Stack
-Note that these registers are only 15 bits. When writing to them bit-0 (MSB) will be discarded. When reading from them bit-0 (MSB) will be zero.
-```
+A0, A1, A2, A3 : Accumulators
 SP : Stack Pointer
 FP : Frame Pointer
+
+ACS : Used to denote a source accumulator
+ACD : Used to denote a destination accumulator
 ```
 
 ## Floating Point
@@ -36,7 +34,9 @@ IDEV : Interrupting device code (read-only)
 SWR : Front Console Switch Register (read-only)
 ```
 
-# Special Assembly Labels
+# Labels
+
+# System Defined Labels
 The following labels refer to special memory locations on a Nova/Eclipse and may be referenced even if they have not been declared anywhere in a given program.
 
 ## Interrupts
@@ -56,34 +56,34 @@ The `TRP_RET` label refers to address `046 (octal)` or `0x27 (hex)`. When a `TRA
 
 # Memory Access
 ## Load/Store Byte
+Transfers a byte from the least significant 8 bits of an accumulator (left argument) into the memory address contained in the (right argument).
 ```
-LDB AC#, [AC#]
-STB AC#, [AC#]
+LDB ACD, AC
+STB ACS, AC
 ```
 
 ## Load/Store Word
+Transfers a byte between accumulator and a specified memory location. If the `@` modifier is specified, then the specified memory location is used as a pointer to the actual location. If the pointer itself has it's MSB set to one (by specifying the `@` prefix on a label) then the value pointed to is also assumed to be a pointer. This check is repeated forever until a value is found with it's MSB set to zero which is considered to be the final pointer.
+
 ```
-LDA AC#, @[<8-Bit Absolute Address>]
-STA AC#, @[<8-Bit Absolute Address>]
+LD[Nothing|@] ACD, <8-Bit Absolute Address>
+ST[Nothing|@] ACS, <8-Bit Absolute Address>
+	
+LD[Nothing|@] ACD, <Zero Page Label>
+ST[Nothing|@] ACS, <Zero Page Label>
 
-LDA AC#, @[<Zero Page Label>]
-STA AC#, @[<Zero Page Label>]
+LD[Nothing|@] ACD, PC ± <Signed 8-Bit Offset>
+ST[Nothing|@] ACS, PC ± <Signed 8-Bit Offset>
 
-LDA AC#, @[PC, <(Nothing)|Signed 8-Bit Offset>]
-STA AC#, @[PC, <(Nothing)|Signed 8-Bit Offset>]
+LD[Nothing|@] ACD, A2 ± <Signed 8-Bit Offset>
+ST[Nothing|@] ACS, A2 ± <Signed 8-Bit Offset>
 
-LDA AC#, @[AC2, <(Nothing)|Signed 8-Bit Offset>]
-STA AC#, @[AC2, <(Nothing)|Signed 8-Bit Offset>]
-
-LDA AC#, @[AC3, <(Nothing)|Signed 8-Bit Offset>]
-STA AC#, @[AC3, <(Nothing)|Signed 8-Bit Offset>]
-
-LDA AC#, [IO#, 6-Bit Device Code], <(NOTHING)|SET|CLR|PLS>
-STA AC#, [IO#, 6-Bit Device Code], <(NOTHING)|SET|CLR|PLS>
+LD[Nothing|@] ACD, A3 ± <Signed 8-Bit Offset>
+ST[Nothing|@] ACS, A3 ± <Signed 8-Bit Offset>
 ```
 
-## Load/Store Long (uses AC0|AC1 as a 32-bit value)
-Loads/Stores 2 words from memory into AC0|AC1 as a 32-bit value. This is a useful shorthand for working with `MUL` and `DIV` instructions.
+## Load/Store Double (uses AC0|AC1 as a 32-bit value)
+Loads/Stores 2 words from memory into AC0|AC1 as a 32-bit value. This is a useful shorthand for working with `MUL[U|S]` and `DIV[U|S]` instructions.
 
 The first word is transfered to/from AC0 (high order bits) and the second word is transfered to/from AC1 (low order bits). This is consistent with the big-endian addressing used by Nova 4 byte operations.
 
@@ -91,94 +91,143 @@ The first word will be stored/loaded from the address specified in the instructi
 
 The provided `<8-Bit Absolute Address>` must not be 0xFF
 ```
-LDL [<8-Bit Absolute Address>]
-STL [<8-Bit Absolute Address>]
+LDD <8-Bit Absolute Address>
+STD <8-Bit Absolute Address>
 
-LDL [<Zero Page Label>]
-STL [<Zero Page Label>]
+LDD <Zero Page Label>
+STD <Zero Page Label>
 ```
 The provided `<Signed 8-Bit Offset>` must not be 0x7F
 ```
-LDL [PC, <Signed 8-Bit Offset>]
-STL [PC, <Signed 8-Bit Offset>]
+LDD PC ± <Signed 8-Bit Offset>
+STD PC ± <Signed 8-Bit Offset>
 
-LDL [AC2, <Signed 8-Bit Offset>]
-STL [AC2, <Signed 8-Bit Offset>]
+LDD AC2 ± <Signed 8-Bit Offset>
+STD AC2 ± <Signed 8-Bit Offset>
 
-LDL [AC3, <Signed 8-Bit Offset>]
-STL [AC3, <Signed 8-Bit Offset>]
-```
-
-## Load/Store Float
-```
-LDF FPAC, [AC#]
-STF FPAC, [AC#]
-```
-
-## Load/Store Double
-```
-LDD FPAC, [AC#]
-STD FPAC, [AC#]
+LDD AC3 ± <Signed 8-Bit Offset>
+STD AC3 ± <Signed 8-Bit Offset>
 ```
 
 # Flow Control
 ## Jump
+Jump to the specified address
+```
+JMP[Nothing|@] <8-Bit Absolute Address>
+JMP[Nothing|@] <Zero Page Label>
 
+JMP[Nothing|@] PC ± <Signed 8-Bit Offset>
+
+JMP[Nothing|@] AC2 ± <Signed 8-Bit Offset>
+
+JMP[Nothing|@] AC3 ± <Signed 8-Bit Offset>
 ```
-JMP @[<8-Bit Absolute Address>]
-JMP @[<Zero Page Label>]
-JMP @[PC, <Signed 8-Bit Offset>]
-JMP @[AC2, <Signed 8-Bit Offset>]
-JMP @[AC3, <Signed 8-Bit Offset>]
-JMP <16-Bit Absolute Address>
-JMP <LABEL>
-```
-For `JMP <16-Bit Absolute Address>` and `JMP <LABEL>` the address will be placed in the word immediately after the `JMP` instruction.
 
 ## Jump and Link
-
 Place next address into AC3 then preform an unconditional jump to the specified address
 ```
-JSR @[<8-Bit Absolute Address>]
-JSR @[<Zero Page Label>]
-JSR @[PC, <Signed 8-Bit Offset>]
-JSR @[AC2, <Signed 8-Bit Offset>]
-JSR @[AC3, <Signed 8-Bit Offset>]
-JSR <16-Bit Absolute Address>
-JSR <LABEL>
+JSR[Nothing|@] <8-Bit Absolute Address>
+JSR[Nothing|@] <Zero Page Label>
+
+JSR[Nothing|@] PC ± <Signed 8-Bit Offset>
+
+JSR[Nothing|@] AC2 ± <Signed 8-Bit Offset>
+
+JSR[Nothing|@] AC3 ± <Signed 8-Bit Offset>
 ```
-For `JSR <16-Bit Absolute Address>` and `JSR <LABEL>` the address will be placed in the word immediately after the `JSR` instruction.
 
 ## Modify and Test
 Increment value at indicated address by 1 and skip next instruction if result is zero
 ```
-ISZ @[<8-Bit Absolute Address>]
-ISZ @[<Zero Page Label>]
-ISZ @[PC, <Signed 8-Bit Offset>]
-ISZ @[AC2, <Signed 8-Bit Offset>]
-ISZ @[AC3, <Signed 8-Bit Offset>]
+ISZ[Nothing|@] <8-Bit Absolute Address>
+ISZ[Nothing|@] <Zero Page Label>
+
+ISZ[Nothing|@] PC ± <Signed 8-Bit Offset>
+
+ISZ[Nothing|@] AC2 ± <Signed 8-Bit Offset>
+
+ISZ[Nothing|@] AC3 ± <Signed 8-Bit Offset>
 ```
+
 Decrement value at indicated address by 1 and skip next instruction if result is zero
 ```
-DSZ @[<8-Bit Absolute Address>]
-DSZ @[<Zero Page Label>]
-DSZ @[PC, <Signed 8-Bit Offset>]
-DSZ @[AC2, <Signed 8-Bit Offset>]
-DSZ @[AC3, <Signed 8-Bit Offset>]
+DSZ[Nothing|@] <8-Bit Absolute Address>
+DSZ[Nothing|@] <Zero Page Label>
+
+DSZ[Nothing|@] PC ± <Signed 8-Bit Offset>
+
+DSZ[Nothing|@] AC2 ± <Signed 8-Bit Offset>
+
+DSZ[Nothing|@] AC3 ± <Signed 8-Bit Offset>
+```
+
+# Extended Immediate Addressing
+To simplify addressing memory locations outside zero page, extended-immediate mode macros are available for all standard memory instructions. These macros attempt to place a constant containing the memory location within a -128 to +127 range of the instruction itself. This is accomplished by inserting the constant after an ALU instruction that does not have a skip condition specified. The ALU instruction will be modified to skip over the inserted constant.
+
+If no suitable ALU instruction can be located within the -128 to +127 region, the following instructions will be emitted instead.
+```  
+<IMM_INST> PC + 2
+JMP PC + 2
+<LABEL|16-Bit Constant>
+```
+
+## Load/Store
+
+Transfer the contents of the memory address specified by the label or constant to/from the accumulator.
+```
+LDI ACD, <LABEL>
+LDI ACD, <16-Bit Constant>
+
+STI ACS, <LABEL>
+STI ACS, <16-Bit Constant>
+```
+
+## Jump
+Jump to the address specified by the label or constant.
+```
+JMPI <LABEL>
+JMPI <16-Bit Constant>
+```
+
+## Jump and Link
+Place next address into AC3 then preform an unconditional jump to the address specified by the label or constant.
+```
+JSRI <LABEL>
+JSRI <16-Bit Constant>
+```
+
+## Modify and Test
+Increment value at the address specified by the label or constant by 1 and skip next instruction if result is zero.
+```
+ISZI <LABEL>
+ISZI <16-Bit Constant>
+```
+
+Decrement value at the address specified by the label or constant by 1 and skip next instruction if result is zero.
+```
+DSZI <LABEL>
+DSZI <16-Bit Constant>
+```
+
+## Move
+Places the value of the label or constant into the specified accumulator.
+```
+MVI ACD, <LABEL>
+MVI ACD, <16-Bit Constant>
 ```
 
 # Arithmetic & Logic Flags
-## Carry Control
+## Carry Modifiers
 ```
-SET : Set Carry to one before operation
-CLR : Set Carry to zero before operation
-INV : Invert Carry before operation
+Z = Set Carry to 0 before operation
+O = Set Carry to 1 before operation
+C = Complement (invert) Carry before operation
 ```
-## Shift Control
+## Shift Modifiers
 ```
-SHL : Shift result left one bit (MSB goes into Carry)
-SHR : Shift result right one bit (LSB goes into Carry)
-SWP : Swap the upper and lower byte of the result (Carry unaffected)
+L : 17-bit Rotate result left one bit with (MSB goes into Carry)
+R : 17-bit Rotate result right one bit (LSB goes into Carry)
+S : Swap the upper and lower byte of the result (Carry unaffected)
 ```
 ## Skip Condition
 If `#` is L (Load) : Place result in destination accumulator then preform skip
@@ -187,8 +236,7 @@ If `#` is T (Test) : Preform skip without modifying the destination accumulator
 
 ```
 (Nothing) : Place result in destination
-LSKP : Place result in destination accumulator and skip the next instruction.
-TSKP : Skip the next instruction without modifying the destination accumulator. This is effectively a jump instruction.
+SKP : Place result in destination accumulator and skip the next instruction.
 
 #CZ : Skip if the Carry bit is zero
 #CN : Skip if the Carry bit is non-zero
@@ -197,120 +245,58 @@ TSKP : Skip the next instruction without modifying the destination accumulator. 
 #EZ : Skip if either the Carry or Result (or both) are zero
 #BN : Skip if both the Carry and Result are non-zero
 ```
-# Move
-## Accumulator to Accumulator
+## Move
 This operation does not affect the carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 
 ```
-MOV <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+MOV <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
-## Accumulator to/from FP Accumulator
-Place bits 1-7 of Accumulator into bits 1-7 (exponent) of FP Accumulator
-```
-FSPUT #AC, FPAC
-FDPUT #AC, FPAC
-```
+## Empty
 
-Place the most significant 16 bits of FP Accumulator into Accumulator
-```
-FSGET AC#, FPAC
-FDGET AC#, FPAC
-```
-
-## FP Accumulator to FP Accumulator
-```
-FSMOV FPAC, FPTM
-FSMOV FPTM, FPAC
-```
-
-# Empty
-## Accumulator
-Set all bits of AC# to zero
+Set all bits of AC to zero
 
 This operation does not affect the carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 ```
-EMT <(NOTHING)|SET|CLR|INV>, ACD#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+EMT <(NOTHING)|SET|CLR|INV>, ACD, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 
 Decodes as (invert carry selection behavior as this will toggle the carry bit):
-SUB <(NOTHING)|SET|CLR|INV>, ACD#, ACD# <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+SUB <(NOTHING)|SET|CLR|INV>, ACD, ACD <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
-## FP Accumulator
-Set all bits of FPAD to zero
-```
-EMT FPAC
-```
-# Fill
-## Accumulator
-Set all bits of AC# to one
+## Fill
+Set all bits of AC to one
 
 This operation does not affect the carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 ```
-FIL <(NOTHING)|SET|CLR|INV>, ACD#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+FIL <(NOTHING)|SET|CLR|INV>, ACD, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 
 Decodes as (invert cary selection behavior as this will toggle the carry bit):
-ADC <(NOTHING)|SET|CLR|INV>, ACD#, ACD# <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+ADC <(NOTHING)|SET|CLR|INV>, ACD, ACD <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
-# Addition
-## Add Accumulator to Accumulator
+## Addition
 Add the unsigned value of source to destination. If this operation produces a carry value of 1, then invert the Carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 ```
-ADD <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
-```
-
-## Add value in memory to FP Accumulator
-Add two words in memory to the floating point accumulator
-```
-FSADD [AC#]
-```
-Add four words in memory to the floating point accumulator
-```
-FDADD [AC#]
+ADD <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
-## Add FP Accumulator to FP Accumulator
-Add FP Temp to FP Accumulator
-```
-FSADD TEMP
-FDADD TEMP
-```
-
-# Subtract
-## Subtract Accumulator from Accumulator
+## Subtract
 Subtract the unsigned value of the source from the destination. If this operation produces a carry value of 1, then invert the Carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 ```
-SUB <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
-```
-
-## Subtract value in memory from FP Accumulator
-Subtract two words in memory from the floating point accumulator
-```
-FSSUB [AC#]
-```
-Subtract four words in memory from the floating point accumulator
-```
-FDSUB [AC#]
+SUB <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
-## Subtract FP Accumulator from FP Accumulator
-```
-FSSUB FPTM
-FDSUB FPTM
-```
-
-# Multiply
-## Multiply Accumulator
+## Multiply
 Unsigned multiplication
 ```
 MULU
@@ -320,24 +306,7 @@ Signed multiplication
 MULS
 ```
 
-## Multiply value in memory with FP Accumulator
-Multiply two words in memory with the floating point accumulator
-```
-FSMUL [AC#]
-```
-Multiply four words in memory with the floating point accumulator
-```
-FDMUL [AC#]
-```
-
-## Multiply FP Accumulator with FP Accumulator
-```
-FSMUL FPTM
-FDMUL FPTM
-```
-
-# Division
-## Divide Accumulator by Accumulator
+## Division
 Unsigned division
 ```
 DIVU
@@ -347,102 +316,52 @@ Signed division
 DIVS
 ```
 
-## Divide value in memory with FP Accumulator
-Divide floating point accumulator by two words in memory
-```
-FSDIV [AC#]
-```
-Divide floating point accumulator by four words in memory
-```
-FDDIV [AC#]
-```
-
-## Divide FP Accumulator by FP Accumulator
-Divide first argument by second argument
-```
-FSDIV FPTM
-FDDIB FPTM
-```
-
-# Negation
-## Negate Accumulator
+## Negation
 Take the value of the source register as two's compliment and negate it. If the source register was zero, then invert the carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 ```
-NEG <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
-```
-
-## Negate FP Accumulator
-Invert the sign bit of the floating point accumulator
-```
-FNEG
+NEG <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
-# Absolute Value
-## Accumulator
-Place the unsigned absolute value of ACS# into ACD#
+## Absolute Value
+Place the unsigned absolute value of ACS into ACD
 
-This operation inverts the carry bit if ACS# was negative
+This operation inverts the carry bit if ACS was negative
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 ```
-ABS <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+ABS <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 
 Decodes as:
 MOV <(NOTHING)|SET|CLR|INV>, ACS, ACS, SHL, TCZ
 NEG INV, ACD, ACS <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
-## FP Accumulator Absolute
-Set the most significant bit (sign bit) to zero
-```
-FABS
-```
-
-# Scale
-## Scale FP Accumulator
-Scale the FP Accumulator according to the contents of bits 1-7 of the specified accumulator
-```
-FSCL AC#
-```
-
-# Normalize
-## Normalize Accumulator
-Normalize `AC0|AC1`
-```
-NORM
-```
-## Normalize FP Accumulator
-Normalize the Floating Point Accumulator
-```
-FNORM
-```
-
 # Bitwise Operations
 ## Not
 Invert all the bits in source. Does not affect the carry bit. For legacy purpouses, `COM` is a valid alias for `NOT`
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 
 ```
-NOT <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+NOT <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 ## And
 Compute the bitwise and of the source and destination. Does not affect the carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 
 ```
-AND <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+AND <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
 ## Or
-Compute the bitwise or of the source and destination. Alters the carry bit if `ACS# < ACD#`
+Compute the bitwise or of the source and destination. Alters the carry bit if `ACS < ACD`
 
 ```
-OR ACD#, ACS#
+OR ACD, ACS
 
 Decodes as:
 NOT ACS, ACS
@@ -450,55 +369,64 @@ AND ACD, ACS
 ADC ACD, ACS ; Compliments carry bit if ACS < ACD
 NOT ACS, ACS
 ```
+
 ## Xor
 Compute the bitwise xor of the source and destination. Destroys the carry bit.
 
 ```
-XOR ACD#, ACS#, ACT#
+XOR ACD, ACS
 
 Decodes as:
-MOV ACT, ACD
-AND CLR, ACT, ACS, SHL ; Destroys carry
+PSH AC3
+MOV AC3, ACD
+AND CLR, AC3, ACS, SHL ; Destroys carry
 ADD ACD, ACS
-SUB ACD, ACT
+SUB ACD, AC3
+POP AC3
 ```
 
-# Increment
-## Increment Accumulator
+The following alternate syntax is a vailable is you do not wish to use the stack. This uses fewer instructions but needs an extra temporary accumulator and may be preferable on systems without a hardware stack.
+
+```
+XOR ACD, ACS, ACT#
+
+Decodes as:
+MOV ACT#, ACD
+AND CLR, ACT#, ACS, SHL ; Destroys carry
+ADD ACD, ACS
+SUB ACD, ACT#
+```
+
+## Increment
 Add one to the source. If the value in source was 0xFFFF, invert the carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 
 ```
-INC <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+INC <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
-# Decrement
-## Decrement Accumulator
+## Decrement
 Subtract one from the source. If the value in source was 0x0000, invert the carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 
 ```
-DEC <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+DEC <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 
 Decodes as:
 NEG <(NOTHING)|SET|CLR|INV>, ACD, ACS
 INV ACD, ACD, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
 
-# Add Complement
+## Add Complement
 Invert all the bits in source and add to destination. If the value in source is less than the value in destination, invert the carry bit.
 
-Order of operations: Modify Carry --> Preform Operation --> Shift Result --> Evaluate Skip Condition
+Order of operations: Modify Carry → Preform Operation → Shift Result → Evaluate Skip Condition
 
 ```
-ADC <(NOTHING)|SET|CLR|INV>, ACD#, ACS#, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
+ADC <(NOTHING)|SET|CLR|INV>, ACD, ACS, <(NOTHING)|SHL|SHR|SWP>, <(NOTHING)|LSKP|LCZ|LCN|LRZ|LRN|LEZ|LBN|TSKP|TCZ|TCN|TRZ|TRN|TEZ|TBN>
 ```
-
-# Floating Point Instructions
-
-TODO
 
 # Stack Instructions
 A stack overflow interrupt is generated every time a `PSH` or `SAV` results in a word being saved to an address which is an integral multiple of `256 (decimal)` or `0xFF (hex)`. The interrupt handler should check to see if the stack pointer exceeds the value present at the `STK_LMT` label and act accordingly.
@@ -506,13 +434,13 @@ A stack overflow interrupt is generated every time a `PSH` or `SAV` results in a
 ## Push
 Pushes the contents of the specified accumulator to onto the stack and increments the stack pointer by one.
 ```
-PSH AC#
+PSH ACS
 ```
 
 ## Pop
 Pops a word off the stack and places it into the specified accumulator and decrements the stack pointer by one.
 ```
-POP AC#
+POP ACD
 ```
 
 ## Save
@@ -562,82 +490,91 @@ The 2nd word is deposited into both the FP and AC3.
 After all words are popped, execution will resume from the new value placed into the program counter.
 
 # I/O Instructions
-None of the following I/O instructions will transfer data to or from an accumulator, therefore you are not required to specify one. Regardless, the instruction format does allow for you to specify an accumulator so an optional field is provided should you choose to do so. Otherwise, AC0 will be specified for you
-## Control
-Set the Busy Flag & Clear the Done Flag
+These instructions allow for the control of I/O devices which are addressed by a 6-bit device code.
+
+## Modifiers
+I/O Control Signal Modifiers
 ```
-IO SET <6-Bit Device Code>, <Nothing|AC0|AC1|AC2|AC3>
-```
-Clear both Busy & Done flags
-```
-IO CLR <6-Bit Device Code>, <Nothing|AC0|AC1|AC2|AC3>
-```
-Send an Pulse to the device
-```
-IO PLS <6-Bit Device Code>, <Nothing|AC0|AC1|AC2|AC3>
-```
-## Conditional
-Skip conditions
-```
-SBZ : Skip if the busy flag is zero
-SBN : Skip if the busy flag is non-zero
-SDZ : Skip if the done flag is zero
-SDN : Skip if the done flag is non-zero
-```
-Skip next instruction if condition is true
-```
-IO <SBZ|SBN|SDZ|SDN> <6-Bit Device Code>, <Nothing|AC0|AC1|AC2|AC3>
+S = Sets the busy flag to 1
+C = Clears the busy flag to 0
+P = Sends a pulse to the device
 ```
 
+I/O Skip Conditions
+```
+BN = Branch if Busy flag is 1
+BZ = Branch if Busy flag is 0
+DN = Branch if Done flag is 1
+DZ = Branch if Doen flag is 0
+```
 
-# GET & PUT Instructions
-These instructions are used to transfer between an accumulator and a system register. Some additional arguments may be allowed/required depending on the type transfer.
+## Flag Instructions
+Sends the specified control signal to an I/O device
+```
+IO[Nothing|S|C|P] <6-Bit Device Code>
+```
+
+Checks either the Busy or Done flag based on the specified skip condition and then skips the next insturction if it passes.
+```
+IO[BN|BZ|DN|DZ] <6-Bit Device Code>
+```
+
+## Data Instructions
+Transfers the contents of the specified accumulator to/from the A, B, or C register of an I/O device. Additionally sends the specified control signal to the I/O device.
+
+```
+IO[A|B|C][Nothing|S|C|P] ACD, <6-Bit Device Code>
+IO[A|B|C][Nothing|S|C|P] <6-Bit Device Code>, ACS
+```
+
+# Move Register
+These instructions are used to transfer between an accumulator and another register. Some additional arguments may be allowed/required depending on the type transfer.
 
 ```  
-GET AC#, <Register> : Transfer from Register to AC#
-PUT AC#, <Register> : Transfer from AC# to Register
+MVR ACD, <Register> : Transfer from Register to ACD
+MVR <Register>, ACS : Transfer from ACS to Register
 ```
 
 ## System Control Registers
 
-Transfer AC# to the interrupt mask. Do not use while interrupts are enabled. Modifies the interrupt enable flag as desired.
+Transfer AC to the interrupt mask. Do not use while interrupts are enabled. Modifies the interrupt enable flag as desired.
 ```
-PUT AC#, IMSK, <Nothing|INTEN|INTDS>
-```
-
-Transfer the 6-bit device code of the interrupting device to AC#. Modifies the interrupt enable flag as desired.
-```
-GET AC#, IDEV, <Nothing|INTEN|INTDS>
+MVR IMSK, ACS, <Nothing|INTEN|INTDS>
 ```
 
-Transfer the contents of the front panel's switches to AC#. Modifies the interrupt enable flag as desired.
+Transfer the 6-bit device code of the interrupting device to AC. Modifies the interrupt enable flag as desired.
 ```
-GET #AC, SWR, <Nothing|INTEN|INTDS>
+MVR ACS, IDEV, <Nothing|INTEN|INTDS>
+```
+
+Transfer the contents of the front panel's switches to AC. Modifies the interrupt enable flag as desired.
+```
+MVR ACS, SWR, <Nothing|INTEN|INTDS>
 ```
 
 ## Stack Pointer
-```
-GET AC#, SP
-PUT AC#, SP
+```  
+MVR ACD, SP
+MVR SP, ACS
 ```
 
 ## Frame Pointer
 ```
-GET AC#, FP
-PUT AC#, FP
+MVR ACD, FP
+MVR FP, ACS
 ```
 
 ## Floating Point Status
 ```
-GET AC#, FPST
-PUT AC#, FPST
+MVR ACD, FPST
+MVR FPST, ACS
 ```
 
 # System Instructions
 ## Reset
 Send a reset pulse to all I/O devices. Modifies the interrupt enable flag as desired.
 ```
-IO RST, <Nothing|INTEN|INTDS>
+IORST, <Nothing|INTEN|INTDS>
 ```
 
 ## Interrupt Control
@@ -671,6 +608,6 @@ HALT <Nothing|INTEN|INTDS>
 Triggers a system trap interrupt
 ```
 TRAP <11-Bit Value>
-TRAP AC#, <9-Bit Value>
-TRAP AC#, AC#, <7-Bit Value>
+TRAP AC, <9-Bit Value>
+TRAP AC, AC, <7-Bit Value>
 ```
